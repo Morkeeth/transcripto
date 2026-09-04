@@ -25,7 +25,7 @@ PROG = _prog()
 # packaging. A stranger who reads the README on GitHub and installs from PyPI can be
 # holding a different build than the one the README describes, and until this flag
 # existed there was no way for them to tell which.
-VERSION = "0.1.4"
+VERSION = "0.1.5"
 
 USAGE = """
   %(p)s index                 build / refresh the index (incremental)
