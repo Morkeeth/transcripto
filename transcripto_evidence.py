@@ -42,14 +42,16 @@ def reference(path, line, record_hash, source_hash):
 def retrieve(con, query, match, limit):
     rows = con.execute(
         "SELECT m.session_id,m.session_file,m.source_line,m.record_sha256,m.ts,m.cwd,"
-        "m.harness,m.prompt_source,m.text,i.sha256 FROM messages_fts "
+        "m.harness,m.prompt_source,m.text,i.sha256,m.origin_session_id,m.inherited,m.timestamp_basis FROM messages_fts "
         "JOIN messages m ON m.id=messages_fts.rowid JOIN indexed i ON i.session_file=m.session_file "
         "WHERE messages_fts MATCH ? AND m.is_human=1 ORDER BY m.ts DESC,m.source_line DESC LIMIT ?",
         (match, limit)).fetchall()
     hits = []
-    for sid, path, line, record_hash, ts, cwd, provider, psrc, text, source_hash in rows:
+    for sid, path, line, record_hash, ts, cwd, provider, psrc, text, source_hash, origin_sid, inherited, timestamp_basis in rows:
         hits.append({"session_id": sid, "provider": provider, "timestamp": ts or None,
                      "cwd": cwd or None, "authorship": authorship(provider, psrc),
+                     "origin_session_id": origin_sid, "inherited": bool(inherited) if inherited is not None else None,
+                     "timestamp_basis": timestamp_basis,
                      "text": text, "source": reference(path, line, record_hash, source_hash),
                      "inspect": ["transcripto", "replay", path, "--json"]})
     return {"schema": "transcripto.ask/1", "query": query,

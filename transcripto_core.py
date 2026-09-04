@@ -312,16 +312,29 @@ def read_session(path, diagnostics=None):
     rows, harness, sid, cwd = [], "claude", os.path.splitext(os.path.basename(path))[0], ""
     calls, results = {}, []
     last_ts = ""
+    owner_sid, context_sid, history_boundary, session_kind = None, None, None, None
     for d in iter_json(path, diagnostics):
         if d.get("type") == "session_meta":
             harness = "codex"
             p = d.get("payload") or {}
-            sid, cwd = p.get("id") or sid, p.get("cwd") or cwd
+            if owner_sid is None:
+                owner_sid = p.get("id") or sid
+                history_boundary = p.get("subagent_history_start_ordinal")
+                session_kind = p.get("thread_source")
+            context_sid = p.get("id") or owner_sid
+            sid, cwd = owner_sid, p.get("cwd") or cwd
+            continue
+        if d.get("type") == "turn_context" and harness == "codex":
+            cwd = (d.get("payload") or {}).get("cwd") or cwd
             continue
         if d.get("type") == "response_item":
             harness = "codex"
             p = d.get("payload") or {}
             meta = {"timestamp": d.get("timestamp", ""), "cwd": cwd, "sessionId": sid, "_line": d["_line"], "_record_sha256": d["_record_sha256"]}
+            ordinal = d.get("ordinal")
+            inherited = (ordinal < history_boundary) if isinstance(ordinal, int) and isinstance(history_boundary, int) else None
+            meta.update(_inherited=inherited, _origin_session_id=context_sid if inherited else owner_sid,
+                        _session_kind=session_kind, _timestamp_basis="native record" if d.get("timestamp") else "unknown")
             pt = p.get("type")
             if pt == "message":
                 text = text_of(p.get("content"))
@@ -345,6 +358,8 @@ def read_session(path, diagnostics=None):
                 d = dict(meta, type="user", message={"role": "user", "content": [{
                     "type": "tool_result", "tool_use_id": p.get("call_id"),
                     "content": p.get("output")}]})
+            elif pt == "agent_message":
+                d = dict(meta, type="user", promptSource="agent", message={"role": "user", "content": text_of(p.get("content", p.get("message", "")))})
             else:
                 continue
         elif {"session_id", "ts", "text"}.issubset(d) and "message" not in d:
@@ -363,6 +378,7 @@ def read_session(path, diagnostics=None):
             if d["type"] == "user" and match:
                 d["promptSource"] = "typed"
                 msg["content"] = match.group(1)
+            d["_timestamp_basis"] = "native record" if d.get("timestamp") else ("context clock, carried forward" if last_ts else "unknown")
             d.update(timestamp=d.get("timestamp") or last_ts, sessionId=sid)
         if d.get("type") not in ("user", "assistant"):
             continue
@@ -410,10 +426,12 @@ def episodes(rows, source=""):
     """One submitted request per episode. Never absorb a later human request."""
     out, current = [], None
     for row in rows:
+        if current is not None and current.get("inherited") is True and row.get("_inherited") is False:
+            current = None  # child actions cannot become consequences of an inherited parent request
         prompt = human_text(row)
         if prompt:
             current = {"prompt": prompt, "line": row.get("_line"), "timestamp": row.get("timestamp", ""),
-                       "source": source, "session_id": row.get("sessionId", ""), "events": [], "reply": ""}
+                       "source": source, "session_id": row.get("sessionId", ""), "inherited": row.get("_inherited"), "events": [], "reply": ""}
             out.append(current)
             continue
         if current is None or row.get("type") != "assistant":
@@ -432,6 +450,7 @@ def episodes(rows, source=""):
                 current["events"].append({"tool": b.get("original_name", b.get("name")),
                     "kind": operation(b), "target": str(target), "status": b.get("execution_status", "unknown"),
                     "evidence": b.get("evidence", "No matching tool result recorded."),
+                    "timestamp": row.get("timestamp") or None,
                     "line": row.get("_line"), "result_line": b.get("result_line")})
         if isinstance(content, str):
             current["reply"] = text_of(content)

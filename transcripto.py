@@ -7,6 +7,7 @@ import sys, os, json, glob, re, sqlite3, argparse, math
 import transcripto_core as core
 import transcripto_sources as sources
 import transcripto_evidence as evidence
+import transcripto_continuity as continuity
 from transcripto_replay import cmd_replay
 from datetime import datetime, timezone
 
@@ -91,7 +92,7 @@ def connect(require_index=True):
     return con
 
 
-SCHEMA_VERSION = 4  # source-line and content-version references
+SCHEMA_VERSION = 5  # source references and inherited-context provenance
 
 
 def _needs_rebuild(con):
@@ -124,7 +125,8 @@ def init_schema(con):
       id INTEGER PRIMARY KEY, session_id TEXT, session_file TEXT, project TEXT,
       ts TEXT, role TEXT, cwd TEXT, git_branch TEXT, text TEXT,
       is_human INTEGER DEFAULT 0, prompt_source TEXT, harness TEXT,
-      source_line INTEGER, record_sha256 TEXT);
+      source_line INTEGER, record_sha256 TEXT, origin_session_id TEXT,
+      inherited INTEGER, session_kind TEXT, timestamp_basis TEXT);
     -- porter stemming: `ask "frustration"` also matches frustrated/frustrating.
     CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
       text, content='messages', content_rowid='id', tokenize="porter unicode61");
@@ -157,7 +159,8 @@ def init_schema(con):
     DROP VIEW IF EXISTS v_messages;
     CREATE VIEW v_messages AS
       SELECT id, session_id, project, ts, role, cwd, git_branch, text,
-             is_human, prompt_source, harness, session_file, source_line, record_sha256 FROM messages;
+             is_human, prompt_source, harness, session_file, source_line, record_sha256,
+             origin_session_id, inherited, session_kind, timestamp_basis FROM messages;
     """)
     con.execute("PRAGMA user_version=%d" % SCHEMA_VERSION)
     con.commit()
@@ -298,8 +301,8 @@ def _index_once(con, progress=False):
             psrc = d.get("promptSource")
             if text:
                 cur = con.execute(
-                    "INSERT INTO messages(session_id,session_file,project,ts,role,cwd,git_branch,text,is_human,prompt_source,harness,source_line,record_sha256)"
-                    " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", (sid, f, proj, ts, role, cwd, gb, text, human, psrc, harness, d.get('_line'), d.get('_record_sha256')))
+                    "INSERT INTO messages(session_id,session_file,project,ts,role,cwd,git_branch,text,is_human,prompt_source,harness,source_line,record_sha256,origin_session_id,inherited,session_kind,timestamp_basis)"
+                    " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (sid, f, proj, ts, role, cwd, gb, text, human, psrc, harness, d.get('_line'), d.get('_record_sha256'), d.get('_origin_session_id') or sid, d.get('_inherited'), d.get('_session_kind'), d.get('_timestamp_basis') or ('native record' if ts else 'unknown')))
                 con.execute("INSERT INTO messages_fts(rowid,text) VALUES(?,?)", (cur.lastrowid, text))
                 msgs += 1
             for action, path in fl:
@@ -434,6 +437,17 @@ def cmd_find(args):
 
 
 def cmd_trace(args):
+    if getattr(args, 'json', False) or getattr(args, 'from_line', None) is not None or getattr(args, 'to_line', None) is not None:
+        if not os.path.isfile(os.path.expanduser(args.query)):
+            print('For a source timeline, pass the transcript path returned by ask --json.', file=sys.stderr)
+            return 2
+        try:
+            report = continuity.session(args.query, args.from_line, args.to_line)
+        except (OSError, ValueError) as exc:
+            print(core.safe_text(str(exc)), file=sys.stderr)
+            return 2
+        print(json.dumps(report, indent=2) if args.json else core.safe_text(continuity.describe(report)))
+        return 0
     replay = argparse.Namespace(target=args.query, episode=None, events=12, limit=args.limit,
         all=args.all, failures=False, demo=False, json=False, share=False)
     return cmd_replay(replay, _coach_files(_coach_roots(args.root, args.harness), args.harness))
@@ -1508,22 +1522,29 @@ def _resolve_run(target, roots, harness):
         return None
     if target == "latest":
         for path in sorted(paths, key=os.path.getmtime, reverse=True):
-            if any(core.human_text(r) for r in _rows_for_file(path)[0]):
+            if any(core.human_text(r) and r.get('_inherited') is not True and r.get('_session_kind') != 'subagent' for r in _rows_for_file(path)[0]):
                 return path
         return None
     hits = [p for p in paths if os.path.basename(p).startswith(target)]
     if not hits:                     # codex names rollouts rollout-<date>-<id>.jsonl
         hits = [p for p in paths if target in os.path.basename(p)]
-    return max(hits, key=os.path.getmtime) if hits else None
+    if len(hits) > 1:
+        raise ValueError('Session prefix is ambiguous; pass a full transcript path.')
+    return hits[0] if hits else None
 
 
 def export_run(path):
     """The run-level numbers of one transcript file, as a JSON-ready dict."""
+    document = continuity.session(path)
     rows, harness = _rows_for_file(path)
+    if evidence.version(path)['sha256'] != document['source_version']['sha256']:
+        raise ValueError('source changed while building run summary; retry')
+    inherited_count = sum(r.get('_inherited') is True for r in rows)
+    rows = [r for r in rows if r.get('_inherited') is not True]
     sid = next((r.get("sessionId") for r in rows if r.get("sessionId")), "") \
         or os.path.splitext(os.path.basename(path))[0]
     cwd = next((r.get("cwd") for r in reversed(rows) if r.get("cwd")), "")
-    stamps = [e for e in (_epoch(r.get("timestamp")) for r in rows) if e is not None]
+    stamps = [e for e in (_epoch(r.get("timestamp")) for r in rows if r.get('_timestamp_basis', 'native record') == 'native record') if e is not None]
     start, end = (min(stamps), max(stamps)) if stamps else (None, None)
     typed, corrections = count_corrections(rows)
     tool_calls, files = 0, set()
@@ -1537,7 +1558,13 @@ def export_run(path):
     commits = _reflog_commits(cwd, start, end) if cwd and start is not None and end is not None else None
     return {
         "schema": "transcripto.export-run/1",
-        "session_id": sid,
+        "session_id": document['identity']['session_id'],
+        "identity": document['identity'],
+        "source_version": document['source_version'],
+        "repository": document['repository'],
+        "coverage": document['coverage'],
+        "inherited_records_excluded": inherited_count,
+        "work_state": "unknown",
         "project": cwd,
         "harness": harness,
         "transcript": path,
@@ -1552,23 +1579,49 @@ def export_run(path):
         "files_touched": sorted(files),
         "commits_in_window": len(commits) if commits is not None else None,
         "commits": commits,
-        "proxy": ("typed_turns is the authorship gate (typed/queued, never meta, "
-                  "sidechain or tool output); correction_rate is a lexical estimate; "
+        "proxy": ("typed_turns is the legacy request-envelope count; human typing is unknown for Codex/Cursor. "
+                  "Inherited parent records are excluded; correction_rate is a lexical estimate; "
                   "commits_in_window is this tree's reflog inside the run window, "
                   "null when the project is not a git repo."),
     }
 
 
 def cmd_export_run(args):
+    if getattr(args, "check", False):
+        try:
+            report = continuity.check_packet(args.target)
+        except (OSError, ValueError) as exc:
+            print(core.safe_text(str(exc)), file=sys.stderr)
+            return 2
+        print(json.dumps(report, indent=2))
+        return 0 if report['status'] == 'current' else 3
     roots = _coach_roots(args.root, args.harness)
-    path = _resolve_run(args.target, roots, args.harness)
+    try:
+        path = _resolve_run(args.target, roots, args.harness)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     if not path:
         sys.stderr.write("\n  no transcript matches '%s'.\n" % args.target)
         sys.stderr.write("  looked in: %s\n" % ", ".join(roots))
         sys.stderr.write("  pass a session id (or a prefix of one), 'latest', or a path "
                          "to a .jsonl; --root / --harness as for coach.\n\n")
         sys.exit(2)
-    print(json.dumps(export_run(path), indent=2))
+    try:
+        if args.timeline or args.packet:
+            report = continuity.session(path, args.from_line, args.to_line)
+            if args.packet:
+                report = continuity.packet(report, args.question, args.settled_line, args.reversed_line, args.next_action)
+        else:
+            report = export_run(path)
+        if args.output:
+            continuity.write_private(args.output, report)
+            print('Saved local export: ' + core.safe_text(args.output), file=sys.stderr)
+        else:
+            print(json.dumps(report, indent=2))
+    except (OSError, ValueError) as exc:
+        print(core.safe_text(str(exc)), file=sys.stderr)
+        return 2
 
 
 def main():
@@ -1586,6 +1639,9 @@ def main():
     s = sub.add_parser("find"); s.add_argument("name"); s.set_defaults(fn=cmd_find)
     s = sub.add_parser("trace"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=10)
     s.add_argument("-a", "--all", action="store_true", help="show the complete replay sequence")
+    s.add_argument("--json", action="store_true", help="source timeline for an explicit transcript path")
+    s.add_argument("--from-line", type=int)
+    s.add_argument("--to-line", type=int)
     s.set_defaults(fn=cmd_trace)
     s = sub.add_parser("sessions"); s.add_argument("-n", "--limit", type=int, default=30)
     s.add_argument("--all", action="store_true",
@@ -1615,6 +1671,17 @@ def main():
     s.add_argument("--root", help="look in this transcript dir instead of ~/.claude/projects")
     s.add_argument("--harness", choices=["claude", "codex", "cursor"],
                    help="which agent's transcripts to look in. default: all three")
+    mode = s.add_mutually_exclusive_group()
+    mode.add_argument("--timeline", action="store_true", help="versioned source evidence and session identity")
+    mode.add_argument("--packet", action="store_true", help="local continuation packet from an explicit line range")
+    mode.add_argument("--check", action="store_true", help="check a saved packet against current source bytes")
+    s.add_argument("--from-line", type=int)
+    s.add_argument("--to-line", type=int)
+    s.add_argument("--question", help="explicit current-question annotation for a packet")
+    s.add_argument("--settled-line", type=int, action="append", default=[], help="caller-reviewed request line; may repeat")
+    s.add_argument("--reversed-line", type=int, action="append", default=[], help="caller-reviewed reversed request line; may repeat")
+    s.add_argument("--next-action", help="explicit next-action annotation for a packet")
+    s.add_argument("--output", help="create a new private local file; never overwrite")
     s.set_defaults(fn=cmd_export_run)
     s = sub.add_parser("replay", help="replay requests and their recorded tool results")
     s.add_argument("target", nargs="?", default="latest", help="latest, a transcript path, or words from a request")
@@ -1634,6 +1701,12 @@ def main():
             parser.add_argument("--root", help="read transcripts in this directory")
             parser.add_argument("--harness", choices=["claude", "codex", "cursor"], help="default: all three")
     a = p.parse_args(["replay"] if len(sys.argv) == 1 else None)
+    if getattr(a, 'from_line', None) is not None and a.from_line < 1 or getattr(a, 'to_line', None) is not None and a.to_line < 1:
+        p.error('source lines are one-based positive integers')
+    if getattr(a, 'from_line', None) is not None and getattr(a, 'to_line', None) is not None and a.from_line > a.to_line:
+        p.error('from-line must not exceed to-line')
+    if a.cmd == 'export-run' and not a.packet and (a.question or a.settled_line or a.reversed_line or a.next_action):
+        p.error('decision annotations require --packet')
     if getattr(a, "events", 1) < 1 or getattr(a, "limit", 1) < 1 or (getattr(a, "episode", None) is not None and a.episode < 1):
         p.error("episode, events, and limit must be positive")
     if getattr(a, "session", None) and a.target != "latest":
