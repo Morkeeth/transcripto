@@ -11,9 +11,11 @@ your disk and never opens a socket.
 uvx transcripto coach
 ```
 
-> **which build you got.** `uvx transcripto --version` should print **0.1.4**. If `--version`
-> is not a recognised flag at all you are on 0.1.1, which predates `trace`, Cursor support and
-> this README. `uvx --refresh transcripto` forces a fresh resolve past uv's cache.
+> **which build you got.** `uvx transcripto --version` should print **0.1.5**. If it prints
+> **0.1.4** you have the build whose `coach` ranked habits it could not tell apart, printing
+> them under "do more of these" when their 95% interval straddled your own baseline. If
+> `--version` is not a recognised flag at all you are on 0.1.1, which predates `trace`, Cursor
+> support and this README. `uvx --refresh transcripto` forces a fresh resolve past uv's cache.
 >
 > The repo always matches this README and needs nothing installed:
 >
