@@ -10,6 +10,14 @@ Claude Code · Codex · Cursor. Local files. No account. No runtime dependencies
 
 ## Start with something you remember saying
 
+Run `transcripto ask` without a query to discover local histories first.
+It separates missing, empty, unsupported and unreadable sources and shows
+which supported files are new or changed since indexing, without building the
+index. `transcripto index --status --json` exposes this inventory to local
+consumers. Discovery reads bounded file prefixes; unidentified files are
+reported, not silently counted as supported. File modification time is not
+proof of human activity or completed work.
+
 ```sh
 uvx --from transcripto==0.2.0 transcripto ask "retry"
 ```

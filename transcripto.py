@@ -5,6 +5,7 @@ Local transcript inspection for Claude Code, Codex, and Cursor. Stdlib only.
 """
 import sys, os, json, glob, re, sqlite3, argparse, math
 import transcripto_core as core
+import transcripto_sources as sources
 from transcripto_replay import cmd_replay
 from datetime import datetime, timezone
 
@@ -295,12 +296,21 @@ def _index_once(con, progress=False):
 
 
 def cmd_index(args):
+    if getattr(args, "status", False):
+        return cmd_sources(args)
     con = connect(require_index=False); init_schema(con)
     new, msgs = _index_once(con, progress=sys.stderr.isatty())
     if sys.stderr.isatty():
         sys.stderr.write(" " * 60 + "\r"); sys.stderr.flush()
     tot = con.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
     print("indexed %d changed sessions · +%d messages · %d total searchable" % (new, msgs, tot))
+
+
+def cmd_sources(args):
+    report = sources.inventory(ROOTS, HARNESS, DB)
+    print(json.dumps(report, indent=2) if getattr(args, "json", False)
+          else core.safe_text(sources.describe(report)))
+    return 0
 
 
 def cmd_watch(args):
@@ -381,6 +391,8 @@ def cmd_ask(args):
     date + repo + session id + snippet, and opens with a deterministic rollup of
     the arc: how many, how long, which repos, and your latest thought on it.
     """
+    if not args.query:
+        return cmd_sources(args)
     con = connect()
     try:
         rows = con.execute(
@@ -1603,9 +1615,12 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--version", action="version", version="%s %s" % (PROG, VERSION))
     sub = p.add_subparsers(dest="cmd")
-    sub.add_parser("index").set_defaults(fn=cmd_index)
+    s = sub.add_parser("index")
+    s.add_argument("--status", action="store_true", help="discover histories and index coverage without building an index")
+    s.add_argument("--json", action="store_true", help="machine-readable source inventory with --status")
+    s.set_defaults(fn=cmd_index)
     s = sub.add_parser("watch"); s.add_argument("--interval", type=int, default=5); s.set_defaults(fn=cmd_watch)
-    s = sub.add_parser("ask"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=25); s.set_defaults(fn=cmd_ask)
+    s = sub.add_parser("ask"); s.add_argument("query", nargs="?"); s.add_argument("-n", "--limit", type=int, default=25); s.set_defaults(fn=cmd_ask)
     s = sub.add_parser("search"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=25); s.set_defaults(fn=cmd_search)
     s = sub.add_parser("find"); s.add_argument("name"); s.set_defaults(fn=cmd_find)
     s = sub.add_parser("trace"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=10)
