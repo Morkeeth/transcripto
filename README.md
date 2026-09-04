@@ -9,27 +9,18 @@ Missing results stay unknown. A confident closing message changes neither.
 Claude Code · Codex · Cursor. Local. No accounts. No runtime dependencies.
 
 ```sh
-# From this checkout:
-python3 transcripto.py
+uvx --from transcripto==0.2.0 transcripto
 
 # Try a synthetic session without opening your own history:
-python3 transcripto.py replay --demo
+uvx --from transcripto==0.2.0 transcripto replay --demo
 ```
 
-**Release status:** this checkout is **0.2.0**. PyPI's previous **0.1.5** does not
-have replay. Until 0.2.0 is published, use the checkout or install it locally:
+Or install with `python3 -m pip install transcripto==0.2.0`, then run
+`transcripto`. Requires Python 3.9 or newer.
 
-```sh
-git clone https://github.com/Morkeeth/transcripto
-cd transcripto
-python3 -m pip install .
-transcripto --version
-transcripto replay --demo
-```
-
-After the release is published, `uvx --from transcripto==0.2.0 transcripto`
-opens your latest human session. Pinning the version makes the reviewed build
-and the build you run the same object.
+Version **0.2.0** adds replay. The default command opens your latest human
+session. Pinning the version makes the reviewed build and the build you run
+the same object.
 
 ## The replay
 
