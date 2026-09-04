@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Search everything your coding agents ever did, and find where any file came from.
+"""Instant replay for coding agents. Calls are attempts; results are evidence.
 
-Indexes coding-agent transcripts (Claude Code ~/.claude/projects, Codex ~/.codex)
-into a local SQLite full-text index. Stdlib only. No network. Your data never
-leaves the machine.
+Local transcript inspection for Claude Code, Codex, and Cursor. Stdlib only.
 """
 import sys, os, json, glob, re, sqlite3, argparse, math
+import transcripto_core as core
+from transcripto_replay import cmd_replay
 from datetime import datetime, timezone
 
-# The tool ships under two console scripts (`transcripto` and `trace`) and is also
+# The tool ships under the `transcripto` console script and is also
 # run as `python3 transcripto.py`. Every hint we print must name the command the
 # reader actually typed, otherwise we tell a stranger to run a binary they do not
 # have on PATH.
@@ -16,7 +16,7 @@ def _prog():
     n = os.path.basename(sys.argv[0] or "")
     if n.endswith(".py"):
         n = n[:-3]
-    return n if n in ("transcripto", "trace") else "transcripto"
+    return "transcripto"
 
 
 PROG = _prog()
@@ -25,25 +25,30 @@ PROG = _prog()
 # packaging. A stranger who reads the README on GitHub and installs from PyPI can be
 # holding a different build than the one the README describes, and until this flag
 # existed there was no way for them to tell which.
-VERSION = "0.1.5"
+VERSION = "0.2.0"
 
 USAGE = """
-  %(p)s index                 build / refresh the index (incremental)
-  %(p)s ask "<topic>"         YOUR OWN messages about a topic, newest first + a rollup
-  %(p)s search "<query>"      full-text search across every session (you + agents)
-  %(p)s find <filename>       every session that wrote, edited, or read a file
-  %(p)s sessions              recent sessions, newest first, with their opening ask
-  %(p)s stats                 what you work on most: projects, files, volume
-  %(p)s cost                  what ONE decision of yours costs: spend / turns you typed
-  %(p)s coach                 which of YOUR prompt habits actually survive (a proxy)
-  %(p)s coach --harness codex grade your Codex (~/.codex) transcripts instead\n  %(p)s coach --harness cursor grade your Cursor (~/.cursor) transcripts instead
-  %(p)s coach --verified-human subtract likely-PASTED turns (echoes of agent output)
-  %(p)s export-run <session|latest>  one run's numbers as JSON: typed turns, correction rate, commits
-""" % {"p": PROG}
+  transcripto                         replay your latest human session
+  transcripto replay --demo           try a labelled synthetic session
+  transcripto replay --failures       jump to a failed tool call
+  transcripto replay "<request>"       find and replay something you asked
+  transcripto ask "<topic>"            find your own words across harnesses
+  transcripto search "<topic>"         search prompts, replies, and tool text
+  transcripto find <file>              find recorded attempts and file operations
+  transcripto coach                    descriptive request history, never grades
+  transcripto export-run latest        machine-readable session summary
+
+  --harness claude|codex|cursor        select one harness (default: all)
+  --root <dir>                        use a transcript directory
+  cost is Claude-only; replay needs no index. Search refreshes its index automatically.
+"""
+
 
 HOME = os.path.expanduser("~")
-ROOTS = [os.path.join(HOME, ".claude", "projects")]
+ROOTS = [os.path.join(HOME, ".claude", "projects"),
+         os.path.join(HOME, ".codex"), os.path.join(HOME, ".cursor")]
 DB = os.path.join(HOME, ".trace", "trace.db")
+HARNESS = None
 
 FILE_TOOLS = {"Write": "write", "Edit": "edit", "Read": "read",
               "NotebookEdit": "edit", "MultiEdit": "edit"}
@@ -55,32 +60,50 @@ def connect(require_index=True):
     require_index=False. Before this guard existed a cold start printed a raw
     `sqlite3.OperationalError: no such table: messages_fts` — and three of the six
     printed it and still exited 0."""
-    os.makedirs(os.path.dirname(DB), exist_ok=True)
+    os.makedirs(os.path.dirname(DB), mode=0o700, exist_ok=True)
+    if not os.path.exists(DB):
+        fd = os.open(DB, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        os.close(fd)
+    os.chmod(DB, 0o600)
     con = sqlite3.connect(DB)
     con.execute("PRAGMA journal_mode=WAL")
-    if require_index and not con.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='messages'"
-    ).fetchone():
-        print("\n  no index yet.  (looked in %s)\n" % DB)
-        print("  this command reads a local index of your transcripts. build it once:\n")
-        print("    transcripto index\n")
-        print("  it takes a few minutes on a large corpus and is incremental after that.")
-        print("  `coach` and `cost` read your transcripts directly and need no index.\n")
-        sys.exit(2)
+    for sidecar in (DB + "-wal", DB + "-shm"):
+        if os.path.exists(sidecar):
+            os.chmod(sidecar, 0o600)
+    if require_index:
+        init_schema(con)
+        _index_once(con, progress=sys.stderr.isatty())
+        # Temporary read views keep --root/--harness queries inside their selected
+        # corpus while the persistent index can retain other harnesses.
+        clauses = []
+        for root in ROOTS:
+            root = os.path.abspath(os.path.expanduser(root))
+            literal = root.replace("'", "''")
+            clauses.append("session_file='%s' OR substr(session_file,1,%d)='%s/'" %
+                           (literal, len(root) + 1, literal))
+        scope = "(" + (" OR ".join(clauses) or "0") + ")"
+        if HARNESS:
+            scope += " AND harness='%s'" % HARNESS
+        for table in ("messages", "files"):
+            con.execute("CREATE TEMP VIEW %s AS SELECT * FROM main.%s WHERE %s" % (table, table, scope))
     return con
 
 
-SCHEMA_VERSION = 2  # bump when a column/tokenizer change needs a full rebuild
+SCHEMA_VERSION = 3  # bump when a column/tokenizer change needs a full rebuild
 
 
 def _needs_rebuild(con):
     """True if the messages table exists but predates the current schema
     (missing is_human, or an old FTS tokenizer). Triggers a one-time full reindex."""
+    if con.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
+        return True
     t = con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='messages'").fetchone()
     if not t:
         return False  # fresh db — nothing to migrate
     cols = {r[1] for r in con.execute("PRAGMA table_info(messages)")}
-    if "is_human" not in cols:
+    if "is_human" not in cols or "harness" not in cols:
+        return True
+    if "warnings" not in {r[1] for r in con.execute("PRAGMA table_info(indexed)")}:
         return True
     fts = con.execute("SELECT sql FROM sqlite_master WHERE name='messages_fts'").fetchone()
     if fts and "porter" not in (fts[0] or ""):
@@ -98,37 +121,41 @@ def init_schema(con):
     CREATE TABLE IF NOT EXISTS messages(
       id INTEGER PRIMARY KEY, session_id TEXT, session_file TEXT, project TEXT,
       ts TEXT, role TEXT, cwd TEXT, git_branch TEXT, text TEXT,
-      is_human INTEGER DEFAULT 0, prompt_source TEXT);
+      is_human INTEGER DEFAULT 0, prompt_source TEXT, harness TEXT);
     -- porter stemming: `ask "frustration"` also matches frustrated/frustrating.
     CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
       text, content='messages', content_rowid='id', tokenize="porter unicode61");
     CREATE TABLE IF NOT EXISTS files(
       id INTEGER PRIMARY KEY, path TEXT, name TEXT, action TEXT,
-      session_id TEXT, session_file TEXT, ts TEXT, cwd TEXT);
+      session_id TEXT, session_file TEXT, ts TEXT, cwd TEXT, harness TEXT);
     CREATE INDEX IF NOT EXISTS idx_files_name ON files(name);
     CREATE INDEX IF NOT EXISTS idx_msg_human ON messages(is_human, ts);
-    CREATE TABLE IF NOT EXISTS indexed(session_file TEXT PRIMARY KEY, mtime REAL);
+    CREATE TABLE IF NOT EXISTS indexed(session_file TEXT PRIMARY KEY, mtime REAL, warnings TEXT);
 
     -- Stable READ-ONLY views for consumers (ZUP, Helicon). The contract: consumers
     -- open the db read-only and SELECT from these views; they never write. See READ-CONTRACT.md.
     DROP VIEW IF EXISTS v_sessions;
     CREATE VIEW v_sessions AS
-      SELECT m.session_id, m.project,
+      SELECT m.session_id, m.project, m.harness,
              MAX(m.ts) AS last_ts, MIN(m.ts) AS first_ts,
              COUNT(*) AS n_messages,
              SUM(CASE WHEN m.role='assistant' THEN 1 ELSE 0 END) AS assistant_turns,
              (SELECT cwd FROM messages c WHERE c.session_id=m.session_id AND c.cwd!=''
               ORDER BY c.ts DESC LIMIT 1) AS cwd
-      FROM messages m GROUP BY m.session_id;
-    CREATE VIEW IF NOT EXISTS v_file_touches AS
-      SELECT name, path, action, session_id, ts, cwd FROM files;
+      FROM messages m GROUP BY m.session_id, m.harness;
+    DROP VIEW IF EXISTS v_file_touches;
+    CREATE VIEW v_file_touches AS
+      SELECT name, path, action, session_id, ts, cwd, harness FROM files;
+    DROP VIEW IF EXISTS v_index_health;
+    CREATE VIEW v_index_health AS SELECT session_file, mtime, warnings FROM indexed;
     -- is_human=1 marks a turn Oscar actually typed (promptSource typed/queued, not
     -- injected/tool/peer). See ask_gate() + READ-CONTRACT.md.
     DROP VIEW IF EXISTS v_messages;
     CREATE VIEW v_messages AS
       SELECT id, session_id, project, ts, role, cwd, git_branch, text,
-             is_human, prompt_source FROM messages;
+             is_human, prompt_source, harness FROM messages;
     """)
+    con.execute("PRAGMA user_version=%d" % SCHEMA_VERSION)
     con.commit()
 
 
@@ -150,8 +177,14 @@ def extract(d):
             elif bt == "tool_use":
                 name, inp = b.get("name", ""), _tool_input(b)
                 fp = inp.get("file_path") or inp.get("path") or inp.get("notebook_path")
-                if fp:
-                    files.append((FILE_TOOLS.get(name, name.lower()), fp))
+                paths = inp.get("paths") or ([fp] if fp else [])
+                for fp in paths:
+                    if not isinstance(fp, str):
+                        continue
+                    action = FILE_TOOLS.get(name, name.lower())
+                    if action in ("write", "edit") and b.get("execution_status") != "succeeded":
+                        action = "attempt:" + action
+                    files.append((action, fp))
                 for k in ("command", "description", "prompt", "pattern", "query", "url", "file_path"):
                     v = inp.get(k)
                     if isinstance(v, str) and v:
@@ -178,13 +211,15 @@ def is_human_turn(d):
       drop:  isMeta (skill bodies/images) · toolUseResult (tool output) ·
              isSidechain (spawned agent's prompt) · sdk/system (judges, peers)
     """
-    if d.get("type") != "user":
-        return False
-    if d.get("promptSource") not in ("typed", "queued"):
-        return False
-    if d.get("isMeta") or d.get("isSidechain") or d.get("toolUseResult") is not None:
-        return False
-    return True
+    return bool(core.human_text(d))
+
+
+def _drop_indexed_file(con, path):
+    for mid, text in con.execute("SELECT id,text FROM messages WHERE session_file=?", (path,)).fetchall():
+        con.execute("INSERT INTO messages_fts(messages_fts,rowid,text) VALUES('delete',?,?)", (mid, text))
+    con.execute("DELETE FROM messages WHERE session_file=?", (path,))
+    con.execute("DELETE FROM files WHERE session_file=?", (path,))
+    con.execute("DELETE FROM indexed WHERE session_file=?", (path,))
 
 
 def _index_once(con, progress=False):
@@ -194,9 +229,15 @@ def _index_once(con, progress=False):
     transcripts takes minutes, and a silent terminal for that long reads as a hang,
     which is the point at which a first-time user kills it.
     """
-    seen = []
-    for root in ROOTS:
-        seen += glob.glob(os.path.join(root, "**", "*.jsonl"), recursive=True)
+    seen = _coach_files(ROOTS, HARNESS)
+    for (path,) in con.execute("SELECT session_file FROM indexed").fetchall():
+        try:
+            os.stat(path)
+        except FileNotFoundError:
+            _drop_indexed_file(con, path)
+        except OSError:
+            pass  # unreadable is not deleted
+    con.commit()
     if progress:
         sys.stderr.write("scanning %d transcript file(s) in %s\n"
                          % (len(seen), ", ".join(r.replace(HOME, "~") for r in ROOTS)))
@@ -207,42 +248,48 @@ def _index_once(con, progress=False):
             sys.stderr.write("  %d/%d files · %d changed · %d messages\r"
                              % (done, len(seen), new, msgs))
             sys.stderr.flush()
-        mt = os.path.getmtime(f)
-        row = con.execute("SELECT mtime FROM indexed WHERE session_file=?", (f,)).fetchone()
-        if row and abs(row[0] - mt) < 1e-6:
+        try:
+            mt = os.path.getmtime(f)
+        except OSError:
             continue
-        con.execute("DELETE FROM messages WHERE session_file=?", (f,))
-        con.execute("DELETE FROM files WHERE session_file=?", (f,))
-        proj = os.path.basename(os.path.dirname(f))
+        row = con.execute("SELECT mtime,warnings FROM indexed WHERE session_file=?", (f,)).fetchone()
+        if row and abs(row[0] - mt) < 1e-6:
+            for warning in json.loads(row[1] or "[]"):
+                print("warning: partial index: " + core.safe_text(warning), file=sys.stderr)
+            continue
+        diagnostics = []
+        rows, harness = core.read_session(f, diagnostics)
+        if diagnostics:
+            for warning in diagnostics:
+                print("warning: " + core.safe_text(warning), file=sys.stderr)
+            if not rows:
+                print("warning: file could not be indexed; any previous indexed copy is retained", file=sys.stderr)
+                continue
+            print("warning: indexing the valid records only", file=sys.stderr)
+        _drop_indexed_file(con, f)
+        proj = core.safe_text(os.path.basename(os.path.dirname(f)))
         fallback_sid = os.path.basename(f)[:-6]
-        for line in open(f, errors="replace"):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                d = json.loads(line)
-            except Exception:
-                continue
-            if d.get("type") not in ("user", "assistant"):
-                continue
+        for d in rows:
             role, text, fl = extract(d)
-            ts = d.get("timestamp") or ""
-            cwd = d.get("cwd") or ""
-            gb = d.get("gitBranch") or ""
-            sid = d.get("sessionId") or fallback_sid
+            text = core.safe_text(text)
+            fl = [(action, core.safe_text(path)) for action, path in fl if isinstance(path, str)]
+            ts = core.safe_text(d.get("timestamp") or "")
+            cwd = core.safe_text(d.get("cwd") or "")
+            gb = core.safe_text(d.get("gitBranch") or "")
+            sid = core.safe_text(d.get("sessionId") or fallback_sid)
             human = 1 if is_human_turn(d) else 0
             psrc = d.get("promptSource")
             if text:
                 cur = con.execute(
-                    "INSERT INTO messages(session_id,session_file,project,ts,role,cwd,git_branch,text,is_human,prompt_source)"
-                    " VALUES(?,?,?,?,?,?,?,?,?,?)", (sid, f, proj, ts, role, cwd, gb, text, human, psrc))
+                    "INSERT INTO messages(session_id,session_file,project,ts,role,cwd,git_branch,text,is_human,prompt_source,harness)"
+                    " VALUES(?,?,?,?,?,?,?,?,?,?,?)", (sid, f, proj, ts, role, cwd, gb, text, human, psrc, harness))
                 con.execute("INSERT INTO messages_fts(rowid,text) VALUES(?,?)", (cur.lastrowid, text))
                 msgs += 1
             for action, path in fl:
                 con.execute(
-                    "INSERT INTO files(path,name,action,session_id,session_file,ts,cwd)"
-                    " VALUES(?,?,?,?,?,?,?)", (path, os.path.basename(path), action, sid, f, ts, cwd))
-        con.execute("INSERT OR REPLACE INTO indexed(session_file,mtime) VALUES(?,?)", (f, mt))
+                    "INSERT INTO files(path,name,action,session_id,session_file,ts,cwd,harness)"
+                    " VALUES(?,?,?,?,?,?,?,?)", (path, os.path.basename(path), action, sid, f, ts, cwd, harness))
+        con.execute("INSERT OR REPLACE INTO indexed(session_file,mtime,warnings) VALUES(?,?,?)", (f, mt, json.dumps(diagnostics)))
         con.commit(); new += 1
     return new, msgs
 
@@ -324,7 +371,7 @@ def cmd_search(args):
 
 
 def _repo(cwd, proj):
-    return os.path.basename(cwd) if cwd else proj
+    return core.safe_text(os.path.basename(cwd) if cwd else proj)
 
 
 def cmd_ask(args):
@@ -349,7 +396,7 @@ def cmd_ask(args):
         # Did the topic exist at all (just not in his own words)? Say so honestly.
         try:
             any_hit = con.execute(
-                "SELECT COUNT(*) FROM messages_fts WHERE messages_fts MATCH ?",
+                "SELECT COUNT(*) FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid WHERE messages_fts MATCH ?",
                 (_match(args.query),)).fetchone()[0]
         except sqlite3.OperationalError:
             any_hit = 0
@@ -414,78 +461,9 @@ def cmd_find(args):
 
 
 def cmd_trace(args):
-    """WHAT ACTUALLY HAPPENED after you asked. The join nothing else makes.
-
-    `ask` shows what you typed. `find` shows what a file went through. Neither
-    answers the only question that matters after the fact: you asked for X, did
-    anything durable happen? This walks each of your matching prompts forward
-    inside its own session and lists the writes and edits that followed it,
-    stopping at your next prompt so one turn cannot claim the next turn's work.
-
-    HONEST LIMIT, stated because the product is about claims: a write following
-    a prompt in the same session is CO-OCCURRENCE, not proof the write was caused
-    by that prompt or that it was correct. It is the same proxy `coach` uses and
-    it is labelled the same way.
-    """
-    con = connect()
-    try:
-        rows = con.execute(
-            "SELECT m.id,m.ts,m.project,m.cwd,m.session_id,m.text,m.git_branch"
-            " FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid"
-            " WHERE messages_fts MATCH ? AND m.is_human=1"
-            " ORDER BY m.ts DESC LIMIT ?",
-            (_match(args.query), args.limit)).fetchall()
-    except sqlite3.OperationalError as e:
-        print("trace error:", e); return
-    if not rows:
-        print("no prompts YOU typed matching '%s'. try `%s ask \"%s\"` or `%s index`."
-              % (args.query, PROG, args.query, PROG)); return
-
-    landed = stalled = 0
-    blocks = []
-    for _id, ts, proj, cwd, sid, text, branch in rows:
-        nxt = con.execute(
-            "SELECT MIN(ts) FROM messages WHERE session_id=? AND is_human=1 AND ts>?",
-            (sid, ts)).fetchone()[0]
-        if nxt:
-            files = con.execute(
-                "SELECT ts,action,path FROM files WHERE session_id=? AND ts>? AND ts<?"
-                " ORDER BY ts", (sid, ts, nxt)).fetchall()
-        else:
-            files = con.execute(
-                "SELECT ts,action,path FROM files WHERE session_id=? AND ts>?"
-                " ORDER BY ts", (sid, ts)).fetchall()
-        durable = [f for f in files if f[1] in ("write", "edit")]
-        if durable: landed += 1
-        else: stalled += 1
-        blocks.append((ts, proj, cwd, sid, text, branch, files, durable))
-
-    total = len(blocks)
-    pct = (100.0 * landed / total) if total else 0.0
-    print("\033[1m%s\033[0m  %d prompt%s you typed · \033[32m%d landed\033[0m · "
-          "\033[31m%d produced nothing durable\033[0m · %.0f%%"
-          % (args.query, total, "" if total == 1 else "s", landed, stalled, pct))
-    print("\033[2mdurable = a Write or Edit in the same session before your next prompt. "
-          "CO-OCCURRENCE, not proof of cause or correctness.\033[0m\n")
-
-    for ts, proj, cwd, sid, text, branch, files, durable in blocks:
-        mark = "\033[32m●\033[0m" if durable else "\033[31m○\033[0m"
-        head = " ".join((text or "").split())[:110]
-        br = (" \033[2m%s\033[0m" % branch) if branch else ""
-        print("%s %s  \033[36m%s\033[0m%s  \033[2m%s\033[0m"
-              % (mark, _day(ts), _repo(cwd, proj)[:22], br, (sid or "")[:8]))
-        print("   \033[1m\"%s\"\033[0m" % head)
-        if not files:
-            print("   \033[31mnothing touched\033[0m")
-        else:
-            shown = files if args.all else files[:8]
-            for fts, action, path in shown:
-                tag = {"write": "\033[32mWROTE\033[0m", "edit": "\033[33mEDIT \033[0m",
-                       "read": "\033[2mread \033[0m"}.get(action, action.upper())
-                print("   %s %s" % (tag, path))
-            if len(files) > len(shown):
-                print("   \033[2m… %d more, -a to show all\033[0m" % (len(files) - len(shown)))
-        print()
+    replay = argparse.Namespace(target=args.query, episode=None, events=12, limit=args.limit,
+        all=args.all, failures=False, demo=False, json=False, share=False)
+    return cmd_replay(replay, _coach_files(_coach_roots(args.root, args.harness), args.harness))
 
 
 def cmd_sessions(args):
@@ -687,7 +665,7 @@ def collect_cost(days=30, roots=None):
     """Walk the transcripts once. Returns a report dict. Numerator = deduped
     assistant token spend (sub-agent runs included — that is real money).
     Denominator = is_human_turn, the gate `ask` already uses."""
-    roots = roots or ROOTS
+    roots = roots or [os.path.join(HOME, ".claude", "projects")]
     cutoff = cut_iso = None
     if days:
         cutoff = datetime.now(timezone.utc).timestamp() - days * 86400
@@ -701,14 +679,7 @@ def collect_cost(days=30, roots=None):
             # append-only files: an mtime before the window means every record is older
             if cutoff and os.path.getmtime(f) < cutoff:
                 continue
-            for line in open(f, errors="replace"):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    d = json.loads(line)
-                except Exception:
-                    continue
+            for d in core.iter_json(f):
                 t = d.get("type")
                 if t not in ("user", "assistant"):
                     continue
@@ -817,29 +788,9 @@ def cmd_cost(args):
 
 
 # ============================================================================
-# coach — rank YOUR OWN prompt habits by whether the work survived
-# ============================================================================
-# Ported from hack-fleet-ata/fleet/coach.py + contract/deterministic.py so it
-# runs here with no imports beyond the stdlib. Same gate (is_human_turn), same
-# survival proxy, same deterministic pattern tags. Offline. Nothing leaves the
-# machine.
-#
-# SURVIVAL IS A PROXY, NOT TRUTH. An episode "survived" iff a Write/Edit landed
-# or a git commit ran after the prompt and nothing reverted it inside the SAME
-# transcript. That is a durable KEYSTROKE, not a durable OUTCOME:
-#   - a commit is not proof the code was correct, merged, or kept;
-#   - cross-session reverts are invisible to us;
-#   - a prompt whose payoff was a decision rather than an edit reads as dead.
-# This caveat travels with every number the command prints. It is a coaching
-# signal, not a verdict.
+# coach — descriptive request history. Execution status comes from transcripto_core.
+# These lexical tags describe prompts; they do not establish which prompts work best.
 
-_ABANDON_MARKERS = ("never mind", "forget it", "abandon", "scrap this", "drop it")
-_CORRECTIVE_MARKERS = ("no,", "no ", "no.", "not that", "not this", "not the",
-                       "i meant", "i mean", "actually", "wait,", "wrong ",
-                       "other file", "other one")
-_WRITE_TOOLS = {"Write", "Edit", "NotebookEdit", "MultiEdit"}
-_COMMIT_RE = re.compile(r"\bgit\s+commit\b")
-_REVERT_RE = re.compile(r"\bgit\s+(revert|reset\s+--hard)\b")
 _FILE_RE = re.compile(r"\b[\w./-]+\.[A-Za-z]{1,5}\b|\b[\w-]+/[\w./-]+\b")
 _CHECK_RE = re.compile(r"\b(test|tests|verify|verif|prove|proof|done[- ]?when|"
                        r"make sure|ensure|confirm|check that|assert|so that|"
@@ -883,15 +834,8 @@ _STOP = {"the", "a", "an", "to", "of", "in", "into", "on", "for", "and", "or",
          "you", "do", "does", "not", "no", "all", "some", "any", "edge",
          "case", "cases", "set", "result", "nothing", "empty", "load", "box"}
 
-MIN_PATTERN_N = 8   # a habit is only rankable once you have this many episodes
-MAX_CI_WIDTH = 0.30  # and its 95% interval must be narrower than this to be advice
-MIN_EPISODES_TO_RANK = 30   # below this, refuse to rank the corpus at all — a
-                            # rate over a handful of episodes is the exact thing
-                            # this tool exists to distrust. Raised from 3 after a
-                            # 9-transcript run printed a ranked table over n=3 buckets.
-_DURABLE = ("commit", "artifact")
-_PROBE = {"commit": "COMMIT-WITNESSED", "artifact": "ARTIFACT-WITNESSED",
-          "reverted": "COMMIT-THEN-REVERTED", "none": "NO-DURABLE-RECORD"}
+MIN_PATTERN_N = 8  # display floor for descriptive habit groups
+MIN_EPISODES_TO_RANK = 30  # legacy threshold; no inferential rankings are produced
 
 
 def _c_tokens(text):
@@ -940,37 +884,6 @@ def _objects(text):
             if n not in _STOP and n not in _INTENT_WORDS:
                 objs.add(n)
     return objs
-
-
-def _same_task(a, b):
-    """Offline SAME/DIFFERENT floor. No network, no synonym table, no key.
-
-    No placeable object in either prompt -> not the same (we refuse to guess).
-    Disjoint objects -> different. Overlapping objects but incompatible intent
-    families (change vs describe vs revert vs test) -> different.
-    """
-    oa, ob = _objects(a), _objects(b)
-    if not oa or not ob:
-        return False
-    hit = bool(oa & ob)
-    if not hit:
-        for x in oa:
-            if len(x) < 5:
-                continue
-            for y in ob:
-                if len(y) >= 5 and x[:4] == y[:4]:
-                    hit = True
-                    break
-            if hit:
-                break
-    if not hit:
-        return False
-    return (_intent(a) or "CHANGE") == (_intent(b) or "CHANGE")
-
-
-def _looks_corrective(text):
-    low = " " + text.lower().strip()
-    return any(low.startswith(" " + m) or (" " + m) in low for m in _CORRECTIVE_MARKERS)
 
 
 # ============================================================================
@@ -1150,16 +1063,7 @@ def count_corrections(rows, pasted=None, version=None):
 
 def _human_prompt(d):
     """The text of a genuine human turn, or '' — reuses the measured gate."""
-    if not is_human_turn(d):
-        return ""
-    msg = d.get("message") or {}
-    c = msg.get("content")
-    if isinstance(c, str):
-        return c.strip()
-    if isinstance(c, list):
-        return "\n".join(b.get("text", "") for b in c
-                         if isinstance(b, dict) and b.get("type") == "text").strip()
-    return ""
+    return core.human_text(d)
 
 
 def _tool_input(b):
@@ -1182,230 +1086,10 @@ def _tool_uses(rec):
 
 
 # ============================================================================
-# harness connectors — Claude Code is the native shape; Codex is a SECOND source
-# ============================================================================
-# Codex writes rollout transcripts with a different record shape than Claude
-# Code, so we NORMALISE each rollout into the same Claude-shaped rows the coach
-# already understands (is_human_turn / _human_prompt / _tool_uses). One parser,
-# no forked coach — which is also why test_coach.sh stays green by construction.
-#
-# The Codex human gate (measured, see the C1 probe over 77 real rollouts): the
-# reliable, universal signal is a `response_item` `message` with role `user`,
-# MINUS the context blocks Codex threads in wearing the user's role — AGENTS.md,
-# environment_context, permissions, user_instructions, image attachments, the
-# goal context, and file-mention headers. The cleaner `user_message` EVENT is
-# absent from 9 of 77 rollouts (older CLI builds), so the filtered role:user
-# item is the one gate that holds across every build.
-
-_CODEX_INJECTED_WRAPPERS = (
-    "<environment_context>", "AGENTS.md instructions", "<INSTRUCTIONS>",
-    "permissions instructions", "<user_instructions>", "<collaboration_mode>",
-    # the auto-continuation Codex injects between turns wearing the user's role
-    "The following is the Codex agent history",
-)
-_CODEX_INJECTED_BLOCK_PREFIXES = (
-    "<image ", "</image>", "<codex_internal_context",
-    "# Files mentioned by the user:",
-)
-# apply_patch envelope: `*** Add File: <path>` / `*** Update File: <path>`.
-_CODEX_ADDFILE_RE = re.compile(r"\*\*\* (?:Add|Update) File: ([^\n\\\"]+)")
-
+# JSON reader and file discovery. Harness normalization lives in transcripto_core.
 
 def _iter_json(path):
-    """Yield each parseable JSON record from a .jsonl file. Skips blank/bad lines."""
-    try:
-        f = open(path, "r", errors="replace")
-    except OSError:
-        return
-    with f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                yield json.loads(line)
-            except Exception:
-                continue
-
-
-def _codex_user_text(content):
-    """The genuinely-typed text of a Codex role:user item, or '' if it is one of
-    the injected context blocks Codex sends as a user turn."""
-    parts = []
-    if isinstance(content, str):
-        parts.append(content)
-    elif isinstance(content, list):
-        for b in content:
-            if not isinstance(b, dict) or b.get("type") not in ("input_text", "text"):
-                continue
-            t = b.get("text", "")
-            if any(t.lstrip().startswith(p) for p in _CODEX_INJECTED_BLOCK_PREFIXES):
-                continue
-            parts.append(t)
-    txt = "\n".join(parts).strip()
-    if not txt or any(w in txt for w in _CODEX_INJECTED_WRAPPERS):
-        return ""
-    return txt
-
-
-def _codex_out_text(content):
-    """Assistant output text of a Codex role:assistant item."""
-    if isinstance(content, str):
-        return content.strip()
-    if isinstance(content, list):
-        return "\n".join(b.get("text", "") for b in content
-                         if isinstance(b, dict)
-                         and b.get("type") in ("output_text", "text")).strip()
-    return ""
-
-
-def _codex_tool_block(payload):
-    """Map one Codex tool call to a synthetic Claude tool_use block, so the same
-    survival proxy applies: an apply_patch -> Edit (artifact), a `git commit` ->
-    a commit, a `git reset --hard`/revert -> a revert, anything else -> read-only
-    Bash. We regex the raw serialised call rather than parse the embedded JS."""
-    blob = json.dumps(payload)
-    m = _CODEX_ADDFILE_RE.search(blob)
-    if m:
-        return {"type": "tool_use", "name": "Edit",
-                "input": {"file_path": m.group(1).strip()}}
-    if _COMMIT_RE.search(blob):
-        return {"type": "tool_use", "name": "Bash", "input": {"command": "git commit"}}
-    if _REVERT_RE.search(blob):
-        return {"type": "tool_use", "name": "Bash",
-                "input": {"command": "git reset --hard"}}
-    return {"type": "tool_use", "name": "Bash", "input": {"command": "exec"}}
-
-
-_CODEX_TOOL_TYPES = ("function_call", "custom_tool_call", "local_shell_call")
-
-
-def _codex_rows(path):
-    """Normalise one Codex rollout .jsonl into ordered Claude-shaped rows that
-    extract_episodes / _human_prompt / _tool_uses consume unchanged."""
-    rows, sid, cwd = [], "", ""
-    for d in _iter_json(path):
-        p = d.get("payload") or {}
-        if d.get("type") == "session_meta":
-            sid, cwd = p.get("id") or sid, p.get("cwd") or cwd
-            continue
-        if d.get("type") != "response_item":
-            continue
-        # the envelope export-run reads; coach ignores it
-        meta = {"timestamp": d.get("timestamp") or "", "cwd": cwd, "sessionId": sid}
-        pt = p.get("type")
-        if pt == "message":
-            role = p.get("role")
-            if role == "user":
-                txt = _codex_user_text(p.get("content"))
-                if txt:
-                    rows.append(dict(meta, type="user", promptSource="typed",
-                                     message={"role": "user", "content": txt}))
-            elif role == "assistant":
-                txt = _codex_out_text(p.get("content"))
-                rows.append(dict(meta, type="assistant", message={
-                    "role": "assistant",
-                    "content": [{"type": "text", "text": txt}] if txt else []}))
-        elif pt in _CODEX_TOOL_TYPES:
-            rows.append(dict(meta, type="assistant", message={
-                "role": "assistant", "content": [_codex_tool_block(p)]}))
-    return rows
-
-
-# --- Cursor CLI ------------------------------------------------------------
-# Cursor writes ~/.cursor/projects/<slug>/agent-transcripts/<uuid>/<uuid>.jsonl
-# with the SAME {role, message:{content:[...]}} shape Claude Code uses, so
-# extract() already reads it. Three things are missing and this connector adds
-# them: there is no timestamp field (it is embedded in the user text), no cwd
-# field (it is the directory slug), and the human turn is wrapped in
-# <user_query> tags that would otherwise be graded as part of the prompt.
-
-_CUR_TS = re.compile(r"<timestamp>(.*?)</timestamp>", re.S)
-_CUR_Q = re.compile(r"<user_query>\s*(.*?)\s*</user_query>", re.S)
-
-
-def _cursor_ts(text):
-    """'Thursday, Aug 13, 2026, 5:53 PM (UTC+2)' -> ISO-ish, or ''. Never guesses
-    a date it cannot parse: an unparsed stamp yields '' rather than today."""
-    m = _CUR_TS.search(text or "")
-    if not m:
-        return ""
-    raw = m.group(1).strip()
-    for fmt in ("%A, %b %d, %Y, %I:%M %p", "%A, %B %d, %Y, %I:%M %p"):
-        try:
-            import datetime
-            return datetime.datetime.strptime(raw.split(" (")[0], fmt).isoformat()
-        except Exception:
-            pass
-    return ""
-
-
-def _cursor_cwd(path):
-    """~/.cursor/projects/Users-dev-CODE-proj/... -> /Users/dev/CODE/proj.
-    The slug is lossy (a real hyphen in a directory name is indistinguishable
-    from the separator), so the result is checked on disk and dropped if it is
-    not a real directory. A wrong cwd is worse than no cwd."""
-    parts = os.path.normpath(path).split(os.sep)
-    try:
-        slug = parts[parts.index("projects") + 1]
-    except (ValueError, IndexError):
-        return ""
-    cand = "/" + slug.replace("-", "/")
-    if os.path.isdir(cand):
-        return cand
-    # try collapsing trailing segments back into hyphenated names
-    segs = slug.split("-")
-    for join_from in range(len(segs) - 1, 0, -1):
-        cand = "/" + "/".join(segs[:join_from] + ["-".join(segs[join_from:])])
-        if os.path.isdir(cand):
-            return cand
-    return ""
-
-
-def _cursor_rows(path):
-    """Normalise Cursor records onto the Claude shape the indexer already reads.
-
-    AUTHORSHIP, stated because it is a DIFFERENT gate with different provenance.
-    Claude Code stamps `promptSource: typed`, which is the measured-reliable signal
-    (~95% of raw `type: user` records are not the operator). Cursor has no such
-    field. Its one honest equivalent is the `<user_query>` wrapper: Cursor puts it
-    around a prompt the operator submitted, and injected/tool-result user records
-    do not carry it. So a Cursor record counts as typed IFF it carried that
-    wrapper. This is a weaker signal than Claude's and it is labelled as such
-    rather than silently pooled with it.
-    """
-    cwd = _cursor_cwd(path)
-    sid = os.path.splitext(os.path.basename(path))[0]
-    last_ts = ""
-    out = []
-    for d in _iter_json(path):
-        if not isinstance(d, dict) or "message" not in d:
-            continue
-        msg = d.get("message") or {}
-        c = msg.get("content")
-        wrapped = False
-        if isinstance(c, list):
-            for b in c:
-                if isinstance(b, dict) and b.get("type") == "text":
-                    t = b.get("text") or ""
-                    ts = _cursor_ts(t)
-                    if ts:
-                        last_ts = ts
-                    q = _CUR_Q.search(t)
-                    if q:
-                        b["text"] = q.group(1)
-                        wrapped = True
-                    elif _CUR_TS.search(t):
-                        b["text"] = _CUR_TS.sub("", t).strip()
-        role = d.get("role") or msg.get("role")
-        d["type"] = "user" if role == "user" else "assistant"
-        if role == "user" and wrapped:
-            d["promptSource"] = "typed"
-        d["timestamp"] = last_ts
-        d["cwd"] = cwd
-        d["sessionId"] = sid
-        out.append(d)
-    return out
+    return core.iter_json(path)
 
 
 def _sniff(path):
@@ -1414,26 +1098,17 @@ def _sniff(path):
     for d in _iter_json(path):
         if d.get("type") == "session_meta" or ("payload" in d and "timestamp" in d):
             return "codex"
-        if set(d.keys()) == {"session_id", "ts", "text"}:
+        if {"session_id", "ts", "text"}.issubset(d) and "message" not in d:
             return "codex-history"
         # Cursor: role + message only, and none of Claude's envelope fields.
-        if set(d.keys()) <= {"role", "message"} and "message" in d:
+        if "role" in d and "message" in d and "promptSource" not in d:
             return "cursor"
         return "claude"
     return "claude"
 
 
 def _rows_for_file(path):
-    """(rows, harness) for one transcript file, auto-detected. history.jsonl is a
-    witness (a typed-input log), not an episode source, so it yields no rows."""
-    h = _sniff(path)
-    if h == "codex":
-        return _codex_rows(path), "codex"
-    if h == "codex-history":
-        return [], "codex-history"
-    if h == "cursor":
-        return _cursor_rows(path), "cursor"
-    return list(_iter_json(path)), "claude"
+    return core.read_session(path)
 
 
 def _coach_files(roots, harness):
@@ -1447,7 +1122,7 @@ def _coach_files(roots, harness):
             paths.append(r)
             continue
         base = os.path.basename(r.rstrip("/"))
-        if harness == "cursor" or base == ".cursor":
+        if base == ".cursor" or (harness == "cursor" and os.path.isdir(os.path.join(r, "projects"))):
             paths += sorted(glob.glob(
                 os.path.join(r, "projects", "*", "agent-transcripts", "*", "*.jsonl")))
             continue
@@ -1464,6 +1139,9 @@ def _coach_files(roots, harness):
             paths += got
         else:
             paths += sorted(glob.glob(os.path.join(r, "**", "*.jsonl"), recursive=True))
+    paths = sorted({os.path.abspath(p) for p in paths})
+    if harness:
+        paths = [p for p in paths if _sniff(p) == harness]
     return paths
 
 
@@ -1506,47 +1184,17 @@ def _is_echo(text, prior, thresh=_PASTE_THRESH, n=_PASTE_N):
 
 
 def _paste_stream(path, harness):
-    """Ordered [(kind, text)] with kind in {'human','agent'} for one transcript.
-    'agent' pools everything the operator could have copied FROM: assistant
-    messages, tool commands, and tool results, all EARLIER in the session."""
+    """Use the same normalized authorship and result records on every harness."""
     items = []
-    if harness == "codex":
-        for d in _iter_json(path):
-            if d.get("type") != "response_item":
-                continue
-            p = d.get("payload") or {}
-            pt = p.get("type")
-            if pt == "message":
-                role = p.get("role")
-                if role == "user":
-                    t = _codex_user_text(p.get("content"))
-                    if t:
-                        items.append(("human", t))
-                elif role == "assistant":
-                    t = _codex_out_text(p.get("content"))
-                    if t:
-                        items.append(("agent", t))
-            elif pt in _CODEX_TOOL_TYPES:
-                items.append(("agent", json.dumps(p)))
-            elif pt in ("function_call_output", "custom_tool_call_output"):
-                o = p.get("output")
-                t = o if isinstance(o, str) else json.dumps(o)
-                if t:
-                    items.append(("agent", t[:4000]))
-    else:
-        for d in _iter_json(path):
-            if is_human_turn(d):
-                t = _human_prompt(d)
-                if t:
-                    items.append(("human", t))
-            elif d.get("type") == "assistant":
-                _, t, _ = extract(d)
-                if t:
-                    items.append(("agent", t))
-            elif d.get("type") == "user" and d.get("toolUseResult") is not None:
-                _, t, _ = extract(d)
-                if t:
-                    items.append(("agent", t))
+    rows, _ = core.read_session(path)
+    for row in rows:
+        human = core.human_text(row)
+        if human:
+            items.append(("human", human))
+        else:
+            text = extract(row)[1]
+            if text:
+                items.append(("agent", text))
     return items
 
 
@@ -1567,71 +1215,35 @@ def detect_pastes(stream, min_words=_PASTE_MIN_WORDS):
 
 
 def extract_episodes(rows, source="", pasted=None):
-    """Split one transcript into episodes: one human intent, opened and closed.
-    A `pasted` set (opener texts flagged by detect_pastes) is treated as non-human
-    so echoed agent output never counts as one of the operator's own prompts."""
-    pasted = pasted or set()
-    eps, n, i = [], len(rows), 0
-    while i < n:
-        opener = _human_prompt(rows[i])
-        if not opener or opener in pasted:
-            i += 1
+    result = []
+    for ep in core.episodes(rows, source):
+        if ep["prompt"] in (pasted or set()):
             continue
-        start, corrective, assistants = i, 0, 0
-        wrote = committed = reverted = read_only = False
-        witness, j = "", i + 1
-        while j < n:
-            row = rows[j]
-            nxt = _human_prompt(row)
-            if nxt and nxt in pasted:
-                nxt = ""              # a pasted turn is agent output, not a new intent
-            if nxt:
-                low = nxt.lower()
-                if any(m in low for m in _ABANDON_MARKERS):
-                    break
-                if _looks_corrective(nxt) or _same_task(opener, nxt):
-                    corrective += 1
-                    j += 1
-                    continue
-                break                      # a genuinely new intent ends the episode
-            if row.get("type") == "assistant":
-                assistants += 1
-            for b in _tool_uses(row):
-                name = b.get("name")
-                if name in _WRITE_TOOLS:
-                    wrote = True
-                    if not witness:
-                        inp = _tool_input(b)
-                        tgt = inp.get("file_path") or inp.get("notebook_path") or "?"
-                        witness = "%s %s" % (name, os.path.basename(tgt))
-                elif name == "Bash":
-                    cmd = _tool_input(b).get("command", "") or ""
-                    if _COMMIT_RE.search(cmd):
-                        committed, witness = True, "git commit"
-                    elif _REVERT_RE.search(cmd):
-                        reverted = True
-                    else:
-                        read_only = True
-            j += 1
-
-        if committed and reverted:
-            tier = "reverted"
-        elif committed:
-            tier = "commit"
-        elif wrote:
-            tier = "artifact"
+        mutations = [e for e in ep["events"] if e["kind"] in ("edit", "commit", "rollback")]
+        success = [e for e in mutations if e["status"] == "succeeded"]
+        unknown = any(e["status"] == "unknown" for e in mutations)
+        # A rollback's affected revision cannot be inferred from its presence.
+        # Preserve the call in replay; do not claim continued durability.
+        last_success = max((i for i, e in enumerate(mutations) if e["status"] == "succeeded"), default=-1)
+        later_rollback = any(e["kind"] == "rollback" and e["status"] != "failed" for e in mutations[last_success + 1:])
+        if later_rollback or (success and success[-1]["kind"] == "rollback"):
+            tier = "unknown"
+        elif success:
+            tier = "commit" if success[-1]["kind"] == "commit" else "artifact"
+        elif unknown:
+            tier = "unknown"
         else:
             tier = "none"
-            witness = ("read-only Bash only, no file change" if read_only
-                       else "no tool ran after the prompt")
-
-        eps.append({"opener": opener, "source": os.path.basename(source),
-                    "tier": tier, "probe": _PROBE[tier],
-                    "score": 2 if tier == "commit" else (1 if tier == "artifact" else 0),
-                    "survived": tier in _DURABLE, "corrective_turns": corrective,
-                    "assistant_turns": assistants, "witness": witness})
-        i = j if j > start else start + 1
-    return eps
+        witnessed = success[-1] if success else (mutations[-1] if mutations else None)
+        result.append({"opener": ep["prompt"], "source": source, "line": ep["line"],
+            "tier": tier, "probe": {"commit": "COMMIT-WITNESSED", "artifact": "ARTIFACT-WITNESSED",
+                "unknown": "OUTCOME-UNKNOWN", "none": "NO-SUCCESSFUL-CHANGE"}[tier],
+            "score": 2 if tier == "commit" else int(tier == "artifact"),
+            "survived": None if tier == "unknown" else tier in ("commit", "artifact"), "corrective_turns": 0,
+            "assistant_turns": len(ep["events"]), "has_mutation": bool(mutations),
+            "witness": ((witnessed["kind"] + " " + witnessed["target"]) if witnessed else "No change call recorded"),
+            "events": ep["events"]})
+    return result
 
 
 def prompt_patterns(text):
@@ -1662,53 +1274,21 @@ def _wilson(k, n, z=1.96):
 
 
 def rank_patterns(episodes, baseline=None):
-    """Rank habits by survival, and refuse to rank one we cannot tell from average.
-
-    MIN_PATTERN_N alone is not enough. On a real corpus (2026-09-04, 2244 episodes)
-    a band of n=40 at 55% sat fifth in "do more of these" beside a band of n=815,
-    and its 95% interval was [39.8, 69.3] — it straddled the 47% corpus baseline and
-    overlapped the WORST band. The tool told its user to write vaguer prompts.
-
-    So a habit is ranked only when its interval EXCLUDES the corpus baseline, i.e.
-    when we can actually say it differs from average. Everything else is still
-    measured and still printed, just not under a heading that says "do more of these".
-    A denominator too small to rank does not get ranked.
-    """
+    """Descriptive proportions only. Correlated, overlapping habits are not advice."""
     buckets = {}
     for ep in episodes:
-        for tag in prompt_patterns(ep["opener"]):
-            buckets.setdefault(tag, []).append(ep)
-    if baseline is None:
-        baseline = (sum(1 for e in episodes if e["survived"]) / len(episodes)
-                    if episodes else 0.0)
+        if ep.get("has_mutation", True) and ep.get("tier") != "unknown":
+            for tag in prompt_patterns(ep["opener"]):
+                buckets.setdefault(tag, []).append(ep)
     out = []
-    for tag, eps in buckets.items():
+    for tag, eps in sorted(buckets.items()):
         n = len(eps)
-        durable = sum(1 for e in eps if e["survived"])
-        lo, hi = _wilson(durable, n)
-        out.append({"pattern": tag, "n": n, "survived": durable,
-                    "survival_rate": durable / n if n else 0.0,
-                    "ci_lo": lo, "ci_hi": hi,
-                    # Two conditions, both necessary. (1) the interval must EXCLUDE
-                    # the corpus baseline, or we cannot say the habit differs from
-                    # average. (2) the interval must be narrower than MAX_CI_WIDTH,
-                    # because an estimate of "somewhere between 49% and 94%" is not
-                    # advice at any position in a list. n>=8 alone allowed both a
-                    # baseline-straddling band and a 45pp-wide one to be printed
-                    # under "do more of these".
-                    "distinguishable": (n >= MIN_PATTERN_N
-                                        and not (lo <= baseline <= hi)
-                                        and (hi - lo) <= MAX_CI_WIDTH),
-                    "rankable": n >= MIN_PATTERN_N})
-    out.sort(key=lambda p: (p["survival_rate"], p["n"]), reverse=True)
+        k = sum(bool(e["survived"]) for e in eps)
+        lo, hi = _wilson(k, n)
+        out.append({"pattern": tag, "n": n, "survived": k, "survival_rate": k / n,
+                    "ci_lo": lo, "ci_hi": hi, "rankable": n >= MIN_PATTERN_N,
+                    "distinguishable": False, "reason": "descriptive_only"})
     return out
-
-
-def _pick(episodes, survived, key):
-    cand = [e for e in episodes if e["survived"] is survived and len(e["opener"]) >= 25]
-    if not cand:
-        cand = [e for e in episodes if e["survived"] is survived]
-    return max(cand, key=key) if cand else None
 
 
 def _codex_history_overlap(roots, human_texts):
@@ -1745,16 +1325,13 @@ def _coach_roots(root=None, harness=None):
         return [os.path.expanduser("~/.codex")]
     if harness == "cursor":
         return [os.path.expanduser("~/.cursor")]
+    if harness == "claude":
+        return [os.path.join(HOME, ".claude", "projects")]
     return list(ROOTS)
 
 
 def coach(roots=None, harness=None, verified_human=False):
-    """Rank the operator's own prompt habits by the survival proxy. Offline.
-
-    harness: None (auto-detect per file), 'claude', or 'codex'. A Codex root is
-    normalised into the same rows, so the survival proxy is identical.
-    verified_human: subtract likely-PASTED turns (echoes of earlier agent/tool
-    output in the same session) from the human signal before grading."""
+    """Describe submitted requests and the execution evidence attached to them."""
     if not roots:
         roots = _coach_roots(None, harness)
     paths = _coach_files(roots, harness)
@@ -1779,23 +1356,21 @@ def coach(roots=None, harness=None, verified_human=False):
         corrections += corr
         episodes += extract_episodes(rows, source=p, pasted=pasted)
 
-    _coach_baseline = (sum(1 for e in episodes if e["survived"]) / len(episodes)
-                       if episodes else 0.0)
-    patterns = rank_patterns(episodes, baseline=_coach_baseline)
-    rankable = [p for p in patterns if p["distinguishable"]]
-    # Measured, but the interval straddles the corpus baseline, so we cannot say it
-    # differs from average. Printed under its own heading, never as advice.
-    indistinct = [p for p in patterns if p["rankable"] and not p["distinguishable"]]
+    patterns = rank_patterns(episodes)
+    indistinct = [p for p in patterns if p["rankable"]]
     durable = sum(1 for e in episodes if e["survived"])
+    known_changes = sum(e["has_mutation"] and e["tier"] != "unknown" for e in episodes)
     tiers = {t: sum(1 for e in episodes if e["tier"] == t)
-             for t in ("commit", "artifact", "reverted", "none")}
+             for t in ("commit", "artifact", "reverted", "none", "unknown")}
     resolved = (harness or ("codex" if harnesses == {"codex"}
                             else "claude" if harnesses == {"claude"}
-                            else "mixed" if harnesses else "claude"))
+                            else "cursor" if harnesses == {"cursor"}
+                            else "mixed" if harnesses else "auto"))
     hist_lines, hist_matched = (_codex_history_overlap(roots, human_texts)
                                 if "codex" in harnesses or harness == "codex"
                                 else (0, 0))
     return {
+        "schema": "transcripto.coach/2",
         "harness": resolved,
         "verified_human": verified_human, "pastes_flagged": pastes,
         "history_lines": hist_lines, "history_matched": hist_matched,
@@ -1806,75 +1381,23 @@ def coach(roots=None, harness=None, verified_human=False):
         "corrections": corrections,
         "correction_rate": round(corrections / humans, 3) if humans else 0.0,
         "episodes": len(episodes), "durable": durable,
-        "durable_rate": round(durable / len(episodes), 3) if episodes else 0.0,
+        "durable_rate": round(durable / known_changes, 3) if known_changes else None,
+        "known_change_requests": known_changes,
         "tiers": tiers,
-        "top_patterns": [p for p in rankable
-                         if p["survival_rate"] > _coach_baseline][:5],
-        # The share block needs named habits by name, and a habit can land in either
-        # half of the most/least split depending on corpus. Give it the whole list
-        # rather than making it guess which slice to look in.
-        "all_patterns": rankable,
-        # SURVIVES LEAST must draw only from habits SURVIVES MOST did not take.
-        # The old guard was `len(rankable) > 5`, which only protected the <=5 case:
-        # with 6-9 rankable habits, rankable[:5] and rankable[-5:] overlap, and the
-        # tool printed the SAME row under "do more of these" and "these tend to
-        # loop" with the same denominator. A first-time user has 6-9 habits, so the
-        # first outside run was the one that saw it. Slicing from index 5 makes the
-        # two lists disjoint by construction at every corpus size, and is
-        # byte-identical to the old output once there are >=10 rankable habits.
-        # Direction, not list position. A band is "survives least" because it sits
-        # BELOW the corpus baseline, never because it fell outside the first five
-        # slots. Position slicing put a 42% band under "do more of these" the moment
-        # the baseline filter shortened the list.
-        "bottom_patterns": [p for p in rankable
-                            if p["survival_rate"] <= _coach_baseline][-5:][::-1],
-        "best_prompt": _pick(episodes, True,
-                             lambda e: (e["score"], -e["corrective_turns"],
-                                        e["assistant_turns"])),
-        "worst_prompt": _pick(episodes, False,
-                              lambda e: (e["corrective_turns"], e["assistant_turns"])),
+        "top_patterns": [],
+        "all_patterns": patterns,
+        "bottom_patterns": [],
+        "best_prompt": None,  # deprecated: execution evidence is not prompt quality
+        "worst_prompt": None,
+        "successful_request": next((e for e in reversed(episodes) if e["survived"] is True), None),
+        "failed_request": next((e for e in reversed(episodes) if any(x["status"] == "failed" for x in e["events"])), None),
         "indistinct_patterns": indistinct,
-        "sparse": len(rankable) < 5,
-        "rankable_corpus": len(episodes) >= MIN_EPISODES_TO_RANK,
-        "proxy": ("survival = a durable Write/Edit or an un-reverted git commit "
-                  "in-episode. A PROXY, not proof the work was correct or shipped."),
+        "sparse": len(indistinct) < 5,
+        "rankable_corpus": False,
+        "proxy": ("PROXY: a matching tool result reported a successful change. "
+                  "Not proof of correctness, durability, or shipping. Unknown outcomes are excluded from habit proportions."),
     }
 
-
-
-def _share_block(r):
-    """Four lines a person can paste into a thread.
-
-    The tool asks people to compare their numbers with someone else's; before this
-    existed, answering that meant hand-retyping rows out of two tables, which is
-    why those threads fill with opinions instead of data. Numbers only: no prompt
-    text, no paths, no repo names, so pasting it cannot leak anything.
-    """
-    pats = {p["pattern"]: p for p in r.get("all_patterns") or []}
-    good = pats.get("states-a-check-or-done-condition")
-    bad = pats.get("intent:none")
-    if not (good and bad):                       # fall back to the extremes we do have
-        top = (r.get("top_patterns") or [None])[0]
-        bot = (r.get("bottom_patterns") or [None])[0]
-        good, bad = good or top, bad or bot
-    if not (good and bad) or good is bad:
-        return                                   # nothing honest to compare
-    W = 57
-    print("  " + "\u2500" * W)
-    print("   compare yours. numbers only, nothing from your prompts:\n")
-    print("   transcripto coach \u00b7 %s \u00b7 %s episodes \u00b7 %d%% survived"
-          % (r["harness"], r["episodes"], int(round(r["durable_rate"] * 100))))
-    for label, p in ((good["pattern"], good), (bad["pattern"], bad)):
-        print("   %-34s %3d%%  (%s/%s)"
-              % (label, round(p["survival_rate"] * 100), p["survived"], p["n"]))
-    if bad["survival_rate"]:
-        print("   %-34s  %.1fx" % ("gap", good["survival_rate"] / bad["survival_rate"]))
-    print("  " + "\u2500" * W)
-
-
-def _one_line(text, width=100):
-    one = " ".join(text.split())
-    return one if len(one) <= width else one[:width - 1] + "…"
 
 
 def cmd_coach(args):
@@ -1883,142 +1406,28 @@ def cmd_coach(args):
     if args.json:
         print(json.dumps(r, indent=2)); return
     if not r["episodes"]:
-        # A stranger's first run lands here whenever they have no logs for this
-        # harness. Name where we looked, so "it printed nothing" is diagnosable.
-        looked = _coach_roots(args.root, args.harness)
-        print("\n  no prompt episodes found for harness '%s'.\n" % r["harness"])
-        print("  looked in: %s" % (", ".join(looked) or "(no default root)"))
-        print("\n  this reads transcripts that already exist on your machine; it does not")
-        print("  create them. if that directory is empty, use the agent for a session first.\n")
-        print("  otherwise:")
-        # All three supported harnesses are offered here. Listing only two while the
-        # README sells three is how a stranger concludes cursor is unsupported.
-        print("    %s coach --harness codex       grade Codex (~/.codex) instead" % PROG)
-        print("    %s coach --harness cursor      grade Cursor "
-              "(~/.cursor/projects/*/agent-transcripts)" % PROG)
-        print("    %s coach --root <dir>          point at a folder of .jsonl transcripts\n" % PROG)
+        print("No prompt episodes found. Looked in: " + ", ".join(_coach_roots(args.root, args.harness)))
+        print("Try transcripto replay --demo, --harness codex, --harness cursor, or --root <dir>.")
         return
-    B, D = "\033[1m", "\033[0m"
-    # The share you typed is the argument the whole tool rests on, and it used to
-    # sit in grey at the bottom under the fold. It is the first thing now.
-    print("\n  %s%s of the %s records in your transcripts are things you typed.  %.2f%%%s"
-          % (B, f"{r['human_turns']:,}", f"{r['total_records']:,}",
-             r["human_pct"], D))
-    print("  \033[2mthe rest is the machine answering you. this grades the %s.\033[0m"
-          % f"{r['human_turns']:,}")
-    print("\n  %sYOUR PROMPT HABITS, GRADED%s   (offline, your machine only)\n" % (B, D))
-    w = r["worst_prompt"]
-    if w:
-        print("  \033[31m-\033[0m your worst looped prompt, with its witness:")
-        print("      \"%s\"" % _one_line(w["opener"]))
-        print("      %s: %s  ·  corrections: %s  ·  assistant turns: %s"
-              % (w["probe"], w["witness"], w["corrective_turns"], w["assistant_turns"]))
-    b = r["best_prompt"]
-    if b:
-        print("\n  \033[32m+\033[0m your best landed prompt, with its witness:")
-        print("      \"%s\"" % _one_line(b["opener"]))
-        print("      %s: %s  ·  corrections: %s" % (b["probe"], b["witness"],
-                                                    b["corrective_turns"]))
-    print("\n  \033[2mSURVIVAL IS A PROXY: %s\033[0m" % r["proxy"])
-    if not r["rankable_corpus"]:
-        # The refusal IS the product's argument, not an error. A rate needs a
-        # denominator large enough to mean something; %d episodes is not it, and a
-        # tool that prints "65%%" over three episodes is doing the exact thing this
-        # one exists to catch. So no ranking. The two things below need no sample
-        # size — one episode each — and they are the honest half of the output.
-        print("\n  %sNot enough episodes to rank your habits yet.%s" % (B, D))
-        print("  You have %s. At %s the tool starts looking, and a habit ranks once its"
-              % (r["episodes"], MIN_EPISODES_TO_RANK))
-        print("  own count is large enough to separate it from your average, which is a"
-              "\n  bigger number than %s. A survival percentage over"
-              % MIN_EPISODES_TO_RANK)
-        print("  a handful of episodes is the number this tool was built to distrust,")
-        print("  so it will not print one. Your raw survival and your single best and")
-        print("  worst prompt need no sample size — here they are.")
-    else:
-        if r["sparse"] and r["top_patterns"]:
-            print("\n  \033[2m(few habits cleared the %s-episode minimum, showing what is "
-                  "rankable)\033[0m" % MIN_PATTERN_N)
-        # An empty header under a promise is a claim about rows that do not exist.
-        # The baseline-overlap rule can empty this list entirely on a small corpus,
-        # where no single band's interval clears the user's own average. Say that,
-        # rather than printing "do more of these" over nothing.
-        if not r["top_patterns"]:
-            print("\n  %sNo habit beats your own average by enough to call it.%s" % (B, D))
-            print("  \033[2mEvery band's 95%% interval straddles your %d%% baseline. That is a"
-                  "\n  finding, not a gap: at this corpus size the differences are noise.\033[0m"
-                  % round(r["durable_rate"] * 100))
-        else:
-            print("\n  %sSURVIVES MOST%s  do more of these:" % (B, D))
-        for p in r["top_patterns"]:
-            print("    %3d%%  (%s/%s)  %s" % (round(p["survival_rate"] * 100),
-                                              p["survived"], p["n"], p["pattern"]))
-        # With <=5 rankable habits SURVIVES MOST already showed all of them, so
-        # there is no honest "least" left to print. An empty header under a
-        # promise ("these tend to loop") is a claim about rows that do not exist.
-        if r["bottom_patterns"]:
-            print("\n  %sSURVIVES LEAST%s  these tend to loop:" % (B, D))
-            for p in r["bottom_patterns"]:
-                print("    %3d%%  (%s/%s)  %s" % (round(p["survival_rate"] * 100),
-                                                  p["survived"], p["n"], p["pattern"]))
-        elif r["top_patterns"]:
-            print("\n  \033[2m(every rankable habit is listed above; too few to split "
-                  "into a most/least pair)\033[0m")
-        # Measured, but the 95% interval straddles your own survival rate, so the
-        # honest statement is "cannot tell this apart from your average", not a
-        # ranking. These used to appear under "do more of these".
-        if r.get("indistinct_patterns"):
-            print("\n  \033[2mMEASURED, NOT RANKED  the 95%% interval straddles your "
-                  "%d%% baseline, so these cannot be told apart from your average:\033[0m"
-                  % round(r["durable_rate"] * 100))
-            for p in r["indistinct_patterns"]:
-                print("    \033[2m%3d%%  (%s/%s)  [%d-%d%%]  %s\033[0m"
-                      % (round(p["survival_rate"] * 100), p["survived"], p["n"],
-                         round(p["ci_lo"] * 100), round(p["ci_hi"] * 100), p["pattern"]))
-    print("\n  \033[2mharness %s  ·  %s transcript(s), %s records  ·  %s typed by you "
-          "(%s%%)\033[0m"
-          % (r["harness"], r["files"], format(r["total_records"], ","),
-             r["human_turns"], r["human_pct"]))
-    # Keep the phrasing "episodes: N ranked, M survived (P%)" verbatim. test_small_n.sh
-    # greps for it to prove the raw survival count still shows when habit ranking is
-    # refused, which is the honest half of a small-corpus run. Reword it and that check
-    # goes green-by-absence for a reason unrelated to what it is testing.
-    print("  \033[2mepisodes: %s ranked, %s survived (%s%%)\033[0m"
-          % (r["episodes"], r["durable"], int(round(r["durable_rate"] * 100))))
-    t = r["tiers"]
-    print("  \033[2mcommit %s  ·  write/edit %s  ·  reverted %s  ·  nothing durable %s\033[0m"
-          % (t["commit"], t["artifact"], t["reverted"], t["none"]))
-    # correction rate: the inverse of a landed prompt. n travels with it because
-    # a percentage without its denominator is the number this tool distrusts.
-    #
-    # It used to say "a floor" and stop. That was true and useless — it named a
-    # direction without a size, so nobody could tell whether the real figure was
-    # 7% or 40%. Both were measured on 2026-09-03 (200 rows each, agent-labelled,
-    # one tuning sample and one held-out): v1 runs at precision 0.80 and recall
-    # 0.16, so the printed count is roughly a FIFTH of the real one, and the two
-    # samples put the true rate between 26% and 37%.
-    #
-    # The interval is printed rather than a point estimate because the two
-    # samples disagree by more than sampling error, and hiding that behind one
-    # confident number is the failure this tool exists to catch.
-    # Each version states ITS OWN measured recall. Printing one figure for both
-    # would attach v1's recall to v0's count — a true number about the wrong
-    # object, which is the exact error this tool was built to surface.
-    caught = {"v0": "~1 in 18", "v1": "~1 in 6"}.get(_CORRECTION_VERSION, "?")
-    print("  \033[2mcorrection rate: %s%% measured (%s of %s typed turns) · "
-          "%s catches %s, so the real rate is ~26-37%%\033[0m"
-          % (int(round(r["correction_rate"] * 100)), r["corrections"],
-             r["human_turns"], _CORRECTION_VERSION, caught))
-    if r["verified_human"]:
-        print("  \033[2m%s typed turn(s) flagged likely-PASTED and subtracted\033[0m"
-              % r["pastes_flagged"])
+    print("YOUR REQUESTS, ON THE RECORD\n")
+    print("%s submitted turns · %s requests · %s transcript(s) · %s" % (
+        r["human_turns"], r["episodes"], r["files"], r["harness"]))
+    print("episodes: %s observed, %s with a successful change result" % (r["episodes"], r["durable"]))
+    print("%s unknown change outcomes; missing evidence is not failure." % r["tiers"]["unknown"])
+    print("\n" + r["proxy"])
+    if r["episodes"] < MIN_EPISODES_TO_RANK:
+        print("\nSmall history: %d requests. Replay works from one request." % r["episodes"])
+    print("\nMEASURED, NOT RANKED")
+    print("Change attempts with known outcomes only. These overlapping groups are descriptive, not instructions.")
+    for p in r["indistinct_patterns"]:
+        print("  %3d%% (%d/%d) %s" % (round(p["survival_rate"] * 100), p["survived"], p["n"], p["pattern"]))
+    print("\nCorrection markers: %d of %d turns (%d%%). A lexical estimate, with false positives and misses." % (
+        r["corrections"], r["human_turns"], round(r["correction_rate"] * 100)))
     if r["history_lines"]:
-        print("  \033[2mcodex history.jsonl: %s/%s checkable input lines also appear as "
-              "typed rollout turns (gate control)\033[0m"
-              % (r["history_matched"], r["history_lines"]))
-    print()
-    _share_block(r)
-    print()
+        print("Codex history overlap: %d/%d checkable entries." % (r["history_matched"], r["history_lines"]))
+    if r["verified_human"]:
+        print("%d likely pasted turns excluded." % r["pastes_flagged"])
+    print("\nInspect the evidence: transcripto replay --failures or transcripto replay latest")
 
 
 # ============================================================================
@@ -2033,7 +1442,7 @@ def cmd_coach(args):
 def _epoch(ts):
     """ISO-8601 transcript stamp -> unix seconds, or None. Accepts the 'Z' Claude
     Code and Codex write and the naive local stamp the Cursor connector yields."""
-    if not ts:
+    if not isinstance(ts, str) or not ts:
         return None
     s = ts.strip()
     if s.endswith("Z"):
@@ -2125,7 +1534,10 @@ def _resolve_run(target, roots, harness):
     if not paths:
         return None
     if target == "latest":
-        return max(paths, key=os.path.getmtime)
+        for path in sorted(paths, key=os.path.getmtime, reverse=True):
+            if any(core.human_text(r) for r in _rows_for_file(path)[0]):
+                return path
+        return None
     hits = [p for p in paths if os.path.basename(p).startswith(target)]
     if not hits:                     # codex names rollouts rollout-<date>-<id>.jsonl
         hits = [p for p in paths if target in os.path.basename(p)]
@@ -2146,10 +1558,10 @@ def export_run(path):
         for b in _tool_uses(r):
             tool_calls += 1
             if b.get("name") in FILE_TOOLS:
-                fp = _tool_input(b).get("file_path") or _tool_input(b).get("notebook_path")
-                if fp:
-                    files.add(fp)
-    commits = _reflog_commits(cwd, start, end) if cwd else None
+                inp = _tool_input(b)
+                fp = inp.get("file_path") or inp.get("notebook_path")
+                files.update(p for p in (inp.get("paths") or ([fp] if fp else [])) if isinstance(p, str))
+    commits = _reflog_commits(cwd, start, end) if cwd and start is not None and end is not None else None
     return {
         "schema": "transcripto.export-run/1",
         "session_id": sid,
@@ -2168,7 +1580,7 @@ def export_run(path):
         "commits_in_window": len(commits) if commits is not None else None,
         "commits": commits,
         "proxy": ("typed_turns is the authorship gate (typed/queued, never meta, "
-                  "sidechain or tool output); correction_rate is a lexical floor; "
+                  "sidechain or tool output); correction_rate is a lexical estimate; "
                   "commits_in_window is this tree's reflog inside the run window, "
                   "null when the project is not a git repo."),
     }
@@ -2197,7 +1609,7 @@ def main():
     s = sub.add_parser("search"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=25); s.set_defaults(fn=cmd_search)
     s = sub.add_parser("find"); s.add_argument("name"); s.set_defaults(fn=cmd_find)
     s = sub.add_parser("trace"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=10)
-    s.add_argument("-a", "--all", action="store_true", help="show every file, not the first 8")
+    s.add_argument("-a", "--all", action="store_true", help="show the complete replay sequence")
     s.set_defaults(fn=cmd_trace)
     s = sub.add_parser("sessions"); s.add_argument("-n", "--limit", type=int, default=30)
     s.add_argument("--all", action="store_true",
@@ -2210,11 +1622,11 @@ def main():
     s.add_argument("--json", action="store_true", help="machine-readable, for other tools")
     s.set_defaults(fn=cmd_cost)
     s = sub.add_parser("coach")
-    s.add_argument("--root", help="grade this transcript dir instead of ~/.claude/projects")
+    s.add_argument("--root", help="read this transcript directory")
     s.add_argument("--harness", choices=["claude", "codex", "cursor"],
                    help="which agent's transcripts to grade. codex reads "
                         "~/.codex (archived_sessions + sessions); cursor reads "
-                        "~/.cursor/projects/*/agent-transcripts. default: auto-detect")
+                        "~/.cursor/projects/*/agent-transcripts. default: all three")
     s.add_argument("--verified-human", dest="verified_human", action="store_true",
                    help="subtract likely-PASTED turns: a typed turn whose text is a "
                         "verbatim/high n-gram echo of an earlier agent or tool message "
@@ -2226,12 +1638,39 @@ def main():
                                   "path to a .jsonl transcript")
     s.add_argument("--root", help="look in this transcript dir instead of ~/.claude/projects")
     s.add_argument("--harness", choices=["claude", "codex", "cursor"],
-                   help="which agent's transcripts to look in. default: claude")
+                   help="which agent's transcripts to look in. default: all three")
     s.set_defaults(fn=cmd_export_run)
-    a = p.parse_args()
+    s = sub.add_parser("replay", help="replay requests and their recorded tool results")
+    s.add_argument("target", nargs="?", default="latest", help="latest, a transcript path, or words from a request")
+    s.add_argument("--session", help="explicit session ID or an unambiguous filename prefix")
+    s.add_argument("--episode", type=int, help="request number within the session")
+    s.add_argument("--events", type=int, default=12, help="events displayed per request (default 12)")
+    s.add_argument("--limit", type=int, default=5, help="matching requests to show")
+    s.add_argument("--all", action="store_true", help="all requests and events in the selected session")
+    s.add_argument("--failures", action="store_true", help="jump to a request with a failed tool call")
+    s.add_argument("--demo", action="store_true", help="run an explicitly synthetic replay")
+    output = s.add_mutually_exclusive_group()
+    output.add_argument("--json", action="store_true")
+    output.add_argument("--share", action="store_true", help="counts and caveat only; no prompts or paths")
+    s.set_defaults(fn=lambda a: sys.exit(cmd_replay(a, _coach_files(_coach_roots(a.root, a.harness), a.harness))))
+    for name, parser in sub.choices.items():
+        if name not in ("coach", "cost", "export-run"):
+            parser.add_argument("--root", help="read transcripts in this directory")
+            parser.add_argument("--harness", choices=["claude", "codex", "cursor"], help="default: all three")
+    a = p.parse_args(["replay"] if len(sys.argv) == 1 else None)
+    if getattr(a, "events", 1) < 1 or getattr(a, "limit", 1) < 1 or (getattr(a, "episode", None) is not None and a.episode < 1):
+        p.error("episode, events, and limit must be positive")
+    if getattr(a, "session", None) and a.target != "latest":
+        p.error("use either a positional query/path or --session")
+    global ROOTS, HARNESS
+    if a.cmd not in ("coach", "cost", "export-run", "replay"):
+        HARNESS = getattr(a, "harness", None)
+        ROOTS = _coach_roots(getattr(a, "root", None), HARNESS)
     if not getattr(a, "fn", None):
         p.print_help(); return
-    a.fn(a)
+    status = a.fn(a)
+    if isinstance(status, int):
+        sys.exit(status)
 
 
 if __name__ == "__main__":

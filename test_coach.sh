@@ -1,34 +1,6 @@
 #!/usr/bin/env bash
-# test_coach.sh — the check on `trace coach`. Stdlib only, offline, no keys.
-#
-# The fixture inherits the SHAPE of a real Claude Code transcript (same keys,
-# same nesting, the same four ways a non-human record disguises itself as
-# `type: user`) and collapses only the CONTENT, so a green here is green on
-# data that actually occurs.
-#
-# fixtures-coach/coach-fixture.jsonl — 21 records, hand-laid:
-#
-#   HUMAN (8, must be KEPT)
-#     09:00 typed   detailed refactor + a check      -> Edit          ARTIFACT
-#     09:05 typed   "list the files"                 -> read-only ls  NONE
-#     09:10 typed   add retry wrapper                -> Write+commit  COMMIT
-#     09:20 typed   rename invoice model             -> commit+reset  REVERTED
-#     09:30 queued  "fix it"                         -> no tool       NONE
-#     09:40 typed   document the caching layer       -> read-only cat NONE
-#     09:50 typed   "Refactor the auth parser."      \  one episode,  ARTIFACT
-#     09:51 typed   "no, i meant the header path"    /  the correction merges
-#
-#   NOT HUMAN (4, must be DROPPED — each one CLAIMS a durable act, so if the
-#   gate leaks, survival inflates and the leak is loud instead of silent)
-#     toolUseResult · isSidechain · isMeta · promptSource=sdk
-#
-# Expected: 8 human turns, 7 episodes, 3 survived
-#           tiers commit 1 · artifact 2 · reverted 1 · none 3
-#
-# THE LOAD-BEARING CONTROL is `reverted is not survived`. A commit that was
-# reset --hard in the same session left no durable record. If someone ever
-# scores tier by "did a commit run", that row alone flips 3 -> 4 and this test
-# goes red. Survival is a PROXY and a generous proxy is a broken one.
+# Legacy call-only fixtures must not be promoted to successful execution.
+# Result-bearing success/failure contracts live in tests/test_replay.py.
 set -u
 cd "$(dirname "$0")"
 PASS=0; FAIL=0
@@ -50,21 +22,21 @@ check "no sub-agent prompt leaked in"     "sum('Sub-agent' in e for e in [(r['be
 
 echo
 echo "episodes"
-check "one episode per human intent"      "r['episodes']"               7
-check "a correction merges, never splits" "sum(1 for t in ['artifact'] for _ in range(r['tiers']['artifact']))" 2
+check "one episode per human intent"      "r['episodes']"               8
+check "missing results have unknown outcomes" "r['tiers']['unknown']" 4
 
 echo
 echo "the survival tiers"
-check "commit-witnessed"                  "r['tiers']['commit']"        1
-check "artifact-witnessed"                "r['tiers']['artifact']"      2
-check "commit-then-reverted"              "r['tiers']['reverted']"      1
-check "nothing durable"                   "r['tiers']['none']"          3
-check "survived = commit + artifact only" "r['durable']"                3
+check "commit-witnessed"                  "r['tiers']['commit']"        0
+check "artifact-witnessed"                "r['tiers']['artifact']"      0
+check "commit-then-reverted"              "r['tiers']['reverted']"      0
+check "nothing durable"                   "r['tiers']['none']"          4
+check "survived = commit + artifact only" "r['durable']"                0
 check "REVERTED IS NOT SURVIVED"          "r['durable'] == r['tiers']['commit'] + r['tiers']['artifact']" True
 
 echo
 echo "the witness (a number with no evidence is a vibe)"
-check "best prompt names its witness"     "(r['best_prompt'] or {}).get('probe')"  COMMIT-WITNESSED
+check "no invented best prompt" "r['best_prompt']" None
 check "the proxy caveat always travels"   "'PROXY' in r['proxy']"       True
 
 echo
