@@ -14,9 +14,12 @@
 set -u
 cd "$(dirname "$0")"
 pat='/Users/morkeeth|-Users-morkeeth|omorke|beloeved routine|mTERMINAL 8|0d98a2c7|Obsidian LIFE|~/…/'
-# The vault uses a numbered-folder convention. Match the CONVENTION, not a list of folder
-# names: a folder-name list caught 5 of 11 real paths on 2026-09-04 and missed every one
-# under "01 Projects/Job Hunt" and "02 Content". This pattern catches 11 of 11.
+# The author's notes use a numbered-folder convention. Match the CONVENTION, not a list
+# of folder names. A hand-written list of folder names caught 5 of 11 real paths on
+# 2026-09-04 and missed 6, because the list only held the folders someone had thought of.
+# The convention catches 11 of 11, including folders nobody has created yet. Do not
+# replace this with a list, and do not name real folders in this file: the guard is
+# public and a list of what you are hiding is itself a disclosure.
 vault='(^|[^0-9])[0-9]{2} [A-Z][A-Za-z ]*/[^"]*\.md'
 hits=$(git ls-files | grep -v -E '^test_privacy\.sh$' | xargs grep -n -i -E "$pat|$vault" 2>/dev/null)
 if [ -n "$hits" ]; then echo "PRIVACY FAIL:"; echo "$hits" | head -20; exit 1; fi
