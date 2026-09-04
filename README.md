@@ -1,11 +1,27 @@
 # transcripto
 
-**your coding agents keep a transcript of every session. it is the most valuable
-dataset you own, and you cannot scroll back far enough to read it. transcripto
-indexes it, keeps only the turns you actually typed, and grades them.**
+**wait, my agent has been writing all of this down?**
 
-one command, no account, no signup, no cloud. it reads files that are already on
-your disk and never opens a socket.
+it has. every session, to a `.jsonl` file on your disk, since the day you installed it.
+nobody told you and there is no UI for it.
+
+on the machine this was built on that is **2.0 GB across 3,731 transcripts and 1,188
+project folders**, going back to the day the tool was installed. it is the most detailed
+record of how you actually work that exists anywhere, and it has never been read once.
+
+then the part that made this a tool instead of a curiosity. of **504,785 records in there,
+4,261 are turns a human typed. 0.84 percent.** everything else is the machine talking to
+itself. so the thing you would actually want to look at is under a hundredth of the pile,
+and there is no way to scroll to it.
+
+**transcripto indexes it, throws away everything you did not type, and grades what is left:
+which of your prompts produced work that survived, and which produced work you threw away.**
+
+one command, no account, no signup, no cloud. it reads files that are already on your disk
+and never opens a socket.
+
+> those numbers are one machine, read on 2026-09-04 with the commands in this README. yours
+> will differ. the 0.84 percent is the one worth checking on your own disk first.
 
 ```
 uvx transcripto coach
