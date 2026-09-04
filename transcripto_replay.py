@@ -157,7 +157,7 @@ def cmd_replay(args, paths):
             print("\nRecorded: %d succeeded · %d failed · %d unknown" % (counts["succeeded"], counts["failed"], counts["unknown"]))
             if not args.demo:
                 print("Source: %s:%s" % (safe_text(ep["source"]), ep["line"]))
-                print("Replay this request: transcripto replay %s --episode %d --all" % (shlex.quote(ep["source"]), ep["number"]))
+                print("Replay this request: transcripto replay %s --episode %d --all" % (safe_text(shlex.quote(ep["source"])), ep["number"]))
             print(PROXY + "\n")
         for warning in diagnostics:
             print("warning: " + safe_text(warning))

@@ -343,6 +343,25 @@ class CLITests(FixtureCase):
         return subprocess.run([sys.executable, str(ROOT/'transcripto.py'), *args], env=env,
                               cwd=self.root, capture_output=True, text=True, timeout=20)
 
+    def test_source_filename_cannot_emit_terminal_controls(self):
+        name = 'unsafe\x1b[2J.jsonl'
+        self.read([user()], name)
+        p = self.run_cli('replay', str(self.root/name))
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertNotIn('\x1b', p.stdout)
+
+    def test_session_view_keeps_harness_cwd_separate(self):
+        import sqlite3
+        u = dict(user(), sessionId='shared', cwd='/claude-project', timestamp='2026-01-01')
+        self.read([u], 'claude.jsonl')
+        self.read([{'type':'session_meta','payload':{'id':'shared','cwd':'/codex-project'}},
+            {'type':'response_item','timestamp':'2026-02-01','payload':{'type':'message','role':'user','content':'Codex request'}}], 'codex.jsonl')
+        p = self.run_cli('index','--root',str(self.root))
+        self.assertEqual(p.returncode, 0, p.stderr)
+        with sqlite3.connect(self.root/'.trace'/'trace.db') as db:
+            rows = dict(db.execute('SELECT harness,cwd FROM v_sessions'))
+        self.assertEqual(rows, {'claude':'/claude-project','codex':'/codex-project'})
+
     def test_demo_runs_real_parser(self):
         p = self.run_cli('replay', '--demo', '--json')
         self.assertEqual(p.returncode, 0, p.stderr)

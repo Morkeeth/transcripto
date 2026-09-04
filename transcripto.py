@@ -140,7 +140,7 @@ def init_schema(con):
              MAX(m.ts) AS last_ts, MIN(m.ts) AS first_ts,
              COUNT(*) AS n_messages,
              SUM(CASE WHEN m.role='assistant' THEN 1 ELSE 0 END) AS assistant_turns,
-             (SELECT cwd FROM messages c WHERE c.session_id=m.session_id AND c.cwd!=''
+             (SELECT cwd FROM messages c WHERE c.session_id=m.session_id AND c.harness=m.harness AND c.cwd!=''
               ORDER BY c.ts DESC LIMIT 1) AS cwd
       FROM messages m GROUP BY m.session_id, m.harness;
     DROP VIEW IF EXISTS v_file_touches;
@@ -1377,7 +1377,7 @@ def coach(roots=None, harness=None, verified_human=False):
         "files": len(paths), "total_records": records, "human_turns": humans,
         "human_pct": round(100 * humans / records, 2) if records else 0.0,
         # correction rate = typed turns that correct the agent / typed turns.
-        # See is_correction() for the two rules; it is a lexical floor.
+        # See is_correction(); lexical markers can have false positives and misses.
         "corrections": corrections,
         "correction_rate": round(corrections / humans, 3) if humans else 0.0,
         "episodes": len(episodes), "durable": durable,
