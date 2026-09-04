@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "transcripto"
+version = "0.1.4"
+description = "Search everything your coding agents ever did, grade your own prompts, and price your decisions. Local, stdlib-only, your data never leaves the machine."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Oscar Morke" }]
+keywords = ["claude-code", "coding-agents", "transcripts", "local-first", "analytics"]
+classifiers = [
+    "Environment :: Console",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Utilities",
+]
+# No runtime dependencies. Standard library only — that is the whole pitch.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Morkeeth/transcripto"
+Source = "https://github.com/Morkeeth/transcripto"
+
+[project.scripts]
+transcripto = "transcripto:main"
+
+[tool.setuptools]
+py-modules = ["transcripto"]

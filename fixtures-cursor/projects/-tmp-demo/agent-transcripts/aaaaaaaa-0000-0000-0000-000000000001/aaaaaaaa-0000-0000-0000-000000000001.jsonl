@@ -1,0 +1,6 @@
+{"role": "user", "message": {"role": "user", "content": [{"type": "text", "text": "<timestamp>Thursday, Aug 13, 2026, 5:53 PM (UTC+2)</timestamp>\n<user_query>Add the retry helper to src/queue.py and keep the tests green.</user_query>"}]}}
+{"role": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "name": "Write", "input": {"file_path": "/tmp/demo/src/queue.py", "contents": "x"}}]}}
+{"role": "user", "message": {"role": "user", "content": [{"type": "text", "text": "<timestamp>Thursday, Aug 13, 2026, 6:10 PM (UTC+2)</timestamp>\n<user_query>Write the cache notes into docs/cache.md with a TTL section.</user_query>"}]}}
+{"role": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "name": "Write", "input": "{\"contents\": \""}]}}
+{"role": "user", "message": {"role": "user", "content": [{"type": "text", "text": "<timestamp>Thursday, Aug 13, 2026, 6:22 PM (UTC+2)</timestamp>\n<user_query>Run the suite and commit if it is green.</user_query>"}]}}
+{"role": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "name": "Bash", "input": "{\"command\": \"git c"}]}}

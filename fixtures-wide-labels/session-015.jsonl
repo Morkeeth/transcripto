@@ -1,0 +1,2 @@
+{"type": "user", "promptSource": "typed", "timestamp": "2026-08-01T09:14:00Z", "message": {"role": "user", "content": "It is broken again"}}
+{"type": "assistant", "timestamp": "2026-08-01T09:14:10Z", "message": {"role": "assistant", "content": [{"type": "tool_use", "name": "Edit", "input": {"file_path": "/repo/src/parser.py", "old_string": "a", "new_string": "b"}}]}}

@@ -1,0 +1,2 @@
+{"type": "user", "promptSource": "typed", "timestamp": "2026-08-01T09:08:00Z", "message": {"role": "user", "content": "Write a benchmark script for the auth path and run it once."}}
+{"type": "assistant", "timestamp": "2026-08-01T09:08:10Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "acknowledged"}]}}

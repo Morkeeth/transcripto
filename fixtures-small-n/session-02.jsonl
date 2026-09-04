@@ -1,0 +1,2 @@
+{"type": "user", "promptSource": "typed", "timestamp": "2026-08-01T09:02:00Z", "message": {"role": "user", "content": "Add retry logic to the queue worker module and commit when the suite passes."}}
+{"type": "assistant", "timestamp": "2026-08-01T09:02:10Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "acknowledged"}]}}

@@ -1,0 +1,2 @@
+{"type": "user", "promptSource": "typed", "timestamp": "2026-08-01T09:14:00Z", "message": {"role": "user", "content": "Update the parser module so the retry loop stops after three attempts and the counter resets on success"}}
+{"type": "assistant", "timestamp": "2026-08-01T09:14:10Z", "message": {"role": "assistant", "content": [{"type": "tool_use", "name": "Bash", "input": {"command": "ls -la /repo"}}]}}

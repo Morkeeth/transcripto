@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+build/
+*.egg-info/
+dist/
+
+# Never commit real transcript text. This repo is public and every fixture in
+# it is synthetic; the correction labels carry ids only (see fixtures-precision/).
+fixtures-precision/*-text.jsonl
+fixtures-precision/sample-to-label.jsonl
+# The correction labels carry real session ids: local-only, never committed.
+fixtures-precision/labels-*.jsonl

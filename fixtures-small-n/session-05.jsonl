@@ -1,0 +1,2 @@
+{"type": "user", "promptSource": "typed", "timestamp": "2026-08-01T09:05:00Z", "message": {"role": "user", "content": "List all files in the src directory so I can see the layout."}}
+{"type": "assistant", "timestamp": "2026-08-01T09:05:10Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "acknowledged"}]}}

@@ -1,0 +1,21 @@
+{"type":"user","promptSource":"typed","timestamp":"2026-08-01T09:00:00Z","message":{"role":"user","content":"Refactor the auth parser in src/auth/parser.py so that the existing tests still pass, and make sure the token expiry branch is covered before you touch anything else in that module."}}
+{"type":"assistant","timestamp":"2026-08-01T09:00:10Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/src/auth/parser.py","old_string":"a","new_string":"b"}}]}}
+{"type":"user","promptSource":"typed","timestamp":"2026-08-01T09:05:00Z","message":{"role":"user","content":"list the files"}}
+{"type":"assistant","timestamp":"2026-08-01T09:05:10Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"ls -la /repo"}}]}}
+{"type":"user","toolUseResult":{"stdout":"parser.py"},"timestamp":"2026-08-01T09:05:11Z","message":{"role":"user","content":"parser.py"}}
+{"type":"user","promptSource":"typed","timestamp":"2026-08-01T09:10:00Z","message":{"role":"user","content":"Add the retry wrapper to the queue worker and commit it when the suite is green."}}
+{"type":"assistant","timestamp":"2026-08-01T09:10:10Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Write","input":{"file_path":"/repo/worker/retry.py"}}]}}
+{"type":"assistant","timestamp":"2026-08-01T09:10:20Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"git commit -m 'retry wrapper'"}}]}}
+{"type":"user","promptSource":"typed","timestamp":"2026-08-01T09:20:00Z","message":{"role":"user","content":"Rename the billing invoice model everywhere it appears and verify the migration runs clean."}}
+{"type":"assistant","timestamp":"2026-08-01T09:20:10Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"git commit -m 'rename invoice model'"}}]}}
+{"type":"assistant","timestamp":"2026-08-01T09:21:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"git reset --hard HEAD~1"}}]}}
+{"type":"user","promptSource":"queued","timestamp":"2026-08-01T09:30:00Z","message":{"role":"user","content":"fix it"}}
+{"type":"assistant","timestamp":"2026-08-01T09:30:10Z","message":{"role":"assistant","content":[{"type":"text","text":"which one?"}]}}
+{"type":"user","isSidechain":true,"promptSource":"typed","timestamp":"2026-08-01T09:31:00Z","message":{"role":"user","content":"Sub-agent prompt: build the entire dashboard and commit it."}}
+{"type":"user","isMeta":true,"promptSource":"typed","timestamp":"2026-08-01T09:32:00Z","message":{"role":"user","content":"<skill-body>Write a file and commit it every time.</skill-body>"}}
+{"type":"user","promptSource":"sdk","timestamp":"2026-08-01T09:33:00Z","message":{"role":"user","content":"Judge run: write the verdict file and commit."}}
+{"type":"user","promptSource":"typed","timestamp":"2026-08-01T09:40:00Z","message":{"role":"user","content":"Document the caching layer in docs/cache.md and explain why the TTL is what it is."}}
+{"type":"assistant","timestamp":"2026-08-01T09:40:10Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"cat docs/cache.md"}}]}}
+{"type":"user","promptSource":"typed","timestamp":"2026-08-01T09:50:00Z","message":{"role":"user","content":"Refactor the auth parser."}}
+{"type":"user","promptSource":"typed","timestamp":"2026-08-01T09:51:00Z","message":{"role":"user","content":"no, i meant the header path in that same parser"}}
+{"type":"assistant","timestamp":"2026-08-01T09:51:10Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/src/auth/parser.py"}}]}}

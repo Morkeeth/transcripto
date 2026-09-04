@@ -1,0 +1,2 @@
+{"type": "user", "promptSource": "typed", "timestamp": "2026-08-01T09:06:00Z", "message": {"role": "user", "content": "Fix the flaky test in tests/test_worker.py without changing production code."}}
+{"type": "assistant", "timestamp": "2026-08-01T09:06:10Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "acknowledged"}]}}

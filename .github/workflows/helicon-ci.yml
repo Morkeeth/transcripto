@@ -1,0 +1,24 @@
+# Agent-memory exam — report-only; fails visibly once AGENTS.md exists and is clean.
+name: helicon-report (ADVISORY — cannot fail, do not use as a required check)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  agent-memory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Mountain of Helicon
+        run: python -m pip install mountain-of-helicon
+      # --fail-on none means this step CANNOT fail, at any severity. It is a report,
+      # not a gate. `--fail-on rot` is the real gate; at 2026-08-31 this repo has
+      # 1 rot class firing (R13 UNMEASURED), so flipping it turns this red.
+      - name: Run agent-memory exam (REPORT ONLY — this step cannot fail)
+        run: helicon ci --path . --fail-on none

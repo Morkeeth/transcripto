@@ -1,0 +1,2 @@
+{"type": "user", "promptSource": "typed", "timestamp": "2026-08-01T09:00:00Z", "message": {"role": "user", "content": "Fix the retry parser in src/parser.py"}}
+{"type": "assistant", "timestamp": "2026-08-01T09:00:10Z", "message": {"role": "assistant", "content": [{"type": "tool_use", "name": "Bash", "input": {"command": "ls -la /repo"}}]}}

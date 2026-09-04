@@ -1,0 +1,1 @@
+{"session_id": "fixture-sess-0001", "ts": 1782000000, "text": "refactor the http client so it retries failed calls, add tests to verify the retry path"}

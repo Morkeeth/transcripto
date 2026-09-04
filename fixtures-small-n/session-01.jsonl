@@ -1,0 +1,2 @@
+{"type": "user", "promptSource": "typed", "timestamp": "2026-08-01T09:01:00Z", "message": {"role": "user", "content": "Refactor the auth parser in src/auth/parser.py and keep the existing tests green."}}
+{"type": "assistant", "timestamp": "2026-08-01T09:01:10Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "acknowledged"}]}}

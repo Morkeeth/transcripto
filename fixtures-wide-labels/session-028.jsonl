@@ -1,0 +1,2 @@
+{"type": "user", "promptSource": "typed", "timestamp": "2026-08-01T09:27:00Z", "message": {"role": "user", "content": "Update the docs in docs/retry.md"}}
+{"type": "assistant", "timestamp": "2026-08-01T09:27:10Z", "message": {"role": "assistant", "content": [{"type": "tool_use", "name": "Bash", "input": {"command": "ls -la /repo"}}]}}

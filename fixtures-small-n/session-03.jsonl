@@ -1,0 +1,2 @@
+{"type": "user", "promptSource": "typed", "timestamp": "2026-08-01T09:03:00Z", "message": {"role": "user", "content": "Document the caching layer in docs/cache.md with a clear TTL explanation."}}
+{"type": "assistant", "timestamp": "2026-08-01T09:03:10Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "acknowledged"}]}}
