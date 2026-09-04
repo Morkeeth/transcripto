@@ -409,7 +409,10 @@ def cmd_ask(args):
         return cmd_sources(args)
     con = connect()
     try:
-        report = evidence.retrieve(con, args.query, _match(args.query), args.limit)
+        terms, removed = (args.query.split(), []) if getattr(args, 'literal', False) else evidence.remembered_terms(args.query)
+        report = evidence.retrieve(con, args.query, _match(' '.join(terms)), args.limit)
+        report['selection']['query_terms'] = terms
+        report['selection']['ignored_question_words'] = removed
     except sqlite3.OperationalError as exc:
         print("ask error: " + core.safe_text(str(exc)), file=sys.stderr)
         return 2
@@ -1634,7 +1637,7 @@ def main():
     s.add_argument("--json", action="store_true", help="machine-readable source inventory with --status")
     s.set_defaults(fn=cmd_index)
     s = sub.add_parser("watch"); s.add_argument("--interval", type=int, default=5); s.set_defaults(fn=cmd_watch)
-    s = sub.add_parser("ask"); s.add_argument("query", nargs="?"); s.add_argument("-n", "--limit", type=int, default=25); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_ask)
+    s = sub.add_parser("ask"); s.add_argument("query", nargs="?"); s.add_argument("-n", "--limit", type=int, default=25); s.add_argument("--json", action="store_true"); s.add_argument("--literal", action="store_true", help="keep every question word in the search"); s.set_defaults(fn=cmd_ask)
     s = sub.add_parser("search"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=25); s.set_defaults(fn=cmd_search)
     s = sub.add_parser("find"); s.add_argument("name"); s.set_defaults(fn=cmd_find)
     s = sub.add_parser("trace"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=10)

@@ -1,9 +1,23 @@
 """Local source identities and inspectable retrieval. No generated answers."""
 import hashlib
 import os
+import re
 from datetime import datetime, timezone
 
 import transcripto_core as core
+
+
+QUESTION_WORDS = frozenset('why where when what how did do does have has had was were is are i we you my our the a an about this that it for of to with before after choose chose chosen decide decided ask asked'.split())
+
+
+def remembered_terms(query):
+    """Remove question scaffolding, never negation or silently substitute a topic."""
+    words = re.findall(r"[\w./:-]+", query, re.UNICODE)
+    # A topic query is already intentional. Only natural-question openings opt in.
+    if not words or words[0].lower() not in {'why', 'where', 'when', 'what', 'how', 'did', 'do', 'does', 'have', 'has'}:
+        return words, []
+    removed = [word for word in words if word.lower() in QUESTION_WORDS]
+    return [word for word in words if word.lower() not in QUESTION_WORDS], removed
 
 
 def version(path):
@@ -72,6 +86,11 @@ def describe(report):
             lines.append("%s · %s · %d supported file(s)" % (source["root"], source["state"], source["selected_files"]))
         return "\n".join(lines)
     lines = ["%d recorded request%s · original evidence, newest first" % (len(hits), "" if len(hits) == 1 else "s")]
+    if report.get('selection', {}).get('ignored_question_words'):
+        lines.append('Searching topic terms: ' + ' '.join(report['selection']['query_terms']) + ' · use --literal to keep every word')
+    for source in report.get('coverage', {}).get('sources', []):
+        if source['state'] != 'available':
+            lines.append('Coverage: %s · %s · inspect --json warnings' % (source['state'], source['root']))
     for hit in hits:
         source = hit["source"]
         label = "human" if hit["authorship"]["kind"] == "human" else "authorship unknown"

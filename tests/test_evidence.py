@@ -72,6 +72,20 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(self.query('Postgres')['status'], 'no-match')
         self.assertEqual(self.query('SQLite')['hits'][0]['text'], 'Keep SQLite')
 
+    def test_natural_question_terms_preserve_negation_and_topics(self):
+        self.assertEqual(evidence.remembered_terms('Why did we choose SQLite?')[0], ['SQLite'])
+        self.assertEqual(evidence.remembered_terms('Why did we not choose SQLite?')[0], ['not', 'SQLite'])
+        self.assertEqual(evidence.remembered_terms('never delete backups')[0], ['never', 'delete', 'backups'])
+
+    def test_partial_parse_is_visible_to_json_only_consumer(self):
+        path = self.root / 'partial.jsonl'
+        path.write_text(json.dumps({'type': 'user', 'promptSource': 'typed', 'message': {'content': 'Keep SQLite'}}) + '\n{"broken":')
+        self.assertEqual(self.query('SQLite')['status'], 'matches')
+        report = cli.sources.inventory(cli.ROOTS, database=cli.DB)
+        source = report['sources'][0]
+        self.assertEqual(source['state'], 'partial')
+        self.assertTrue(any(w.get('basis') == 'indexed parse diagnostics' for w in source['warnings']))
+
 
 if __name__ == '__main__':
     unittest.main()

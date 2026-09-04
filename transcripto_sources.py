@@ -70,11 +70,18 @@ def candidates(root):
 
 def inventory(roots, harness=None, database=None):
     indexed = {}
+    index_warnings = {}
     cache_error = None
     if database and os.path.isfile(database):
         try:
             with sqlite3.connect(Path(database).absolute().as_uri() + "?mode=ro", uri=True) as con:
                 indexed = dict(con.execute("SELECT session_file,mtime FROM indexed"))
+                if 'warnings' in {r[1] for r in con.execute('PRAGMA table_info(indexed)')}:
+                    for path, encoded in con.execute('SELECT session_file,warnings FROM indexed'):
+                        try:
+                            index_warnings[path] = json.loads(encoded or '[]')
+                        except (ValueError, TypeError):
+                            index_warnings[path] = ['Index warnings could not be decoded.']
         except sqlite3.Error as exc:
             cache_error = str(exc)
     sources = []
@@ -88,6 +95,8 @@ def inventory(roots, harness=None, database=None):
             counts[provider] = counts.get(provider, 0) + 1
             if warning:
                 warnings.append({"path": path, "reason": warning})
+            for message in index_warnings.get(path, []):
+                warnings.append({"path": path, "reason": message, "basis": "indexed parse diagnostics"})
             if provider not in ("claude", "codex", "cursor") or (harness and provider != harness):
                 continue
             selected += 1
@@ -104,7 +113,9 @@ def inventory(roots, harness=None, database=None):
             if latest is None or modified > latest[0]:
                 latest = (modified, path, provider)
         if state == "available" and not selected:
-            state = "unsupported" if counts and not any(p in counts for p in ("claude", "codex", "cursor")) else "no-selected-harness"
+            state = "inaccessible" if set(counts) == {'inaccessible'} else ("unsupported" if counts and not any(p in counts for p in ("claude", "codex", "cursor")) else "no-selected-harness")
+        if state == 'available' and warnings:
+            state = 'partial'
         sources.append({"root": str(Path(root).expanduser().absolute()), "state": state,
                         "files": len(paths), "formats": counts, "selected_files": selected,
                         "index": {"fresh_by_mtime": fresh, "changed": stale, "not_indexed": selected - fresh - stale},

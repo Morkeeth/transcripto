@@ -50,6 +50,13 @@ the referenced original record is authoritative. No-match returns an empty hit
 list and source coverage. Request authorship is `human` only with Claude's native
 typed/queued gate; Codex/Cursor envelopes return `unknown`.
 
+Natural-question openings remove common question words before matching topic
+terms. The JSON `selection` lists both retained and ignored words; `--literal`
+keeps every word. This is lexical retrieval, not semantic understanding. Negation
+is retained. There is no automatic synonym or spelling substitution. Coverage
+includes indexed parser diagnostics, including when valid records match in a
+partially readable source. Consumers must inspect coverage even on `matches`.
+
 `v_messages` adds `session_file`, `source_line`, and `record_sha256`. An indexed
 source hash describes the bytes observed at indexing, not perpetual freshness.
 Refresh checks nanosecond modification time and size; changed files are hashed
