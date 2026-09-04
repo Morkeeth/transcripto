@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "transcripto"
-version = "0.1.5"
-description = "Search everything your coding agents ever did, grade your own prompts, and price your decisions. Local, stdlib-only, your data never leaves the machine."
+version = "0.2.0"
+description = "Instant replay for coding agents. Inspect requests, tool calls, and recorded results across Claude Code, Codex, and Cursor. Local, stdlib-only."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
@@ -28,4 +28,4 @@ Source = "https://github.com/Morkeeth/transcripto"
 transcripto = "transcripto:main"
 
 [tool.setuptools]
-py-modules = ["transcripto"]
+py-modules = ["transcripto", "transcripto_core", "transcripto_replay"]

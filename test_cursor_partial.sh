@@ -34,12 +34,12 @@ check "no traceback" \
   "! echo '$OUT' | grep -q 'Traceback'"
 check "3 episodes extracted (nothing dropped)" \
   "jq_ \"r['episodes']==3\""
-check "the partial Write still counts as an artifact" \
-  "jq_ \"r['tiers']['artifact']==2\""
+check "partial writes stay unknown" \
+  "jq_ \"r['tiers']['unknown']==2\""
 check "the partial Bash claims no commit" \
   "jq_ \"r['tiers']['commit']==0\""
-check "an unreadable target reads as ? not as a guess" \
-  "echo '$OUT' | grep -q 'Write' "
+check "no successful change is invented" \
+  "jq_ \"r['durable']==0\" "
 
 echo
 if [ "$FAIL" -eq 0 ]; then echo "$PASS/$((PASS+FAIL)) green."; else echo "$PASS/$((PASS+FAIL)) — $FAIL RED."; exit 1; fi

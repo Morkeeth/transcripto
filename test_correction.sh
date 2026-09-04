@@ -119,10 +119,10 @@ check "only the 6 you typed (3 decoys dropped)" "r['human_turns']"   6
 check "3 corrections"                         "r['corrections']"     3
 check "correction_rate = 3/6"                 "r['correction_rate']" 0.5
 OUT=$(TRANSCRIPTO_CORRECTION=v0 python3 transcripto.py coach --root fixtures-correction 2>&1)
-ok "coach prints the rate WITH its n"  "echo \"\$OUT\" | grep -q 'correction rate: 50% measured (3 of 6 typed turns)'"
-ok "…and names the version and its MEASURED recall, not just 'a floor'" \
-  "echo \"\$OUT\" | grep -q 'v0 catches ~1 in 18'"
-ok "existing footer line untouched"    "echo \"\$OUT\" | grep -q '6 typed by you'"
+ok "coach prints the rate WITH its n"  "echo \"\$OUT\" | grep -q 'Correction markers: 3 of 6 turns (50%)'"
+ok "…and names classifier errors, without projecting a foreign calibration" \
+  "echo \"\$OUT\" | grep -q 'false positives and misses'"
+ok "existing footer line untouched"    "echo \"\$OUT\" | grep -q '6 submitted turns'"
 
 echo
 echo "the gate is load-bearing: strip the three decoy flags and the rate moves"
@@ -184,8 +184,8 @@ ok "a rebase pick is not a commit; the open window counts 3" \
   "python3 -c \"import transcripto as t; assert len(t._reflog_commits('$SCRATCH/repo'))==3\""
 ok "not a repo -> None (never 0)" \
   "python3 -c \"import transcripto as t; assert t._reflog_commits('$SCRATCH/nowhere-such-dir') is None\""
-ok "still no subprocess / socket / urllib in the file" \
-  "! grep -nE '\\b(socket|urllib|requests|http\\.client|subprocess)\\b' transcripto.py"
+ok "runtime modules import no network or process-execution libraries" \
+  "python3 -m unittest discover -s tests -p test_replay.py -k PrivacyTests >/dev/null 2>&1"
 rm -rf "$SCRATCH"
 
 echo
