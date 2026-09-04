@@ -1,26 +1,65 @@
 # Transcripto
 
-**Your agent said “done.” Replay what happened.**
+**You might already be keeping a journal. Read your side of it.**
 
-Transcripto reads the transcripts already on your machine and puts your request,
-the tool calls, and their recorded results in order. Failed edits stay failed.
-Missing results stay unknown. A confident closing message changes neither.
+Your agent transcripts contain what you asked for, what you changed your mind
+about, and what you kept coming back to. Transcripto helps you find those words
+and read the recorded work around them.
 
-Claude Code · Codex · Cursor. Local. No accounts. No runtime dependencies.
+Claude Code · Codex · Cursor. Local files. No account. No runtime dependencies.
+
+## Start with something you remember saying
 
 ```sh
-uvx --from transcripto==0.2.0 transcripto
-
-# Try a synthetic session without opening your own history:
-uvx --from transcripto==0.2.0 transcripto replay --demo
+uvx --from transcripto==0.2.0 transcripto ask "retry"
 ```
 
-Or install with `python3 -m pip install transcripto==0.2.0`, then run
-`transcripto`. Requires Python 3.9 or newer.
+Replace `retry` with a word you remember using. `ask` searches messages identified
+as yours and shows dated snippets, newest first. It refreshes the local index
+automatically. The first search indexes the selected history; a large archive
+can take minutes. Add `--harness claude`, `--harness codex`, or `--harness cursor`
+to limit that scan. It does not generate a diary or interpret your personality.
 
-Version **0.2.0** adds replay. The default command opens your latest human
-session. Pinning the version makes the reviewed build and the build you run
-the same object.
+Then open the surrounding work:
+
+```sh
+uvx --from transcripto==0.2.0 transcripto replay "retry"
+
+# Or open your latest human session:
+uvx --from transcripto==0.2.0 transcripto
+```
+
+Replay puts your request, tool calls and recorded results in order. Failed edits
+stay failed. Missing results stay unknown. Status describes tool execution,
+not whether the task was done correctly.
+
+Or install with `python3 -m pip install transcripto==0.2.0`, then run
+`transcripto ask "retry"`. Requires Python 3.9 or newer.
+
+**Your files remain yours.** Transcripto does not upload transcript content or
+execute commands found in it. Search output, replay and JSON can contain private
+words and paths; review anything you choose to share. It reads existing files,
+not deleted history. Check your agent's retention settings and keep your own
+backup if you want a lasting record. Authorship detection differs by harness;
+[see the limits below](#what-each-harness-supports).
+
+## Find the thing you remember
+
+Search automatically refreshes a local index. No setup command is required.
+
+```sh
+transcripto ask "retry"                 # your submitted words
+transcripto search "retry"              # prompts, replies, and tool text
+transcripto find parser.py              # recorded file operations and attempts
+transcripto trace "retry"               # an alias into result-aware replay
+transcripto sessions                    # sessions with submitted prompts
+transcripto stats                       # activity counts
+```
+
+A failed or unconfirmed file change is labelled an **attempt**, never `WROTE`.
+Queries with `--harness` or `--root` are scoped to that selection even if the
+index already contains another corpus. `index` and `watch` remain available for
+explicit refresh and background polling.
 
 ## The replay
 
@@ -72,24 +111,6 @@ transcripto replay latest --share           # counts + caveat; no prompts or pat
 
 `--share` is intentionally small. Full replay output and JSON contain your own
 words and local paths. The tool does not upload either.
-
-## Find the thing you remember
-
-Search automatically refreshes a local index. No setup command is required.
-
-```sh
-transcripto ask "retry"                 # your submitted words
-transcripto search "retry"              # prompts, replies, and tool text
-transcripto find parser.py              # recorded file operations and attempts
-transcripto trace "retry"               # an alias into result-aware replay
-transcripto sessions                    # sessions with submitted prompts
-transcripto stats                       # activity counts
-```
-
-A failed or unconfirmed file change is labelled an **attempt**, never `WROTE`.
-Queries with `--harness` or `--root` are scoped to that selection even if the
-index already contains another corpus. `index` and `watch` remain available for
-explicit refresh and background polling.
 
 ## What each harness supports
 
