@@ -394,16 +394,16 @@ class CLITests(FixtureCase):
         for needle in ['claude-needle','cursor-needle','codex-needle']:
             p = self.run_cli('ask', needle, '--root', str(self.root))
             self.assertEqual(p.returncode, 0, p.stderr)
-            self.assertIn('1 message you typed', p.stdout)
+            self.assertIn('1 recorded request', p.stdout)
         self.assertEqual((self.root/'.trace'/'trace.db').stat().st_mode & 0o777, 0o600)
 
     def test_reindex_removes_old_full_text_tokens(self):
         self.read([user('oldneedle')])
-        self.assertIn('1 message you typed', self.run_cli('ask','oldneedle','--root',str(self.root)).stdout)
+        self.assertIn('1 recorded request', self.run_cli('ask','oldneedle','--root',str(self.root)).stdout)
         self.read([user('newneedle')])
         os.utime(self.root/'session.jsonl', (2000000000, 2000000000))
         self.assertIn('nothing about', self.run_cli('ask','oldneedle','--root',str(self.root)).stdout)
-        self.assertIn('1 message you typed', self.run_cli('ask','newneedle','--root',str(self.root)).stdout)
+        self.assertIn('1 recorded request', self.run_cli('ask','newneedle','--root',str(self.root)).stdout)
 
     def test_failed_edit_not_reported_as_wrote_by_find(self):
         self.read([user(),call(),result('denied',True)])
@@ -420,11 +420,11 @@ class CLITests(FixtureCase):
         p = self.run_cli('ask','sharedneedle','--root',str(right))
         self.assertIn('sharedneedle right', p.stdout)
         self.assertNotIn('sharedneedle left', p.stdout)
-        self.assertIn('1 message you typed', p.stdout)
+        self.assertIn('1 recorded request', p.stdout)
 
     def test_deleted_transcript_is_removed_on_refresh(self):
         self.read([user('deletedneedle')])
-        self.assertIn('1 message you typed', self.run_cli('ask','deletedneedle','--root',str(self.root)).stdout)
+        self.assertIn('1 recorded request', self.run_cli('ask','deletedneedle','--root',str(self.root)).stdout)
         (self.root/'session.jsonl').unlink()
         self.assertIn('nothing about', self.run_cli('ask','deletedneedle','--root',str(self.root)).stdout)
 
@@ -461,7 +461,7 @@ class CLITests(FixtureCase):
         p.write_text(json.dumps(user('partialneedle'))+'\n{bad\n')
         for _ in range(2):
             r = self.run_cli('ask','partialneedle','--root',str(self.root))
-            self.assertIn('1 message you typed', r.stdout)
+            self.assertIn('1 recorded request', r.stdout)
             self.assertIn('malformed', r.stderr)
 
     def test_trace_propagates_no_match_status(self):

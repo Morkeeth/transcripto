@@ -4,6 +4,7 @@ Calls describe attempts. Only a matching tool result can establish execution sta
 The normalized rows deliberately retain the Claude message envelope for consumers.
 """
 import json
+import hashlib
 import os
 import re
 import shlex
@@ -70,6 +71,7 @@ def iter_json(path, diagnostics=None):
                     counts["invalid"] += 1
                     continue
                 d["_line"] = line_no
+                d["_record_sha256"] = hashlib.sha256(raw.rstrip(b"\r\n")).hexdigest()
                 yield d
     except (OSError, ValueError) as exc:
         warning = "%s: %s" % (path, exc)
@@ -319,7 +321,7 @@ def read_session(path, diagnostics=None):
         if d.get("type") == "response_item":
             harness = "codex"
             p = d.get("payload") or {}
-            meta = {"timestamp": d.get("timestamp", ""), "cwd": cwd, "sessionId": sid, "_line": d["_line"]}
+            meta = {"timestamp": d.get("timestamp", ""), "cwd": cwd, "sessionId": sid, "_line": d["_line"], "_record_sha256": d["_record_sha256"]}
             pt = p.get("type")
             if pt == "message":
                 text = text_of(p.get("content"))

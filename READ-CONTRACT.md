@@ -39,3 +39,23 @@ Consumers must not write to these tables. Store consumer state separately,
 keyed by session ID. Message IDs can change during reindexing and schema
 rebuilds; they are not durable foreign keys. Read-only connections must be
 reopened after a schema migration if a query fails.
+
+## Source references (schema 4)
+
+`transcripto ask "offline parser" --json` returns `transcripto.ask/1` with
+original request text, provider, session ID, recorded timestamp and cwd, plus
+the source path, one-based JSONL line, record SHA-256 and indexed source SHA-256.
+These identify evidence, not a synthesized answer. Text is normalized and bounded;
+the referenced original record is authoritative. No-match returns an empty hit
+list and source coverage. Request authorship is `human` only with Claude's native
+typed/queued gate; Codex/Cursor envelopes return `unknown`.
+
+`v_messages` adds `session_file`, `source_line`, and `record_sha256`. An indexed
+source hash describes the bytes observed at indexing, not perpetual freshness.
+Refresh checks nanosecond modification time and size; changed files are hashed
+before and after parsing. A writer changing a source during indexing causes a
+retry warning. Hash-check a source before using saved evidence. File timestamps
+alone cannot detect a same-size rewrite with deliberately preserved metadata.
+
+Set `TRANSCRIPTO_DB` to an explicit local SQLite path for an isolated consumer
+index or reproducible corpus. The default remains `~/.trace/trace.db`.

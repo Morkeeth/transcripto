@@ -6,6 +6,7 @@ Local transcript inspection for Claude Code, Codex, and Cursor. Stdlib only.
 import sys, os, json, glob, re, sqlite3, argparse, math
 import transcripto_core as core
 import transcripto_sources as sources
+import transcripto_evidence as evidence
 from transcripto_replay import cmd_replay
 from datetime import datetime, timezone
 
@@ -48,7 +49,7 @@ USAGE = """
 HOME = os.path.expanduser("~")
 ROOTS = [os.path.join(HOME, ".claude", "projects"),
          os.path.join(HOME, ".codex"), os.path.join(HOME, ".cursor")]
-DB = os.path.join(HOME, ".trace", "trace.db")
+DB = os.path.abspath(os.path.expanduser(os.environ.get("TRANSCRIPTO_DB", os.path.join(HOME, ".trace", "trace.db"))))
 HARNESS = None
 
 FILE_TOOLS = {"Write": "write", "Edit": "edit", "Read": "read",
@@ -90,7 +91,7 @@ def connect(require_index=True):
     return con
 
 
-SCHEMA_VERSION = 3  # bump when a column/tokenizer change needs a full rebuild
+SCHEMA_VERSION = 4  # source-line and content-version references
 
 
 def _needs_rebuild(con):
@@ -122,7 +123,8 @@ def init_schema(con):
     CREATE TABLE IF NOT EXISTS messages(
       id INTEGER PRIMARY KEY, session_id TEXT, session_file TEXT, project TEXT,
       ts TEXT, role TEXT, cwd TEXT, git_branch TEXT, text TEXT,
-      is_human INTEGER DEFAULT 0, prompt_source TEXT, harness TEXT);
+      is_human INTEGER DEFAULT 0, prompt_source TEXT, harness TEXT,
+      source_line INTEGER, record_sha256 TEXT);
     -- porter stemming: `ask "frustration"` also matches frustrated/frustrating.
     CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
       text, content='messages', content_rowid='id', tokenize="porter unicode61");
@@ -131,7 +133,8 @@ def init_schema(con):
       session_id TEXT, session_file TEXT, ts TEXT, cwd TEXT, harness TEXT);
     CREATE INDEX IF NOT EXISTS idx_files_name ON files(name);
     CREATE INDEX IF NOT EXISTS idx_msg_human ON messages(is_human, ts);
-    CREATE TABLE IF NOT EXISTS indexed(session_file TEXT PRIMARY KEY, mtime REAL, warnings TEXT);
+    CREATE TABLE IF NOT EXISTS indexed(session_file TEXT PRIMARY KEY, mtime REAL, warnings TEXT,
+      mtime_ns INTEGER, size INTEGER, sha256 TEXT);
 
     -- Stable READ-ONLY views for consumers (ZUP, Helicon). The contract: consumers
     -- open the db read-only and SELECT from these views; they never write. See READ-CONTRACT.md.
@@ -154,7 +157,7 @@ def init_schema(con):
     DROP VIEW IF EXISTS v_messages;
     CREATE VIEW v_messages AS
       SELECT id, session_id, project, ts, role, cwd, git_branch, text,
-             is_human, prompt_source, harness FROM messages;
+             is_human, prompt_source, harness, session_file, source_line, record_sha256 FROM messages;
     """)
     con.execute("PRAGMA user_version=%d" % SCHEMA_VERSION)
     con.commit()
@@ -250,16 +253,29 @@ def _index_once(con, progress=False):
                              % (done, len(seen), new, msgs))
             sys.stderr.flush()
         try:
-            mt = os.path.getmtime(f)
+            stat = os.stat(f)
+            mt = stat.st_mtime
         except OSError:
             continue
-        row = con.execute("SELECT mtime,warnings FROM indexed WHERE session_file=?", (f,)).fetchone()
-        if row and abs(row[0] - mt) < 1e-6:
+        row = con.execute("SELECT mtime,warnings,mtime_ns,size FROM indexed WHERE session_file=?", (f,)).fetchone()
+        if row and row[2:] == (stat.st_mtime_ns, stat.st_size):
             for warning in json.loads(row[1] or "[]"):
                 print("warning: partial index: " + core.safe_text(warning), file=sys.stderr)
             continue
         diagnostics = []
+        try:
+            before = evidence.version(f)
+        except (OSError, ValueError) as exc:
+            print("warning: " + core.safe_text(str(exc)), file=sys.stderr)
+            continue
         rows, harness = core.read_session(f, diagnostics)
+        try:
+            after = evidence.version(f)
+            if before != after:
+                raise ValueError("source changed during indexing; retry: " + f)
+        except (OSError, ValueError) as exc:
+            print("warning: " + core.safe_text(str(exc)), file=sys.stderr)
+            continue
         if diagnostics:
             for warning in diagnostics:
                 print("warning: " + core.safe_text(warning), file=sys.stderr)
@@ -282,15 +298,15 @@ def _index_once(con, progress=False):
             psrc = d.get("promptSource")
             if text:
                 cur = con.execute(
-                    "INSERT INTO messages(session_id,session_file,project,ts,role,cwd,git_branch,text,is_human,prompt_source,harness)"
-                    " VALUES(?,?,?,?,?,?,?,?,?,?,?)", (sid, f, proj, ts, role, cwd, gb, text, human, psrc, harness))
+                    "INSERT INTO messages(session_id,session_file,project,ts,role,cwd,git_branch,text,is_human,prompt_source,harness,source_line,record_sha256)"
+                    " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", (sid, f, proj, ts, role, cwd, gb, text, human, psrc, harness, d.get('_line'), d.get('_record_sha256')))
                 con.execute("INSERT INTO messages_fts(rowid,text) VALUES(?,?)", (cur.lastrowid, text))
                 msgs += 1
             for action, path in fl:
                 con.execute(
                     "INSERT INTO files(path,name,action,session_id,session_file,ts,cwd,harness)"
                     " VALUES(?,?,?,?,?,?,?,?)", (path, os.path.basename(path), action, sid, f, ts, cwd, harness))
-        con.execute("INSERT OR REPLACE INTO indexed(session_file,mtime,warnings) VALUES(?,?,?)", (f, mt, json.dumps(diagnostics)))
+        con.execute("INSERT OR REPLACE INTO indexed(session_file,mtime,warnings,mtime_ns,size,sha256) VALUES(?,?,?,?,?,?)", (f, mt, json.dumps(diagnostics), after['mtime_ns'], after['bytes'], after['sha256']))
         con.commit(); new += 1
     return new, msgs
 
@@ -385,74 +401,19 @@ def _repo(cwd, proj):
 
 
 def cmd_ask(args):
-    """YOUR OWN messages about a topic — the question that kills 'did I lose something?'.
-
-    Filters to turns Oscar actually typed (is_human=1), newest first, each with
-    date + repo + session id + snippet, and opens with a deterministic rollup of
-    the arc: how many, how long, which repos, and your latest thought on it.
-    """
+    """Return original request evidence; never synthesize an answer."""
     if not args.query:
         return cmd_sources(args)
     con = connect()
     try:
-        rows = con.execute(
-            "SELECT m.id,m.ts,m.project,m.cwd,m.session_id,m.text,"
-            " snippet(messages_fts,0,'\033[1m','\033[0m','…',16)"
-            " FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid"
-            " WHERE messages_fts MATCH ? AND m.is_human=1"
-            " ORDER BY m.ts DESC LIMIT ?",
-            (_match(args.query), args.limit)).fetchall()
-    except sqlite3.OperationalError as e:
-        print("ask error:", e); return
-    if not rows:
-        # Did the topic exist at all (just not in his own words)? Say so honestly.
-        try:
-            any_hit = con.execute(
-                "SELECT COUNT(*) FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid WHERE messages_fts MATCH ?",
-                (_match(args.query),)).fetchone()[0]
-        except sqlite3.OperationalError:
-            any_hit = 0
-        if any_hit:
-            print("no messages YOU typed about '%s', but %d agent/tool turns mention it."
-                  "\ntry `%s search \"%s\"` to see those, or `%s index` if it's new."
-                  % (args.query, any_hit, PROG, args.query, PROG))
-        else:
-            print("nothing about '%s' yet. try `%s index` first, or broader terms."
-                  % (args.query, PROG))
-        return
-
-    # ---- rollup: the arc across ALL your matches, not just the shown page ----
-    allm = con.execute(
-        "SELECT m.ts,m.project,m.cwd,m.session_id"
-        " FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid"
-        " WHERE messages_fts MATCH ? AND m.is_human=1",
-        (_match(args.query),)).fetchall()
-    total = len(allm)
-    days = sorted(_day(r[0]) for r in allm if r[0])
-    sessions = {r[3] for r in allm}
-    repos = {}
-    for ts, proj, cwd, sid in allm:
-        repos[_repo(cwd, proj)] = repos.get(_repo(cwd, proj), 0) + 1
-    top = sorted(repos.items(), key=lambda kv: -kv[1])
-    span = ("%s → %s" % (days[0], days[-1])) if days else "?"
-    shown = len(rows)
-    more = " (showing newest %d)" % shown if shown < total else ""
-    headcount = ("%d" % total) if shown >= total else ("%d of %d" % (shown, total))
-    print("\033[1m%s\033[0m  %s message%s you typed · %d session%s · %d repo%s · %s%s"
-          % (args.query, headcount, "" if total == 1 else "s",
-             len(sessions), "" if len(sessions) == 1 else "s",
-             len(top), "" if len(top) == 1 else "s", span, more))
-    print("\033[2mwhat you were doing about this\033[0m")
-    print("  most active in: " + " · ".join(
-        "\033[36m%s\033[0m (%d)" % (r, c) for r, c in top[:4]))
-    lid, lts, lproj, lcwd, lsid, ltext, lsnip = rows[0]
-    latest = " ".join(ltext.split())[:240]
-    print("  latest (\033[2m%s\033[0m %s): \"%s\"" % (_day(lts), _repo(lcwd, lproj), latest))
-
-    print("\n\033[2myour messages, newest first\033[0m")
-    for _id, ts, proj, cwd, sid, text, snip in rows:
-        print("%s  \033[36m%-20s\033[0m %s  \033[2m%s\033[0m"
-              % (_day(ts), _repo(cwd, proj)[:20], " ".join(snip.split()), (sid or "")[:8]))
+        report = evidence.retrieve(con, args.query, _match(args.query), args.limit)
+    except sqlite3.OperationalError as exc:
+        print("ask error: " + core.safe_text(str(exc)), file=sys.stderr)
+        return 2
+    report["coverage"] = sources.inventory(ROOTS, HARNESS, DB)
+    print(json.dumps(report, indent=2) if getattr(args, "json", False)
+          else core.safe_text(evidence.describe(report)))
+    return 0
 
 
 def cmd_find(args):
@@ -1620,7 +1581,7 @@ def main():
     s.add_argument("--json", action="store_true", help="machine-readable source inventory with --status")
     s.set_defaults(fn=cmd_index)
     s = sub.add_parser("watch"); s.add_argument("--interval", type=int, default=5); s.set_defaults(fn=cmd_watch)
-    s = sub.add_parser("ask"); s.add_argument("query", nargs="?"); s.add_argument("-n", "--limit", type=int, default=25); s.set_defaults(fn=cmd_ask)
+    s = sub.add_parser("ask"); s.add_argument("query", nargs="?"); s.add_argument("-n", "--limit", type=int, default=25); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_ask)
     s = sub.add_parser("search"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=25); s.set_defaults(fn=cmd_search)
     s = sub.add_parser("find"); s.add_argument("name"); s.set_defaults(fn=cmd_find)
     s = sub.add_parser("trace"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=10)
