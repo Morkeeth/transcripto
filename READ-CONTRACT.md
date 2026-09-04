@@ -119,3 +119,26 @@ it is not proof of human typing in Codex or Cursor. Consumers should use the
 timeline authorship field for that distinction. SQLite `v_messages` adds
 `origin_session_id`, `inherited`, `session_kind` and `timestamp_basis`; NULL is
 unknown, not false. Reopen readers after migration.
+
+## A fixed coaching baseline
+
+```sh
+transcripto coach --root /path/to/history --snapshot /private/path/baseline.json
+transcripto coach --root /path/to/history --compare /private/path/baseline.json
+```
+
+The snapshot contains request references and counts, not transcript bodies.
+It binds the selected source versions and excludes inherited parent requests and
+duplicate copies of the same request. Saving refuses an existing file. A return
+visit reads the original baseline bytes, identifies them by SHA-256, and compares
+newly observed request records separately. Rewritten old request lines, changed
+old execution results and absent prior records each have their own fields.
+Newly observed is not a claim about when a person did the work.
+
+`--json` exposes `transcripto.coaching-snapshot/1` or
+`transcripto.coaching-comparison/1`. Populations are grouped by provider to expose
+scope, not rank models. Known-result fractions exclude unknown change outcomes;
+answers without observed changes are separate. Sample sizes and descriptive
+Wilson intervals travel with the result. Within-session dependence and selection
+bias are not modeled. No causal advice, significance tests or quality scores are
+produced. A baseline with no new requests yields no new fraction to estimate.

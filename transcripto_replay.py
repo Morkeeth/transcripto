@@ -79,6 +79,8 @@ def cmd_replay(args, paths):
             if not is_path and "subagents" in path.split(os.sep):
                 continue
             rows, harness = read_session(path, diagnostics)
+            if not is_path and target == 'latest' and any(r.get('_session_kind') == 'subagent' for r in rows):
+                continue
             if not any(human_text(r) for r in rows):
                 continue
             eps = episodes(rows, path)

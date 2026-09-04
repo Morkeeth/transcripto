@@ -387,6 +387,17 @@ class CLITests(FixtureCase):
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertIn('human.jsonl', json.loads(p.stdout)['episodes'][0]['source'])
 
+    def test_latest_skips_codex_child_with_inherited_human_context(self):
+        self.read([user('Original human session')], 'human.jsonl')
+        self.read([
+            {'type': 'session_meta', 'ordinal': 0, 'payload': {'id': 'child', 'thread_source': 'subagent', 'parent_thread_id': 'parent', 'subagent_history_start_ordinal': 3}},
+            {'type': 'session_meta', 'ordinal': 1, 'payload': {'id': 'parent'}},
+            {'type': 'response_item', 'ordinal': 2, 'payload': {'type': 'message', 'role': 'user', 'content': [{'text': 'Inherited request'}]}}
+        ], 'child.jsonl')
+        p = self.run_cli('replay', '--root', str(self.root), '--json')
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn('human.jsonl', json.loads(p.stdout)['episodes'][0]['source'])
+
     def test_search_automatically_indexes_all_three(self):
         self.read([user('claude-needle')], 'claude.jsonl')
         self.read([{'role':'user','message':{'content':[{'type':'text','text':'<user_query>cursor-needle</user_query>'}]}}], 'cursor.jsonl')

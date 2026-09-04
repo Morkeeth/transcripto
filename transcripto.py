@@ -8,6 +8,7 @@ import transcripto_core as core
 import transcripto_sources as sources
 import transcripto_evidence as evidence
 import transcripto_continuity as continuity
+import transcripto_coaching as coaching
 from transcripto_replay import cmd_replay
 from datetime import datetime, timezone
 
@@ -1326,11 +1327,14 @@ def coach(roots=None, harness=None, verified_human=False):
         roots = _coach_roots(None, harness)
     paths = _coach_files(roots, harness)
     episodes, records, humans, pastes, corrections = [], 0, 0, 0, 0
+    inherited_records = 0
     human_texts, harnesses = [], set()
     for p in paths:
         rows, fh = _rows_for_file(p)
         if fh == "codex-history":
             continue
+        inherited_records += sum(row.get('_inherited') is True for row in rows)
+        rows = [row for row in rows if row.get('_inherited') is not True]
         harnesses.add(fh)
         records += len(rows)
         pasted = set()
@@ -1361,6 +1365,8 @@ def coach(roots=None, harness=None, verified_human=False):
                                 else (0, 0))
     return {
         "schema": "transcripto.coach/2",
+        "inherited_records_excluded": inherited_records,
+        "authorship_caveat": "human_turns is a legacy request-envelope count. Codex/Cursor human typing is unknown; verified-human only subtracts likely pasted text.",
         "harness": resolved,
         "verified_human": verified_human, "pastes_flagged": pastes,
         "history_lines": hist_lines, "history_matched": hist_matched,
@@ -1391,6 +1397,19 @@ def coach(roots=None, harness=None, verified_human=False):
 
 
 def cmd_coach(args):
+    if args.snapshot or args.compare:
+        roots = _coach_roots(args.root, args.harness)
+        try:
+            current = coaching.snapshot(_coach_files(roots, args.harness), roots, args.harness)
+            report = coaching.compare(current, args.compare) if args.compare else current
+            if args.snapshot:
+                continuity.write_private(args.snapshot, current)
+                print('Saved fixed local baseline: ' + core.safe_text(args.snapshot), file=sys.stderr)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            print(core.safe_text(str(exc)), file=sys.stderr)
+            return 2
+        print(json.dumps(report, indent=2) if args.json else core.safe_text(coaching.describe(report)))
+        return 0
     r = coach([args.root] if args.root else None, harness=args.harness,
               verified_human=args.verified_human)
     if args.json:
@@ -1404,13 +1423,16 @@ def cmd_coach(args):
         r["human_turns"], r["episodes"], r["files"], r["harness"]))
     print("episodes: %s observed, %s with a successful change result" % (r["episodes"], r["durable"]))
     print("%s unknown change outcomes; missing evidence is not failure." % r["tiers"]["unknown"])
+    if r['harness'] != 'claude':
+        print('Codex/Cursor request envelopes do not establish human typing.')
     print("\n" + r["proxy"])
     if r["episodes"] < MIN_EPISODES_TO_RANK:
         print("\nSmall history: %d requests. Replay works from one request." % r["episodes"])
     print("\nMEASURED, NOT RANKED")
     print("Change attempts with known outcomes only. These overlapping groups are descriptive, not instructions.")
     for p in r["indistinct_patterns"]:
-        print("  %3d%% (%d/%d) %s" % (round(p["survival_rate"] * 100), p["survived"], p["n"], p["pattern"]))
+        print("  %3d%% (%d/%d; descriptive 95%% interval %.0f–%.0f%%) %s" % (round(p["survival_rate"] * 100), p["survived"], p["n"], p['ci_lo'] * 100, p['ci_hi'] * 100, p["pattern"]))
+    print('Intervals do not account for within-session dependence. No significance tests or multiple-comparison claims.')
     print("\nCorrection markers: %d of %d turns (%d%%). A lexical estimate, with false positives and misses." % (
         r["corrections"], r["human_turns"], round(r["correction_rate"] * 100)))
     if r["history_lines"]:
@@ -1418,6 +1440,7 @@ def cmd_coach(args):
     if r["verified_human"]:
         print("%d likely pasted turns excluded." % r["pastes_flagged"])
     print("\nInspect the evidence: transcripto replay --failures or transcripto replay latest")
+    print('For a fixed comparison: transcripto coach --snapshot /private/path/baseline.json, then transcripto coach --compare that file.')
 
 
 # ============================================================================
@@ -1657,6 +1680,8 @@ def main():
     s.add_argument("--json", action="store_true", help="machine-readable, for other tools")
     s.set_defaults(fn=cmd_cost)
     s = sub.add_parser("coach")
+    s.add_argument("--snapshot", help="save a fixed local request population; refuse overwrite")
+    s.add_argument("--compare", help="compare newly observed requests with a saved snapshot")
     s.add_argument("--root", help="read this transcript directory")
     s.add_argument("--harness", choices=["claude", "codex", "cursor"],
                    help="which agent's transcripts to grade. codex reads "
