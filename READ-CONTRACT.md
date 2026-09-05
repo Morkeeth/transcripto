@@ -40,7 +40,7 @@ keyed by session ID. Message IDs can change during reindexing and schema
 rebuilds; they are not durable foreign keys. Read-only connections must be
 reopened after a schema migration if a query fails.
 
-## Source references (SQLite schema 5)
+## Source references (SQLite schema 6)
 
 `transcripto ask "offline parser" --json` returns `transcripto.ask/1` with
 original request text, provider, session ID, recorded timestamp and cwd, plus
@@ -119,6 +119,11 @@ it is not proof of human typing in Codex or Cursor. Consumers should use the
 timeline authorship field for that distinction. SQLite `v_messages` adds
 `origin_session_id`, `inherited`, `session_kind` and `timestamp_basis`; NULL is
 unknown, not false. Reopen readers after migration.
+
+Nested Cursor subagent JSONL files use the same discovery path as their parent
+sessions. Their folder identifies the parent with an explicit directory-convention
+basis. Child request envelopes are labelled agent instructions and excluded from
+personal-request retrieval and coaching; their actions remain in source timelines.
 
 ## A fixed coaching baseline
 

@@ -42,7 +42,7 @@ def identify(path):
 
 def candidates(root):
     """Visit provider transcript directories, never configuration or session indexes."""
-    root = Path(root).expanduser().absolute()
+    root = Path(os.path.abspath(os.path.expanduser(root)))
     errors = []
     try:
         root.stat()
@@ -116,12 +116,16 @@ def inventory(roots, harness=None, database=None):
             state = "inaccessible" if set(counts) == {'inaccessible'} else ("unsupported" if counts and not any(p in counts for p in ("claude", "codex", "cursor")) else "no-selected-harness")
         if state == 'available' and warnings:
             state = 'partial'
-        sources.append({"root": str(Path(root).expanduser().absolute()), "state": state,
+        not_indexed = selected - fresh - stale
+        index_state = ('no-selected-sources' if not selected else 'not-indexed' if not_indexed == selected
+                       else 'partial' if stale or not_indexed or warnings else 'fresh-by-mtime')
+        sources.append({"root": os.path.abspath(os.path.expanduser(root)), "state": state,
                         "files": len(paths), "formats": counts, "selected_files": selected,
-                        "index": {"fresh_by_mtime": fresh, "changed": stale, "not_indexed": selected - fresh - stale},
+                        "index": {"state": index_state, "fresh_by_mtime": fresh, "changed": stale, "not_indexed": not_indexed},
                         "latest_file": {"path": latest[1], "provider": latest[2], "modified_at": datetime.fromtimestamp(latest[0], timezone.utc).isoformat()} if latest else None,
                         "warnings": warnings})
     return {"schema": "transcripto.sources/1", "observed_at": datetime.now(timezone.utc).isoformat(),
+            "index_coverage": "partial" if cache_error or any(s['index']['state'] != 'fresh-by-mtime' for s in sources) else "fresh-by-mtime",
             "sources": sources, "index_error": cache_error,
             "limitations": ["Format detection inspects at most 32 records of 64 KiB each; unidentified is not empty.",
                             "File modification time orders discovery, not human activity or completed work.",

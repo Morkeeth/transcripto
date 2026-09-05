@@ -105,6 +105,43 @@ class ContinuityTests(unittest.TestCase):
         self.assertEqual(doc['timeline'][0]['timestamp_basis'], 'unknown')
         self.assertEqual(doc['timeline'][0]['authorship']['kind'], 'unknown')
 
+    def test_multi_file_change_keeps_each_artifact_reference(self):
+        self.write([self.request('Update both modules'),
+                    {'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'name': 'apply_patch', 'id': 'p',
+                     'input': {'patch': '*** Begin Patch\n*** Update File: a.py\n@@\n-old\n+new\n*** Update File: b.py\n@@\n-old\n+new\n*** End Patch'}}]}}])
+        action = continuity.session(self.source)['timeline'][1]
+        self.assertEqual(action['artifact_paths'], ['a.py', 'b.py'])
+        self.assertEqual(action['status'], 'unknown')
+
+    def test_nested_cursor_agent_instructions_are_not_human_requests(self):
+        import transcripto as cli
+        root = self.root / '.cursor'
+        path = root / 'projects' / 'project' / 'agent-transcripts' / 'parent' / 'subagents' / 'child.jsonl'
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({'role': 'user', 'message': {'content': '<user_query>Inspect this module</user_query>'}}) + '\n')
+        self.assertIn(str(path), cli._coach_files([str(root)], 'cursor'))
+        rows, _ = core.read_session(path)
+        self.assertFalse(any(core.human_text(r) for r in rows))
+        document = continuity.session(path)
+        self.assertEqual(document['identity']['parent_session_id'], 'parent')
+        self.assertEqual(document['identity']['kind'], 'subagent')
+        self.assertEqual(document['identity']['kind_basis'], 'transcript directory convention')
+        self.assertEqual(document['timeline'][0]['kind'], 'agent_instruction')
+
+    def test_embedded_sidechain_record_does_not_rename_the_parent_session(self):
+        self.write([self.request('Parent request'), dict(self.request('Child instruction'), isSidechain=True)])
+        document = continuity.session(self.source)
+        self.assertEqual(document['identity']['session_id'], 'one')
+        self.assertIsNone(document['identity']['parent_session_id'])
+        self.assertNotEqual(document['identity']['kind'], 'subagent')
+
+    def test_filename_identity_does_not_claim_a_native_metadata_id(self):
+        self.write([{'role': 'user', 'message': {'content': '<user_query>A request</user_query>'}}])
+        identity = continuity.session(self.source)['identity']
+        self.assertEqual(identity['session_id'], 'one')
+        self.assertEqual(identity['session_id_basis'], 'transcript filename')
+        self.assertIsNone(identity['native_session_id'])
+
 
 if __name__ == '__main__':
     unittest.main()

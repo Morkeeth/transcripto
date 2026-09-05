@@ -398,6 +398,13 @@ class CLITests(FixtureCase):
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertIn('human.jsonl', json.loads(p.stdout)['episodes'][0]['source'])
 
+    def test_cursor_replay_does_not_claim_the_request_was_human_typed(self):
+        self.read([{'role': 'user', 'message': {'content': '<user_query>Inspect the parser</user_query>'}}], 'cursor.jsonl')
+        p = self.run_cli('replay', str(self.root / 'cursor.jsonl'))
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn('Request (authorship unknown)', p.stdout)
+        self.assertNotIn('You asked:', p.stdout)
+
     def test_search_automatically_indexes_all_three(self):
         self.read([user('claude-needle')], 'claude.jsonl')
         self.read([{'role':'user','message':{'content':[{'type':'text','text':'<user_query>cursor-needle</user_query>'}]}}], 'cursor.jsonl')
@@ -491,8 +498,9 @@ class PrivacyTests(unittest.TestCase):
     def test_runtime_imports_and_dynamic_execution(self):
         import ast
         banned = {'socket', 'urllib', 'requests', 'http', 'subprocess', 'ctypes'}
-        for filename in ['transcripto.py', 'transcripto_core.py', 'transcripto_replay.py']:
-            tree = ast.parse((ROOT/filename).read_text())
+        for path in ROOT.glob('transcripto*.py'):
+            filename = path.name
+            tree = ast.parse(path.read_text())
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
                     self.assertFalse(any(a.name.split('.')[0] in banned for a in node.names), filename)

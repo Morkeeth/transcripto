@@ -8,6 +8,11 @@ and read the recorded work around them.
 
 Claude Code · Codex · Cursor. Local files. No account. No runtime dependencies.
 
+**Development checkout:** source references, continuation packets and pinned
+comparisons on this branch are not in PyPI 0.2.0 yet. To try them, install this
+checkout with `python3 -m pip install .`. The pinned release commands below still
+run the published version.
+
 ## Start with something you remember saying
 
 Run `transcripto ask` without a query to discover local histories first.
@@ -22,8 +27,8 @@ proof of human activity or completed work.
 uvx --from transcripto==0.2.0 transcripto ask "retry"
 ```
 
-Replace `retry` with a word you remember using. `ask` searches messages identified
-as yours and shows dated snippets, newest first. It refreshes the local index
+Replace `retry` with a word you remember using. `ask` searches recorded requests
+and shows dated evidence, newest first. It refreshes the local index
 automatically. The first search indexes the selected history; a large archive
 can take minutes. Add `--harness claude`, `--harness codex`, or `--harness cursor`
 to limit that scan. It does not generate a diary or interpret your personality.
@@ -68,6 +73,32 @@ A failed or unconfirmed file change is labelled an **attempt**, never `WROTE`.
 Queries with `--harness` or `--root` are scoped to that selection even if the
 index already contains another corpus. `index` and `watch` remain available for
 explicit refresh and background polling.
+
+## Carry a decision into tomorrow
+
+In this checkout, `transcripto ask "why did we choose SQLite?" --json` returns
+the original request, source line and hashes. It shows which question words were
+ignored; `--literal` keeps them. It returns evidence, not an invented answer.
+During a cold index, the first matching request appears in stderr while the full
+search continues. Recent files are indexed first; final results still cover the
+selected history. Unknown and partially readable sources remain visible.
+
+Use the returned transcript path with `trace --from-line N --to-line M` to read
+the request, responses and recorded actions in that range. Then
+`export-run <path> --packet --from-line N --to-line M --output <new-local-file>`
+saves only that selected evidence. Decisions remain unclassified until you
+explicitly mark their request lines as settled or reversed. A read-only answer
+is a valid part of the history. `export-run <packet-file> --check` checks whether
+the source bytes have changed before you hand the context to another agent.
+
+For a return visit, save `coach --snapshot <new-local-file>` and later use
+`coach --compare <that-file>`. The old population stays fixed. New requests,
+rewritten requests and changed old results are separate; missing results are
+not failures. Counts and uncertainty travel with the comparison, without grades.
+
+Packets and snapshots are local files, created privately and never overwritten.
+No upload is performed. See the [consumer contract](READ-CONTRACT.md) for exact
+commands, selection rules and machine-readable fields.
 
 ## The replay
 

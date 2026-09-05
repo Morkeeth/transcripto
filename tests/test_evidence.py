@@ -86,6 +86,31 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(source['state'], 'partial')
         self.assertTrue(any(w.get('basis') == 'indexed parse diagnostics' for w in source['warnings']))
 
+    def test_index_observer_receives_committed_source_before_remaining_files(self):
+        old, recent = self.root / 'old.jsonl', self.root / 'recent.jsonl'
+        for path in (old, recent):
+            path.write_text(json.dumps({'type': 'user', 'promptSource': 'typed', 'message': {'content': 'SQLite'}}) + '\n')
+        os.utime(old, (1000000000, 1000000000))
+        observed = []
+        def observer(con, path):
+            observed.append((path, con.execute('SELECT COUNT(*) FROM indexed').fetchone()[0]))
+        con = cli.connect(on_indexed=observer)
+        con.close()
+        self.assertEqual(observed[0], (str(recent), 1))
+        self.assertEqual(observed[1], (str(old), 2))
+
+    def test_control_cleanup_preserves_unicode_newlines_and_tabs(self):
+        value = ''.join(chr(i) for i in range(256)) + '雪🙂\n\t'
+        expected = ''.join(c for c in value if c in '\n\t' or (ord(c) >= 32 and not 127 <= ord(c) < 160))
+        self.assertEqual(cli.core.safe_text(value), expected)
+
+    def test_parent_path_component_does_not_hide_indexed_evidence(self):
+        (self.root / 'child').mkdir()
+        path = self.root / 'one.jsonl'
+        path.write_text(json.dumps({'type': 'user', 'promptSource': 'typed', 'message': {'content': 'relativeprobe'}}) + '\n')
+        cli.ROOTS = [str(self.root / 'child' / '..')]
+        self.assertEqual(self.query('relativeprobe')['hits'][0]['source']['path'], str(path))
+
 
 if __name__ == '__main__':
     unittest.main()

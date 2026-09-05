@@ -83,14 +83,14 @@ def describe(report):
     if not hits:
         lines = ["nothing about '%s' in the selected request records. Try fewer terms." % report["query"], "No answer inferred."]
         for source in report.get("coverage", {}).get("sources", []):
-            lines.append("%s · %s · %d supported file(s)" % (source["root"], source["state"], source["selected_files"]))
+            lines.append("%s · %s · %d supported file(s) · index %s" % (source["root"], source["state"], source["selected_files"], source['index']['state']))
         return "\n".join(lines)
     lines = ["%d recorded request%s · original evidence, newest first" % (len(hits), "" if len(hits) == 1 else "s")]
     if report.get('selection', {}).get('ignored_question_words'):
         lines.append('Searching topic terms: ' + ' '.join(report['selection']['query_terms']) + ' · use --literal to keep every word')
     for source in report.get('coverage', {}).get('sources', []):
-        if source['state'] != 'available':
-            lines.append('Coverage: %s · %s · inspect --json warnings' % (source['state'], source['root']))
+        if source['state'] != 'available' or source['index']['state'] != 'fresh-by-mtime':
+            lines.append('Coverage: %s · index %s · %s · inspect --json details' % (source['state'], source['index']['state'], source['root']))
     for hit in hits:
         source = hit["source"]
         label = "human" if hit["authorship"]["kind"] == "human" else "authorship unknown"

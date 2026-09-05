@@ -68,18 +68,22 @@ def session(path, start_line=None, end_line=None):
     source = payload.get('source')
     spawn = source.get('subagent', {}).get('thread_spawn', {}) if isinstance(source, dict) and isinstance(source.get('subagent'), dict) else {}
     parent = parent or spawn.get('parent_thread_id')
+    parent_basis = 'native session metadata' if parent else 'unknown'
     kind = payload.get('thread_source') or ('subagent' if spawn else None)
-    if provider == 'claude' and any(r.get('isSidechain') for r in rows):
+    kind = kind or next((r.get('_session_kind') for r in rows if r.get('_session_kind')), None)
+    all_sidechain = bool(rows) and all(r.get('isSidechain') is True for r in rows)
+    if provider == 'claude' and (all_sidechain or 'subagents' in Path(path).parts):
         kind = 'subagent'
-    native_sid = sid
-    if provider == 'claude' and kind == 'subagent':
-        parent = parent or sid
+    native_sid = payload.get('id') or next((r.get('sessionId') for r in raw if r.get('sessionId')), None)
+    compound_sid = provider == 'claude' and kind == 'subagent' and native_sid is not None
+    if compound_sid:
+        if not parent:
+            parent = sid
+            parent_basis = 'sidechain context and native shared session ID'
         sid = sid + '/' + Path(path).stem
     if not parent and 'subagents' in Path(path).parts:
         parent = Path(path).parent.parent.name
         parent_basis = 'transcript directory convention; not native parent metadata'
-    else:
-        parent_basis = 'native session metadata' if parent else 'unknown'
     # Metadata may include inherited parent history. Keep the file owner stable.
     owned = [r for r in rows if r.get('_inherited') is not True]
     cwd = next((r.get('cwd') for r in reversed(owned) if r.get('cwd')), payload.get('cwd'))
@@ -95,6 +99,7 @@ def session(path, start_line=None, end_line=None):
         if (start_line is not None and line < start_line) or (end_line is not None and line > end_line):
             continue
         common = {"source": ref(line), "timestamp": row.get('timestamp') or None,
+                  "channel": row.get('_channel'),
                   "timestamp_basis": row.get('_timestamp_basis', 'native record' if row.get('timestamp') else 'unknown'),
                   "inherited": row.get('_inherited'), "origin_session_id": row.get('_origin_session_id') or sid}
         request = core.human_text(row)
@@ -111,10 +116,12 @@ def session(path, start_line=None, end_line=None):
             elif block.get('type') == 'tool_use':
                 inputs = block.get('input') or {}
                 target = inputs.get('file_path') or inputs.get('command') or block.get('original_name')
+                artifacts = inputs.get('paths') or ([inputs['file_path']] if isinstance(inputs.get('file_path'), str) else [])
                 result_line = block.get('result_line')
                 result_selected = result_line is not None and (start_line is None or result_line >= start_line) and (end_line is None or result_line <= end_line)
                 timeline.append(dict(common, kind='action', operation=core.operation(block),
                                      tool=block.get('original_name'), target=core.safe_text(target),
+                                     artifact_paths=[core.safe_text(p) for p in artifacts if isinstance(p, str)],
                                      status=block.get('execution_status', 'unknown') if result_selected else 'unknown',
                                      evidence=core.safe_text(block.get('evidence', '')) if result_selected else 'No matching result inside the selected range.',
                                      result_source=ref(result_line) if result_selected else None,
@@ -129,8 +136,9 @@ def session(path, start_line=None, end_line=None):
     return {"schema": "transcripto.session/1", "observed_at": datetime.now(timezone.utc).isoformat(),
             "identity": {"session_id": sid, "provider": provider if recognized else None,
                          "native_session_id": native_sid,
-                         "session_id_basis": "native session ID plus subagent filename" if sid != native_sid else ("native metadata" if meta or any(r.get('sessionId') for r in raw) else "transcript filename"),
+                         "session_id_basis": "native session ID plus subagent filename" if compound_sid else ("native metadata" if native_sid else "transcript filename"),
                          "kind": kind or 'unknown', "parent_session_id": parent, "parent_basis": parent_basis,
+                         "kind_basis": 'native metadata' if payload.get('thread_source') or spawn else ('native message sidechain flags' if provider == 'claude' and all_sidechain else ('transcript directory convention' if kind == 'subagent' else 'unknown')),
                          "metadata_source": ref(meta['_line']) if meta else None},
             "repository": repository(cwd), "source_version": dict(after, path=path),
             "started_at": min(stamps) if stamps else None, "last_observed_at": max(stamps) if stamps else None,

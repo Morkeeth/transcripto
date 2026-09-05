@@ -27,7 +27,7 @@ def safe_text(value):
     """Remove terminal controls, including OSC clipboard/title sequences."""
     value = re.sub(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)", "", str(value))
     value = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", value)
-    return "".join(c for c in value if c in "\n\t" or (ord(c) >= 32 and not 127 <= ord(c) < 160))
+    return re.sub(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]", "", value)
 
 
 def text_of(value):
@@ -331,6 +331,7 @@ def read_session(path, diagnostics=None):
             harness = "codex"
             p = d.get("payload") or {}
             meta = {"timestamp": d.get("timestamp", ""), "cwd": cwd, "sessionId": sid, "_line": d["_line"], "_record_sha256": d["_record_sha256"]}
+            meta['_channel'] = p.get('channel') if isinstance(p.get('channel'), str) else None
             ordinal = d.get("ordinal")
             inherited = (ordinal < history_boundary) if isinstance(ordinal, int) and isinstance(history_boundary, int) else None
             meta.update(_inherited=inherited, _origin_session_id=context_sid if inherited else owner_sid,
@@ -367,6 +368,7 @@ def read_session(path, diagnostics=None):
             continue
         elif "role" in d and "message" in d and "promptSource" not in d:
             harness = "cursor"
+            is_child = 'subagents' in os.path.normpath(path).split(os.sep)
             msg = d.get("message") or {}
             content = msg.get("content")
             raw_text = content if isinstance(content, str) else "\n".join(
@@ -376,8 +378,10 @@ def read_session(path, diagnostics=None):
             match = re.search(r"<user_query>\s*(.*?)\s*</user_query>", raw_text, re.S)
             d["type"] = d.get("role")
             if d["type"] == "user" and match:
-                d["promptSource"] = "typed"
+                d["promptSource"] = "agent" if is_child else "typed"
                 msg["content"] = match.group(1)
+            if is_child:
+                d['_session_kind'] = 'subagent'
             d["_timestamp_basis"] = "native record" if d.get("timestamp") else ("context clock, carried forward" if last_ts else "unknown")
             d.update(timestamp=d.get("timestamp") or last_ts, sessionId=sid)
         if d.get("type") not in ("user", "assistant"):
@@ -431,7 +435,7 @@ def episodes(rows, source=""):
         prompt = human_text(row)
         if prompt:
             current = {"prompt": prompt, "line": row.get("_line"), "timestamp": row.get("timestamp", ""),
-                       "source": source, "session_id": row.get("sessionId", ""), "inherited": row.get("_inherited"), "events": [], "reply": ""}
+                       "source": source, "session_id": row.get("sessionId", ""), "prompt_source": row.get('promptSource'), "inherited": row.get("_inherited"), "events": [], "reply": ""}
             out.append(current)
             continue
         if current is None or row.get("type") != "assistant":

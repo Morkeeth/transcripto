@@ -58,7 +58,7 @@ FILE_TOOLS = {"Write": "write", "Edit": "edit", "Read": "read",
               "NotebookEdit": "edit", "MultiEdit": "edit"}
 
 
-def connect(require_index=True):
+def connect(require_index=True, on_indexed=None):
     """Open the local index. Six commands (search/ask/find/trace/sessions/stats)
     READ it and are meaningless without it; `index` and `watch` BUILD it and pass
     require_index=False. Before this guard existed a cold start printed a raw
@@ -76,7 +76,7 @@ def connect(require_index=True):
             os.chmod(sidecar, 0o600)
     if require_index:
         init_schema(con)
-        _index_once(con, progress=sys.stderr.isatty())
+        _index_once(con, progress=sys.stderr.isatty(), on_indexed=on_indexed)
         # Temporary read views keep --root/--harness queries inside their selected
         # corpus while the persistent index can retain other harnesses.
         clauses = []
@@ -93,7 +93,7 @@ def connect(require_index=True):
     return con
 
 
-SCHEMA_VERSION = 5  # source references and inherited-context provenance
+SCHEMA_VERSION = 6  # includes nested Cursor subagent authorship
 
 
 def _needs_rebuild(con):
@@ -135,7 +135,9 @@ def init_schema(con):
       id INTEGER PRIMARY KEY, path TEXT, name TEXT, action TEXT,
       session_id TEXT, session_file TEXT, ts TEXT, cwd TEXT, harness TEXT);
     CREATE INDEX IF NOT EXISTS idx_files_name ON files(name);
+    CREATE INDEX IF NOT EXISTS idx_files_source ON files(session_file);
     CREATE INDEX IF NOT EXISTS idx_msg_human ON messages(is_human, ts);
+    CREATE INDEX IF NOT EXISTS idx_messages_source ON messages(session_file);
     CREATE TABLE IF NOT EXISTS indexed(session_file TEXT PRIMARY KEY, mtime REAL, warnings TEXT,
       mtime_ns INTEGER, size INTEGER, sha256 TEXT);
 
@@ -230,7 +232,7 @@ def _drop_indexed_file(con, path):
     con.execute("DELETE FROM indexed WHERE session_file=?", (path,))
 
 
-def _index_once(con, progress=False):
+def _index_once(con, progress=False, on_indexed=None):
     """Incrementally index every changed/new transcript. Returns (new_sessions, new_msgs).
 
     progress=True prints a heartbeat to stderr. A first index over a few thousand
@@ -251,7 +253,12 @@ def _index_once(con, progress=False):
                          % (len(seen), ", ".join(r.replace(HOME, "~") for r in ROOTS)))
         sys.stderr.flush()
     new = msgs = 0
-    for done, f in enumerate(sorted(seen), 1):
+    def modified(path):
+        try:
+            return os.stat(path).st_mtime_ns
+        except OSError:
+            return 0
+    for done, f in enumerate(sorted(seen, key=modified, reverse=True), 1):
         if progress and done % 250 == 0:
             sys.stderr.write("  %d/%d files · %d changed · %d messages\r"
                              % (done, len(seen), new, msgs))
@@ -312,6 +319,8 @@ def _index_once(con, progress=False):
                     " VALUES(?,?,?,?,?,?,?,?)", (path, os.path.basename(path), action, sid, f, ts, cwd, harness))
         con.execute("INSERT OR REPLACE INTO indexed(session_file,mtime,warnings,mtime_ns,size,sha256) VALUES(?,?,?,?,?,?)", (f, mt, json.dumps(diagnostics), after['mtime_ns'], after['bytes'], after['sha256']))
         con.commit(); new += 1
+        if on_indexed:
+            on_indexed(con, f)
     return new, msgs
 
 
@@ -408,10 +417,23 @@ def cmd_ask(args):
     """Return original request evidence; never synthesize an answer."""
     if not args.query:
         return cmd_sources(args)
-    con = connect()
+    terms, removed = (args.query.split(), []) if getattr(args, 'literal', False) else evidence.remembered_terms(args.query)
+    match = _match(' '.join(terms))
+    first_match_shown = False
+    def first_match(con, path):
+        nonlocal first_match_shown
+        if first_match_shown or not terms:
+            return
+        hit = con.execute('SELECT m.source_line,m.text,m.inherited FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid '
+                          'WHERE messages_fts MATCH ? AND m.session_file=? AND m.is_human=1 ORDER BY m.source_line DESC LIMIT 1',
+                          (match, path)).fetchone()
+        if hit:
+            print('First matching request%s: %s:%d\n  %s\nIndexing continues; final search order may differ.' % (
+                ' (inherited context)' if hit[2] else '', core.safe_text(path), hit[0], core.safe_text(' '.join(hit[1].split())[:180])), file=sys.stderr, flush=True)
+            first_match_shown = True
     try:
-        terms, removed = (args.query.split(), []) if getattr(args, 'literal', False) else evidence.remembered_terms(args.query)
-        report = evidence.retrieve(con, args.query, _match(' '.join(terms)), args.limit)
+        con = connect(on_indexed=first_match)
+        report = evidence.retrieve(con, args.query, match, args.limit)
         report['selection']['query_terms'] = terms
         report['selection']['ignored_question_words'] = removed
     except sqlite3.OperationalError as exc:
@@ -1103,36 +1125,10 @@ def _rows_for_file(path):
 
 
 def _coach_files(roots, harness):
-    """Discover transcript files. For a Codex tree we name the two real episode
-    dirs explicitly — a blind **/*.jsonl over ~/.codex swallows session_index,
-    the .tmp scratch, and history.jsonl (double-counted turns)."""
-    paths = []
-    for r in roots:
-        r = os.path.expanduser(r)
-        if os.path.isfile(r):
-            paths.append(r)
-            continue
-        base = os.path.basename(r.rstrip("/"))
-        if base == ".cursor" or (harness == "cursor" and os.path.isdir(os.path.join(r, "projects"))):
-            paths += sorted(glob.glob(
-                os.path.join(r, "projects", "*", "agent-transcripts", "*", "*.jsonl")))
-            continue
-        if harness == "codex" or base == ".codex":
-            got = sorted(glob.glob(os.path.join(r, "archived_sessions", "*.jsonl")))
-            got += sorted(glob.glob(os.path.join(r, "sessions", "**", "*.jsonl"),
-                                    recursive=True))
-            if not got:  # a flat dir of rollouts (e.g. a test fixture)
-                got = [p for p in sorted(glob.glob(os.path.join(r, "**", "*.jsonl"),
-                                                   recursive=True))
-                       if os.path.basename(p) not in ("session_index.jsonl",
-                                                       "history.jsonl")
-                       and os.sep + ".tmp" + os.sep not in p]
-            paths += got
-        else:
-            paths += sorted(glob.glob(os.path.join(r, "**", "*.jsonl"), recursive=True))
-    paths = sorted({os.path.abspath(p) for p in paths})
+    """Use the same provider directories for discovery, replay, indexing and coaching."""
+    paths = sorted({path for root in roots for path in sources.candidates(root)[0]})
     if harness:
-        paths = [p for p in paths if _sniff(p) == harness]
+        paths = [path for path in paths if _sniff(path) == harness]
     return paths
 
 
