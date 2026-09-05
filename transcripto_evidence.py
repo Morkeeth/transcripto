@@ -56,15 +56,18 @@ def reference(path, line, record_hash, source_hash):
 def retrieve(con, query, match, limit):
     rows = con.execute(
         "SELECT m.session_id,m.session_file,m.source_line,m.record_sha256,m.ts,m.cwd,"
-        "m.harness,m.prompt_source,m.text,i.sha256,m.origin_session_id,m.inherited,m.timestamp_basis FROM messages_fts "
+        "m.harness,m.prompt_source,m.text,i.sha256,m.origin_session_id,m.inherited,m.timestamp_basis,m.native_session_id,m.parent_session_id FROM messages_fts "
         "JOIN messages m ON m.id=messages_fts.rowid JOIN indexed i ON i.session_file=m.session_file "
-        "WHERE messages_fts MATCH ? AND m.is_human=1 ORDER BY m.ts DESC,m.source_line DESC LIMIT ?",
+        "WHERE messages_fts MATCH ? AND COALESCE(m.inherited,0)!=1 AND "
+        "(m.is_human=1 OR (m.harness IN ('codex','cursor') AND m.prompt_source IN ('typed','agent'))) "
+        "AND COALESCE(m.prompt_source,'')!='echo' ORDER BY m.ts DESC,m.source_line DESC LIMIT ?",
         (match, limit)).fetchall()
     hits = []
-    for sid, path, line, record_hash, ts, cwd, provider, psrc, text, source_hash, origin_sid, inherited, timestamp_basis in rows:
+    for sid, path, line, record_hash, ts, cwd, provider, psrc, text, source_hash, origin_sid, inherited, timestamp_basis, native_sid, parent_sid in rows:
         hits.append({"session_id": sid, "provider": provider, "timestamp": ts or None,
                      "cwd": cwd or None, "authorship": authorship(provider, psrc),
                      "origin_session_id": origin_sid, "inherited": bool(inherited) if inherited is not None else None,
+                     "native_session_id": native_sid, "parent_session_id": parent_sid,
                      "timestamp_basis": timestamp_basis,
                      "text": text, "source": reference(path, line, record_hash, source_hash),
                      "inspect": ["transcripto", "replay", path, "--json"]})

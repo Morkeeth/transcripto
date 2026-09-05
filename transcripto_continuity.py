@@ -71,16 +71,17 @@ def session(path, start_line=None, end_line=None):
     parent_basis = 'native session metadata' if parent else 'unknown'
     kind = payload.get('thread_source') or ('subagent' if spawn else None)
     kind = kind or next((r.get('_session_kind') for r in rows if r.get('_session_kind')), None)
-    all_sidechain = bool(rows) and all(r.get('isSidechain') is True for r in rows)
+    raw_messages = [r for r in raw if r.get('type') in ('user', 'assistant')]
+    all_sidechain = bool(raw_messages) and all(r.get('isSidechain') is True for r in raw_messages)
     if provider == 'claude' and (all_sidechain or 'subagents' in Path(path).parts):
         kind = 'subagent'
     native_sid = payload.get('id') or next((r.get('sessionId') for r in raw if r.get('sessionId')), None)
     compound_sid = provider == 'claude' and kind == 'subagent' and native_sid is not None
     if compound_sid:
         if not parent:
-            parent = sid
+            parent = native_sid
             parent_basis = 'sidechain context and native shared session ID'
-        sid = sid + '/' + Path(path).stem
+        sid = native_sid + '/' + Path(path).stem
     if not parent and 'subagents' in Path(path).parts:
         parent = Path(path).parent.parent.name
         parent_basis = 'transcript directory convention; not native parent metadata'

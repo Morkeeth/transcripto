@@ -312,8 +312,10 @@ def read_session(path, diagnostics=None):
     rows, harness, sid, cwd = [], "claude", os.path.splitext(os.path.basename(path))[0], ""
     calls, results = {}, []
     last_ts = ""
-    owner_sid, context_sid, history_boundary, session_kind = None, None, None, None
+    owner_sid, context_sid, history_boundary, session_kind, parent_sid = None, None, None, None, None
+    last_assistant_text = ""
     for d in iter_json(path, diagnostics):
+        raw_native_sid = d.get('sessionId') if isinstance(d.get('sessionId'), str) else None
         if d.get("type") == "session_meta":
             harness = "codex"
             p = d.get("payload") or {}
@@ -321,6 +323,7 @@ def read_session(path, diagnostics=None):
                 owner_sid = p.get("id") or sid
                 history_boundary = p.get("subagent_history_start_ordinal")
                 session_kind = p.get("thread_source")
+                parent_sid = p.get('parent_thread_id') or p.get('forked_from_id')
             context_sid = p.get("id") or owner_sid
             sid, cwd = owner_sid, p.get("cwd") or cwd
             continue
@@ -335,6 +338,7 @@ def read_session(path, diagnostics=None):
             ordinal = d.get("ordinal")
             inherited = (ordinal < history_boundary) if isinstance(ordinal, int) and isinstance(history_boundary, int) else None
             meta.update(_inherited=inherited, _origin_session_id=context_sid if inherited else owner_sid,
+                        _parent_session_id=parent_sid,
                         _session_kind=session_kind, _timestamp_basis="native record" if d.get("timestamp") else "unknown")
             pt = p.get("type")
             if pt == "message":
@@ -344,8 +348,12 @@ def read_session(path, diagnostics=None):
                     text = _codex_human_content(p.get("content"))
                     if not text:
                         continue
-                    d = dict(meta, type="user", promptSource="typed", message={"role": "user", "content": text})
+                    compact = re.sub(r"\s+", " ", text).strip()
+                    prior = re.sub(r"\s+", " ", last_assistant_text).strip()
+                    psource = "echo" if len(text) >= 80 and compact == prior else "typed"
+                    d = dict(meta, type="user", promptSource=psource, message={"role": "user", "content": text})
                 elif role == "assistant":
+                    last_assistant_text = text.strip()
                     d = dict(meta, type="assistant", message={"role": "assistant", "content": [{"type": "text", "text": text}]})
                 else:
                     continue
@@ -382,10 +390,12 @@ def read_session(path, diagnostics=None):
                 msg["content"] = match.group(1)
             if is_child:
                 d['_session_kind'] = 'subagent'
+                d['_parent_session_id'] = os.path.basename(os.path.dirname(os.path.dirname(path)))
             d["_timestamp_basis"] = "native record" if d.get("timestamp") else ("context clock, carried forward" if last_ts else "unknown")
             d.update(timestamp=d.get("timestamp") or last_ts, sessionId=sid)
         if d.get("type") not in ("user", "assistant"):
             continue
+        d['_native_session_id'] = owner_sid if harness == 'codex' else raw_native_sid
         d.setdefault("sessionId", sid)
         for field in ("sessionId", "timestamp", "cwd", "gitBranch"):
             if field in d and not isinstance(d[field], str):
@@ -413,6 +423,12 @@ def read_session(path, diagnostics=None):
         elif isinstance(c, str):
             msg["content"] = c[:MAX_TEXT]
         rows.append(d)
+    if harness == 'claude' and rows and ('subagents' in os.path.normpath(path).split(os.sep) or all(r.get('isSidechain') is True for r in rows)):
+        native = next((r['_native_session_id'] for r in rows if r.get('_native_session_id')), None)
+        child_sid = native + '/' + os.path.splitext(os.path.basename(path))[0] if native else os.path.splitext(os.path.basename(path))[0]
+        for row in rows:
+            row.update(sessionId=child_sid, _session_kind='subagent', _parent_session_id=native,
+                       _origin_session_id=child_sid, isSidechain=True)
     for call_id, result, error, line in results:
         if not isinstance(call_id, str):
             continue

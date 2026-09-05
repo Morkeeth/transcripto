@@ -111,6 +111,23 @@ class EvidenceTests(unittest.TestCase):
         cli.ROOTS = [str(self.root / 'child' / '..')]
         self.assertEqual(self.query('relativeprobe')['hits'][0]['source']['path'], str(path))
 
+    def test_index_and_timeline_agree_on_claude_child_identity(self):
+        import transcripto_continuity as continuity
+        parent = self.root / 'parent.jsonl'
+        child = self.root / 'parent' / 'subagents' / 'agent-one.jsonl'
+        child.parent.mkdir(parents=True)
+        parent.write_text(json.dumps({'type': 'user', 'sessionId': 'parent', 'promptSource': 'typed', 'message': {'content': 'Own request'}}) + '\n')
+        child.write_text(json.dumps({'type': 'assistant', 'sessionId': 'parent', 'isSidechain': True, 'message': {'content': 'Child response'}}) + '\n')
+        con = cli.connect()
+        identities = {row[0] for row in con.execute('SELECT session_id FROM v_sessions')}
+        self.assertEqual(identities, {'parent', 'parent/agent-one'})
+        child_row = con.execute('SELECT session_id,native_session_id,parent_session_id FROM v_messages WHERE session_file=?', (str(child),)).fetchone()
+        self.assertEqual(child_row, ('parent/agent-one', 'parent', 'parent'))
+        identity = continuity.session(child)['identity']
+        self.assertEqual(identity['session_id'], child_row[0])
+        self.assertEqual(identity['parent_session_id'], child_row[2])
+        con.close()
+
 
 if __name__ == '__main__':
     unittest.main()

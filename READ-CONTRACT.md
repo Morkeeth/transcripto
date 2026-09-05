@@ -40,7 +40,7 @@ keyed by session ID. Message IDs can change during reindexing and schema
 rebuilds; they are not durable foreign keys. Read-only connections must be
 reopened after a schema migration if a query fails.
 
-## Source references (SQLite schema 6)
+## Source references (SQLite schema 7)
 
 `transcripto ask "offline parser" --json` returns `transcripto.ask/1` with
 original request text, provider, session ID, recorded timestamp and cwd, plus
@@ -124,6 +124,12 @@ Nested Cursor subagent JSONL files use the same discovery path as their parent
 sessions. Their folder identifies the parent with an explicit directory-convention
 basis. Child request envelopes are labelled agent instructions and excluded from
 personal-request retrieval and coaching; their actions remain in source timelines.
+
+SQLite and timeline exports use the same file-owner identity, including Claude
+sidechains. `v_messages` and search hits expose `native_session_id` and
+`parent_session_id` separately. A derived filename identity never claims a native
+metadata ID. One embedded sidechain record does not turn its parent file into a
+child session. Session observation bounds exclude known inherited parent records.
 
 ## A fixed coaching baseline
 

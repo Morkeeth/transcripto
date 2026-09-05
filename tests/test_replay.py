@@ -415,6 +415,18 @@ class CLITests(FixtureCase):
             self.assertIn('1 recorded request', p.stdout)
         self.assertEqual((self.root/'.trace'/'trace.db').stat().st_mode & 0o777, 0o600)
 
+    def test_codex_approval_echo_is_not_a_recorded_request(self):
+        echoed = 'The assistant explanation about the approval flow is repeated here ' * 3
+        self.read([
+            {'type': 'session_meta', 'payload': {'id': 'codex-echo'}},
+            {'type': 'response_item', 'payload': {'type': 'message', 'role': 'assistant', 'content': echoed}},
+            {'type': 'response_item', 'payload': {'type': 'message', 'role': 'user', 'content': echoed}},
+            {'type': 'response_item', 'payload': {'type': 'message', 'role': 'user', 'content': 'genuine codex request'}},
+        ], 'codex-echo.jsonl')
+        p = self.run_cli('ask', 'approval flow', '--root', str(self.root))
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn('nothing about', p.stdout)
+
     def test_reindex_removes_old_full_text_tokens(self):
         self.read([user('oldneedle')])
         self.assertIn('1 recorded request', self.run_cli('ask','oldneedle','--root',str(self.root)).stdout)

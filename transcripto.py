@@ -93,7 +93,7 @@ def connect(require_index=True, on_indexed=None):
     return con
 
 
-SCHEMA_VERSION = 6  # includes nested Cursor subagent authorship
+SCHEMA_VERSION = 7  # one file-owner identity across index and source timelines
 
 
 def _needs_rebuild(con):
@@ -127,7 +127,8 @@ def init_schema(con):
       ts TEXT, role TEXT, cwd TEXT, git_branch TEXT, text TEXT,
       is_human INTEGER DEFAULT 0, prompt_source TEXT, harness TEXT,
       source_line INTEGER, record_sha256 TEXT, origin_session_id TEXT,
-      inherited INTEGER, session_kind TEXT, timestamp_basis TEXT);
+      inherited INTEGER, session_kind TEXT, timestamp_basis TEXT,
+      native_session_id TEXT, parent_session_id TEXT);
     -- porter stemming: `ask "frustration"` also matches frustrated/frustrating.
     CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
       text, content='messages', content_rowid='id', tokenize="porter unicode61");
@@ -146,10 +147,11 @@ def init_schema(con):
     DROP VIEW IF EXISTS v_sessions;
     CREATE VIEW v_sessions AS
       SELECT m.session_id, m.project, m.harness,
-             MAX(m.ts) AS last_ts, MIN(m.ts) AS first_ts,
+             MAX(CASE WHEN COALESCE(m.inherited,0)!=1 THEN m.ts END) AS last_ts,
+             MIN(CASE WHEN COALESCE(m.inherited,0)!=1 THEN m.ts END) AS first_ts,
              COUNT(*) AS n_messages,
              SUM(CASE WHEN m.role='assistant' THEN 1 ELSE 0 END) AS assistant_turns,
-             (SELECT cwd FROM messages c WHERE c.session_id=m.session_id AND c.harness=m.harness AND c.cwd!=''
+             (SELECT cwd FROM messages c WHERE c.session_id=m.session_id AND c.harness=m.harness AND c.cwd!='' AND COALESCE(c.inherited,0)!=1
               ORDER BY c.ts DESC LIMIT 1) AS cwd
       FROM messages m GROUP BY m.session_id, m.harness;
     DROP VIEW IF EXISTS v_file_touches;
@@ -163,7 +165,8 @@ def init_schema(con):
     CREATE VIEW v_messages AS
       SELECT id, session_id, project, ts, role, cwd, git_branch, text,
              is_human, prompt_source, harness, session_file, source_line, record_sha256,
-             origin_session_id, inherited, session_kind, timestamp_basis FROM messages;
+             origin_session_id, inherited, session_kind, timestamp_basis,
+             native_session_id, parent_session_id FROM messages;
     """)
     con.execute("PRAGMA user_version=%d" % SCHEMA_VERSION)
     con.commit()
@@ -309,8 +312,8 @@ def _index_once(con, progress=False, on_indexed=None):
             psrc = d.get("promptSource")
             if text:
                 cur = con.execute(
-                    "INSERT INTO messages(session_id,session_file,project,ts,role,cwd,git_branch,text,is_human,prompt_source,harness,source_line,record_sha256,origin_session_id,inherited,session_kind,timestamp_basis)"
-                    " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (sid, f, proj, ts, role, cwd, gb, text, human, psrc, harness, d.get('_line'), d.get('_record_sha256'), d.get('_origin_session_id') or sid, d.get('_inherited'), d.get('_session_kind'), d.get('_timestamp_basis') or ('native record' if ts else 'unknown')))
+                    "INSERT INTO messages(session_id,session_file,project,ts,role,cwd,git_branch,text,is_human,prompt_source,harness,source_line,record_sha256,origin_session_id,inherited,session_kind,timestamp_basis,native_session_id,parent_session_id)"
+                    " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (sid, f, proj, ts, role, cwd, gb, text, human, psrc, harness, d.get('_line'), d.get('_record_sha256'), d.get('_origin_session_id') or sid, d.get('_inherited'), d.get('_session_kind'), d.get('_timestamp_basis') or ('native record' if ts else 'unknown'), d.get('_native_session_id'), d.get('_parent_session_id')))
                 con.execute("INSERT INTO messages_fts(rowid,text) VALUES(?,?)", (cur.lastrowid, text))
                 msgs += 1
             for action, path in fl:
@@ -385,19 +388,21 @@ def cmd_search(args):
     try:
         rows = con.execute(
             "SELECT m.ts,m.project,m.role,m.is_human,m.cwd,"
-            " snippet(messages_fts,0,'\033[1m','\033[0m','…',14)"
+            " snippet(messages_fts,0,'\033[1m','\033[0m','…',14),m.harness"
             " FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid"
-            " WHERE messages_fts MATCH ?"
+            " WHERE messages_fts MATCH ? AND COALESCE(m.inherited,0)!=1 AND COALESCE(m.prompt_source,'')!='echo'"
             " ORDER BY m.is_human DESC, m.ts DESC LIMIT ?",
             (_match(args.query), args.limit)).fetchall()
     except sqlite3.OperationalError as e:
         print("search error:", e); return
     if not rows:
         print("no matches. try `%s index` first, or broader terms." % PROG); return
-    for ts, proj, role, human, cwd, snip in rows:
+    for ts, proj, role, human, cwd, snip, provider in rows:
         repo = os.path.basename(cwd.rstrip("/")) if cwd else proj
-        if human:
+        if human and provider == 'claude':
             who, colour = "you", "\033[1m"
+        elif human:
+            who, colour = 'request', '\033[1m'
         elif role == "user":
             # role='user' but nobody typed it: a tool result or a harness injection.
             who, colour = "harness", "\033[2m"
@@ -406,7 +411,7 @@ def cmd_search(args):
         print("\033[2m%s\033[0m  \033[36m%-16s\033[0m %s%-7s\033[0m %s"
               % (_day(ts), repo[:16], colour, who, " ".join(snip.split())))
     typed = sum(1 for r in rows if r[3])
-    print("\n\033[2m%d of %d hits are prompts you typed.\033[0m" % (typed, len(rows)))
+    print("\n\033[2m%d of %d hits are recorded requests. Codex/Cursor authorship is unknown.\033[0m" % (typed, len(rows)))
 
 
 def _repo(cwd, proj):
@@ -425,7 +430,9 @@ def cmd_ask(args):
         if first_match_shown or not terms:
             return
         hit = con.execute('SELECT m.source_line,m.text,m.inherited FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid '
-                          'WHERE messages_fts MATCH ? AND m.session_file=? AND m.is_human=1 ORDER BY m.source_line DESC LIMIT 1',
+                          "WHERE messages_fts MATCH ? AND m.session_file=? AND COALESCE(m.inherited,0)!=1 AND "
+                          "(m.is_human=1 OR (m.harness IN ('codex','cursor') AND m.prompt_source IN ('typed','agent'))) "
+                          "AND COALESCE(m.prompt_source,'')!='echo' ORDER BY m.source_line DESC LIMIT 1",
                           (match, path)).fetchone()
         if hit:
             print('First matching request%s: %s:%d\n  %s\nIndexing continues; final search order may differ.' % (
@@ -491,29 +498,29 @@ def cmd_sessions(args):
     --all brings them back, because sometimes you want the subagent run.
     """
     con = connect()
-    HUMAN = ("is_human=1 AND text!='' AND text NOT LIKE '<command-name>%'"
+    HUMAN = ("is_human=1 AND COALESCE(inherited,0)!=1 AND text!='' AND text NOT LIKE '<command-name>%'"
              " AND text NOT LIKE '<local-command-%'")
     having = "" if getattr(args, "all", False) else (
         " HAVING SUM(CASE WHEN " + HUMAN + " THEN 1 ELSE 0 END) > 0")
     rows = con.execute(
-        "SELECT session_id,project,MAX(ts) mx,COUNT(*),"
+        "SELECT session_id,project,MAX(CASE WHEN COALESCE(inherited,0)!=1 THEN ts END) mx,COUNT(*),"
         " SUM(CASE WHEN " + HUMAN + " THEN 1 ELSE 0 END) typed,"
-        " MAX(cwd) FROM messages GROUP BY session_id" + having +
+        " (SELECT cwd FROM messages c WHERE c.session_id=m.session_id AND c.harness=m.harness AND c.cwd!='' AND COALESCE(c.inherited,0)!=1 ORDER BY c.ts DESC LIMIT 1),harness FROM messages m GROUP BY session_id,harness" + having +
         " ORDER BY mx DESC LIMIT ?", (args.limit,)).fetchall()
-    for sid, proj, mx, cnt, typed, cwd in rows:
+    for sid, proj, mx, cnt, typed, cwd, provider in rows:
         t = con.execute("SELECT text FROM messages WHERE session_id=? AND role='user'"
-                        " AND " + HUMAN + " ORDER BY ts LIMIT 1", (sid,)).fetchone()
+                        " AND harness=? AND " + HUMAN + " ORDER BY ts LIMIT 1", (sid, provider)).fetchone()
         title = (t[0][:78].replace("\n", " ") if t
-                 else "\033[2mno prompt you typed — agent-only run\033[0m")
+                 else "\033[2mno qualifying request recorded\033[0m")
         where = os.path.basename((cwd or proj or "").rstrip("/")) or (proj or "")
-        print("\033[2m%s\033[0m  \033[36m%-18s\033[0m %3d typed \033[2m/%-5d\033[0m %s"
+        print("\033[2m%s\033[0m  \033[36m%-18s\033[0m %3d requests \033[2m/%-5d\033[0m %s"
               % (_day(mx), where[:18], typed or 0, cnt, title))
     if not rows:
         total = con.execute("SELECT COUNT(DISTINCT session_id) FROM messages").fetchone()[0]
         if not total:
             print("Your index is empty. `%s index` found no transcripts to read." % PROG)
         else:
-            print("None of your %s indexed sessions has a prompt you typed in it."
+            print("None of the %s indexed sessions has a qualifying request recorded."
                   % f"{total:,}")
             print("\033[2mthat is the finding, not an empty list. `--all` lists them.\033[0m")
         return
@@ -523,9 +530,10 @@ def cmd_sessions(args):
                             " THEN 1 ELSE 0 END)=0)").fetchone()[0]
         ses = con.execute("SELECT COUNT(DISTINCT session_id) FROM messages").fetchone()[0]
         if quiet:
-            print("\n\033[2m%s of your %s sessions have no prompt you typed in them (%.0f%%)."
-                  " They ran\n  without you. `--all` lists them.\033[0m"
+            print("\n\033[2m%s of %s sessions have no qualifying request recorded (%.0f%%)."
+                  " `--all` lists them.\033[0m"
                   % (f"{quiet:,}", f"{ses:,}", 100 * quiet / ses if ses else 0))
+    print('Request counts exclude known inherited context. Codex/Cursor authorship remains unknown.')
 
 
 def cmd_stats(args):
@@ -540,7 +548,7 @@ def cmd_stats(args):
     `cwd` is where work happened and `cost` already keys on it.
     """
     con = connect()
-    HUMAN = ("is_human=1 AND text!='' AND text NOT LIKE '<command-name>%'"
+    HUMAN = ("is_human=1 AND COALESCE(inherited,0)!=1 AND text!='' AND text NOT LIKE '<command-name>%'"
              " AND text NOT LIKE '<local-command-%'")
     typed = con.execute("SELECT COUNT(*) FROM messages WHERE " + HUMAN).fetchone()[0]
     tot = con.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
@@ -561,13 +569,12 @@ def cmd_stats(args):
     # true of different populations, and a tool that prints two shares for one
     # claim without saying which population it read is doing the thing this tool
     # exists to catch.
-    print("\033[1m%s of the %s messages in your index are things you typed.  %.1f%%\033[0m"
+    print("\033[1m%s of the %s indexed messages are qualifying requests.  %.1f%%\033[0m"
           % (f"{typed:,}", f"{tot:,}", 100 * typed / tot if tot else 0.0))
-    print("\033[2mthe rest is the machine answering. `coach` counts raw transcript records"
-          " instead\n  of indexed messages, so its share is smaller; same numerator, wider"
-          " population.\033[0m")
+    print('Other indexed messages include assistant text, tool output and injected context.')
+    print('Request counts exclude known inherited context. Codex/Cursor authorship remains unknown.')
 
-    print("\n\033[1mwhere you typed them\033[0m")
+    print("\n\033[1mrecorded working directories\033[0m")
     rows = con.execute("SELECT cwd,COUNT(*) n FROM messages WHERE " + HUMAN +
                        " AND cwd IS NOT NULL AND cwd!='' GROUP BY cwd"
                        " ORDER BY n DESC LIMIT 10").fetchall()
