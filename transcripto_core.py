@@ -88,7 +88,7 @@ def iter_json(path, diagnostics=None):
 
 
 def human_text(row):
-    if row.get("type") != "user" or row.get("promptSource") not in ("typed", "queued"):
+    if row.get("type") != "user" or row.get("promptSource") not in ("typed", "queued", "echo"):
         return ""
     if row.get("isMeta") or row.get("isSidechain") or row.get("toolUseResult") is not None:
         return ""
