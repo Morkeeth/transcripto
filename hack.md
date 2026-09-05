@@ -74,3 +74,7 @@ Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
 - Slice 2: `docs/STEP-3-README-BELOEVED-RULING.md` + checklist STEP 3 unchecked.
 - Slice 3: 7/7 logged in checklist footer.
 - Slice 4: `docs/BASELINE-ARM.md` — naive `find` wins retention simplicity.
+- Stranger cold clone of this branch → `bash scripts/cold_verify.sh` → PASS.
+- CI `tests` on branch: success (Python 3.9 + 3.13).
+- PyPI JSON re-derived: **0.2.0** live (no bump performed).
+- PR create requires Oscar approval in Cursor settings (branch is pushed).
