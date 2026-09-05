@@ -17,7 +17,8 @@ What exists now that did not at the start of this run:
 5. Hard-fail README install-pin / `should print` checks in `test_version.sh` (control watched RED).
 6. `scripts/check_consumer_integration.sh` — tip wheel → READ-CONTRACT views + ask/1 + packet/1 + coaching snapshot/compare.
 7. `scripts/check_installed_package.sh` — opens **live PyPI wheel** METADATA/bytes; reports longdesc gate + version/schema collision.
-8. Artifact logs under `/opt/cursor/artifacts/` (`consumer-integration*.txt`, `installed-package*.txt`, suite outputs).
+8. `scripts/check_baseline_arms.sh` — tip wheel vs clean-room PyPI on the schema-7 consumer select (PyPI loses today).
+9. Artifact logs under `/opt/cursor/artifacts/` (`consumer-integration*.txt`, `installed-package*.txt`, `baseline-arms.txt`, suite outputs).
 
 Not shipped (Oscar’s click / blocked): PyPI publish, version bump off `0.2.0`, article/X, merging `fed8` retention cold-verify pack, live corpus re-derive, correction v2.
 
@@ -39,7 +40,7 @@ Not shipped (Oscar’s click / blocked): PyPI publish, version bump off `0.2.0`,
 | Consumer integration | `bash scripts/check_consumer_integration.sh` | **PASS** (schema 7, ask/1, packet current, coaching schemas) |
 | Installed-package wheel gate | `bash scripts/check_installed_package.sh` | longdesc **green**; **collision True** (0.2.0 SCHEMA 7 vs 3) |
 | Live PyPI clean-room | cwd `/tmp`, `pip install --no-cache-dir transcripto==0.2.0` | SCHEMA **3**; no tip modules; `ask --json` unrecognized |
-| Naive baseline vs tip contract | PyPI venv `select session_file… from v_messages` | **FAIL** `no such column` |
+| Naive baseline vs tip contract | `bash scripts/check_baseline_arms.sh` | tip wins; PyPI **FAIL** `no such column` |
 | uvx stranger version | `uvx --from transcripto==0.2.0 transcripto --version` | `transcripto 0.2.0` |
 | Helicon on tip | `helicon ci --path . --fail-on none` | **UNMEASURED** (0 memories) — not a pass |
 

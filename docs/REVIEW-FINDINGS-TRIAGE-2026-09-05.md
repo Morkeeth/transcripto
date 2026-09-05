@@ -50,7 +50,7 @@ Status vocabulary: **fixed** · **still open** · **not reproducible** · **docu
 
 ### F5 · Naive / published baseline loses tip consumer contract
 - **Status:** documented (embarrassing; expected until publish)
-- **Command:** clean-room PyPI venv → `select session_file,source_line,record_sha256 from v_messages` → `OperationalError: no such column: session_file` (exit 1). Tip script PASS.
+- **Command:** `bash scripts/check_baseline_arms.sh` → tip PASS / PyPI `pypi_schema7_select FAIL … no such column: session_file`.
 - **Finding:** the alternative any stranger installs today cannot satisfy tip READ-CONTRACT.
 
 ### F6 · Live PyPI wheel longdesc gate

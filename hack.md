@@ -49,3 +49,4 @@ A stranger gets a triage doc where every finding is fixed / still open / not rep
 - 2026-09-05: Slice 2–5 RAN. Privacy empty-index watched RED then fixed. `test_version` install-pin watched RED then hardened. `scripts/check_consumer_integration.sh` PASS. `scripts/check_installed_package.sh` longdesc green + collision True. Naive PyPI arm FAIL on schema-7 select.
 - 2026-09-05: First pip/uvx import from `/workspace` falsely showed tip modules on “PyPI” install — re-derived clean-room from `/tmp`.
 - 2026-09-05: Docs shipped: `docs/REVIEW-FINDINGS-TRIAGE-2026-09-05.md`, `docs/CLOUD-RECEIPT-transcripto-2026-09-05.md`.
+- 2026-09-05: `bash scripts/check_baseline_arms.sh` → tip wins consumer contract; live PyPI 0.2.0 loses schema-7 select.
