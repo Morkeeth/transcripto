@@ -132,8 +132,6 @@ cold_verify: PASS
    (504 typed + disguised `type:user` rows) yields `find` file count **1**, not
    2721. Record-count gates are not the retention object. Script prints
    `anti_conflation: PASS`.
- (retention claim)
-
 1. **Wrong object (prior waves):** some branches treated 504/2721 as authorship-gate
    kept-turns via `coach`. The article claim is **file ages**. Measuring the proxy
    produces a confident false verification.

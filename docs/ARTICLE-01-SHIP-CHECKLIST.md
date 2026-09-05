@@ -1,7 +1,7 @@
 # ARTICLE-01 ship checklist — Oscar morning
 
-**Status:** product **0.2.0** on main · cold verify green 2026-09-05 ·
-article / X / PyPI bumps = **Oscar clicks only**
+**Status:** PyPI **0.2.0 live** (re-derived `curl …/pypi/transcripto/json`) ·
+cold verify green 2026-09-05 · article / X = **Oscar clicks only**
 
 Agent does not post, publish, or bump PyPI.
 
@@ -16,6 +16,8 @@ Agent does not post, publish, or bump PyPI.
 | STEP 3 ruling | `docs/STEP-3-README-BELOEVED-RULING.md` | KEEP invented demo at README L66–88 |
 | Privacy | `./test_privacy.sh` | OK on real tree; empty-index exits **1** (watched RED) |
 | Suites inside cold_verify | coach/codex/cost/label_bands/small_n/cursor_partial/correction/version | all green |
+| PyPI | `curl -sL https://pypi.org/pypi/transcripto/json` | **0.2.0** |
+| CI | branch push `tests` workflow | **success** (3.9 + 3.13) |
 
 ## STEP 3 — README launch example
 
