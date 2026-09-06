@@ -85,3 +85,5 @@ Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
 - Privacy empty-index watched RED (exit 1). PyPI JSON re-derived: **0.2.0**.
 - Stranger clone of branch → `cold_verify: PASS`.
 - duration_vs_calendar counted=0 tonight — calendar cut ≠ pure 30d duration.
+- README Development points at `bash scripts/cold_verify.sh`.
+- Unit tests: `python3 -m unittest discover -s tests -v` → 73 OK.
