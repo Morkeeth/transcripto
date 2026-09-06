@@ -405,7 +405,23 @@ fi
 echo
 
 # --- privacy: real tree must pass; empty index must FAIL ---
+# git archive extracts have no .git. Prior waves claimed stranger PASS on a
+# clone only; archive mode was the bigger object and it failed. Ephemeral
+# index over the extract makes privacy runnable without mutating a real repo.
 echo "=== PRIVACY ==="
+PRIVACY_SCAN_ROOT="$REPO_ROOT"
+ARCHIVE_GIT_CLEANUP=""
+if ! git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "privacy_mode: archive-extract (no .git) — ephemeral git add -A for scan"
+  (
+    cd "$REPO_ROOT"
+    git init -q
+    git add -A
+  )
+  ARCHIVE_GIT_CLEANUP="$REPO_ROOT/.git"
+else
+  echo "privacy_mode: git-worktree"
+fi
 set +e
 PRIV_OUT=$(bash "$REPO_ROOT/test_privacy.sh" 2>&1)
 privrc=$?
@@ -417,6 +433,10 @@ if [ "$privrc" -ne 0 ]; then
   OFFLINE_CORE_FAIL=1
 else
   echo "privacy on real tree: PASS"
+fi
+if [ -n "$ARCHIVE_GIT_CLEANUP" ]; then
+  rm -rf "$ARCHIVE_GIT_CLEANUP"
+  echo "privacy_archive_ephemeral_git: removed"
 fi
 EMPTY_DIR="$WORK/privacy-empty-index"
 rm -rf "$EMPTY_DIR"

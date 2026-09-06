@@ -37,8 +37,7 @@ draft PR for Oscar review is the handoff, not a public post.
    projects root (`find … ! -newermt`), **not** an authorship-gate count of
    human turns. Do not conflate the two.
 4. A control that has not been watched going RED is not a control. Empty-input
-   greens are bugs. (Main's `test_privacy.sh` was green on empty `git init`
-   tonight — that is Slice 1 risk.)
+   greens are bugs.
 5. No outward acts. Branch push + draft PR for Oscar review is allowed; public
    post/publish/PyPI is not.
 6. Do not reorganise, rename, or start a new project.
@@ -47,46 +46,49 @@ draft PR for Oscar review is the handoff, not a public post.
 8. Cold stranger means: after source install, retention + oracle + suites must
    PASS with no network. Docs/PyPI probes are separate and may use network;
    their absence must not paint retention green-by-skip.
+9. A stranger path that only works with `.git` present is not fully cold —
+   archive extracts must be exercised.
 
 ## PLAN (risk first)
 
-1. **Slice 1 — cold stranger at the file object + controls that can go RED.**
-   Privacy empty-index fail-closed. `scripts/cold_verify.sh` with arithmetic
-   fixture, independent oracle, boundary + calendar-vs-duration probes,
-   anti-conflation, offline-after-install core. Artifact:
-   `docs/COLD-VERIFY-2026-08-30.md`. Also: true `git archive` stranger run.
-2. **Slice 2 — STEP 3 ruling at the README object.**
-   Open README line refs; KEEP/TRIM recommendation; Oscar ticks.
-3. **Slice 3 — STEP 0 logged.**
-   Re-run `./test_small_n.sh` and `bash scripts/test_small_n.sh`; log 7/7 in
-   checklist footer with the command.
-4. **Slice 4 — baseline arm that can embarrass us.**
-   `docs/BASELINE-ARM.md`: naive `find` vs transcripto on retention; pip-install
-   only (live PyPI, no clone) vs clone path; authorship gate naive vs coach.
-   Honest if naive/`find`/pip-only wins on simplicity.
+1. **Slice 1 — cold stranger at the file object + controls that can go RED.** DONE.
+   Ran `bash scripts/cold_verify.sh` → `cold_verify: PASS`, `offline_core: PASS`,
+   `ratio_30d: 504 of 2721`, `independent_oracle: PASS`. Archive stranger first
+   FAIL then PASS after privacy ephemeral-index fix. Artifact:
+   `docs/COLD-VERIFY-2026-08-30.md`.
+2. **Slice 2 — STEP 3 ruling at the README object.** DONE.
+   `docs/STEP-3-README-BELOEVED-RULING.md` recommends KEEP L66–88;
+   checklist boxes unchecked for Oscar.
+3. **Slice 3 — STEP 0 logged.** DONE.
+   `./test_small_n.sh` and `bash scripts/test_small_n.sh` → 7/7 in checklist footer.
+4. **Slice 4 — baseline arm that can embarrass us.** DONE.
+   `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` — naive `find`
+   wins retention; pip-only cannot answer file-age; gate 8 vs naive 12;
+   `stats` 2721/2721 near-miss documented.
 
 ## NOW
 
-**Slice 1 only.** Write privacy fail-closed + cold_verify + capture COLD-VERIFY
-doc. Do not tick Slice 2–4 until Slice 1's done-when has been RUN.
-
-Done-when: `bash scripts/cold_verify.sh` exits 0 and
-`docs/COLD-VERIFY-2026-08-30.md` contains tonight's command output including
-`ratio_30d`, `independent_oracle`, and `cold_verify: PASS`.
+Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
+`find` re-derive, article/X/PyPI.
 
 ## LOG
 
 - 2026-09-06 start (bc-fa7a9e70): main has no `hack.md`, no `docs/`, no
-  `scripts/`. Prior night-wave branches (fed8, caf5) are floor, not truth —
-  this wave re-runs at the object and goes bigger (archive stranger,
-  offline-after-install core, pip-only baseline).
+  `scripts/`. Prior night-wave branches (fed8, caf5) treated as floor.
 - START: `pip install -e . -q` ok; `./test_small_n.sh` → **7/7 green**;
-  `bash scripts/test_small_n.sh` → missing (no scripts/ yet).
-- Embarrassment already: empty `git init` + `test_privacy.sh` → exit **0**
-  (`PRIVACY OK: 0 hits in 0 tracked files`) — green-on-outage.
-- No live `~/.claude/projects` (OQ-1).
-- `python3 -m venv` needed `apt install python3.12-venv` (was missing).
-- PyPI JSON re-derived: **0.2.0**.
-- Docs object opened (`settings-reference.md`): `cleanupPeriodDays` Default
-  **30**; `desktopSessionCleanupPeriodDays` Default **0** (no age limit).
-- hack.md written before any code.
+  `bash scripts/test_small_n.sh` → missing.
+- Embarrassment at start: empty `git init` + `test_privacy.sh` → exit **0**.
+- No live `~/.claude/projects` (OQ-1). Needed `apt install python3.12-venv`.
+- PyPI JSON re-derived: **0.2.0**. Docs object: `cleanupPeriodDays` Default
+  **30**; desktop Default **0**.
+- hack.md written before any code; committed; pushed.
+- Slice 1: privacy fail-closed; `scripts/cold_verify.sh` with offline core,
+  oracle, boundary, product boundary. `bash scripts/cold_verify.sh` → **PASS**.
+- Archive stranger first run → **FAIL** (privacy needs `.git`). Fixed ephemeral
+  index; re-run → **PASS**.
+- Slice 2: README L66–88 invented demo; KEEP ruling; Oscar ticks open.
+- Slice 3: both small-n paths **7/7**; logged in checklist footer.
+- Slice 4: `pip_only_baseline.sh` → find wins; pip-only `retention` exit 2;
+  `stats` prints 2721/2721 typed on retention fixture (near-miss).
+- Unit tests: **73 OK**.
+- PR create requires Oscar approval in Cursor settings (branch is pushed).
