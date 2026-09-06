@@ -71,6 +71,9 @@ gate. Raw `type:user` counting does not.
 - Hiding that `pip install` adds friction the retention story does not need.
 - Treating a planter that asserts its own plant as method proof (fixed tonight
   via independent oracle).
+- Treating the calendar `find ! -newermt` cut as identical to
+  `age_seconds > 30*86400`. Tonight a file aged exactly 30 duration-days was
+  **not** counted (`duration_vs_calendar=0`).
 
 ## Honest product sentence
 
