@@ -83,3 +83,5 @@ Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
   `docs/COLD-VERIFY-2026-08-30.md`).
 - README object: invented demo at L66–88; author markers absent. STEP 3 = KEEP.
 - Privacy empty-index watched RED (exit 1). PyPI JSON re-derived: **0.2.0**.
+- Stranger clone of branch → `cold_verify: PASS`.
+- duration_vs_calendar counted=0 tonight — calendar cut ≠ pure 30d duration.

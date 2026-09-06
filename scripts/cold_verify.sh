@@ -248,6 +248,19 @@ else
   echo "boundary_probe: FAIL — unexpected inclusion (at=$AT after=$AFTER before=$BEFORE)"
   FAIL=1
 fi
+# Calendar threshold ≠ pure duration. A file aged exactly 30*86400 seconds may
+# still be NEWER than calendar midnight of "30 days ago" (same calendar day,
+# later clock time) and therefore NOT counted by ! -newermt.
+DUR="$WORK/duration-vs-calendar"
+mkdir -p "$DUR"
+DUR_EPOCH=$(( $(date +%s) - 30*86400 ))
+printf '%s\n' '{"k":1}' > "$DUR/exactly-30d-duration.jsonl"
+touch -d "@$DUR_EPOCH" "$DUR/exactly-30d-duration.jsonl"
+DUR_COUNTED=$(find "$DUR" -name 'exactly-30d-duration.jsonl' ! -newermt "$THIRTY" | wc -l | tr -d ' ')
+echo "duration_vs_calendar: file aged exactly 30*86400s counted_by_bang_newermt=$DUR_COUNTED"
+echo "  (0 means calendar method is stricter than pure duration at this clock time;"
+echo "   1 means the duration-aged file already sits on/before threshold midnight)"
+echo "caveat: article find method uses calendar midnight, not age_seconds > 30*86400"
 echo
 
 # --- deletion-timer control: must be watchable RED ---

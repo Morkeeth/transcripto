@@ -49,27 +49,27 @@ from Python `st_mtime` vs `find ! -newermt`, plus a midnight boundary probe.
 Command run tonight: `bash scripts/cold_verify.sh` (exit 0).
 
 ```text
-=== COLD VERIFY · 2026-09-06T00:10:42Z ===
+=== COLD VERIFY · 2026-09-06T00:14:01Z ===
 repo: /workspace
-work: /tmp/transcripto-cold-verify-run2
+work: /tmp/transcripto-cold-verify-lok3wL
 
 transcripto: transcripto 0.2.0
 
 generating fixture: 2721 jsonl files (504 aged 31–44d)…
-retention source: FIXTURE /tmp/transcripto-cold-verify-run2/fixtures-retention-504-of-2721
+retention source: FIXTURE /tmp/transcripto-cold-verify-lok3wL/fixtures-retention-504-of-2721
   (no live ~/.claude/projects on this machine — method + arithmetic only)
 
 === RETENTION (find method, re-derived) ===
 mode: fixture
-as_of: 2026-09-06T00:10:50Z
+as_of: 2026-09-06T00:14:10Z
 threshold_30d: mtime <= 2026-08-07
 threshold_45d: mtime <= 2026-07-23
 total_jsonl: 2721
 older_than_30d: 504
 older_than_45d: 0
 ratio_30d: 504 of 2721
-oldest_file: /tmp/transcripto-cold-verify-run2/fixtures-retention-504-of-2721/demo-project/sessions/session-0055.jsonl
-oldest_mtime: 2026-07-24T00:10:47Z
+oldest_file: /tmp/transcripto-cold-verify-lok3wL/fixtures-retention-504-of-2721/demo-project/sessions/session-0055.jsonl
+oldest_mtime: 2026-07-24T00:14:06Z
 
 frozen_quote (Oscar 2026-08-28, NOT re-derived on this VM unless mode=live): 504 of 2,721
 frozen_rederive (Oscar 2026-08-29, NOT re-derived here): 579 of 2,874
@@ -94,6 +94,10 @@ counted_by_bang_newermt at_midnight: 1   (expect 1 — mtime == ref is NOT newer
 counted_by_bang_newermt one_sec_after: 0   (expect 0 — strictly newer)
 counted_by_bang_newermt one_sec_before: 1   (expect 1)
 boundary_probe: PASS — ! -newermt means mtime <= threshold midnight
+duration_vs_calendar: file aged exactly 30*86400s counted_by_bang_newermt=0
+  (0 means calendar method is stricter than pure duration at this clock time;
+   1 means the duration-aged file already sits on/before threshold midnight)
+caveat: article find method uses calendar midnight, not age_seconds > 30*86400
 
 === DELETION TIMER PROBE ===
 settings.json: missing
@@ -107,7 +111,7 @@ docs_cleanupPeriodDays_default_30: PASS (re-derived from settings-reference.md)
 docs_desktop_default_0_no_age_limit: PASS
 
 === ANTI-CONFLATION (wrong object must not look like retention) ===
-wrote 2721 records into /tmp/transcripto-cold-verify-run2/wrong-object-authorship-gate/retention-gate.jsonl
+wrote 2721 records into /tmp/transcripto-cold-verify-lok3wL/wrong-object-authorship-gate/retention-gate.jsonl
 wrong_object_files: 1
 wrong_object_records: 2721
 wrong_object_old30_files: 0
@@ -134,7 +138,7 @@ total_records: 21 (naive line scan saw 21)
 baseline: naive overcounts (gate is stricter) — expected
 
 === PRIVACY ===
-PRIVACY OK: 0 hits in 208 tracked files
+PRIVACY OK: 0 hits in 214 tracked files
 privacy on real tree: PASS
 PRIVACY FAIL: git ls-files returned 0 files (empty index is not a clean tree)
 privacy_empty_index_exit: 1
@@ -175,7 +179,12 @@ cold_verify: PASS
 7. **Green-on-outage traps watched RED tonight:**
    - missing `settings.json` → `grep cleanupPeriodDays` exit 2
    - empty `git init` → `test_privacy.sh` exit 1
-8. **Docs object opened tonight**
+8. **Calendar midnight ≠ duration age.** Tonight a file aged exactly
+   `30*86400` seconds was **not** counted by `! -newermt` (counted=0) because
+   its clock time still sat after threshold midnight on the same calendar day.
+   The article `find` method is a calendar-day cut, not a pure duration cut.
+   Script prints `duration_vs_calendar` and the caveat line.
+9. **Docs object opened tonight**
    (`https://code.claude.com/docs/en/settings-reference.md`):
    - `cleanupPeriodDays` **Default: 30**
    - `desktopSessionCleanupPeriodDays` **Default: 0** (no age limit for

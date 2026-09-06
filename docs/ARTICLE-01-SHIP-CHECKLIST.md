@@ -10,7 +10,7 @@ Agent does not post, publish, or bump PyPI.
 | gate | command | result |
 |------|---------|--------|
 | STEP 0 small-n | `./test_small_n.sh` | **7/7 green** (also `bash scripts/test_small_n.sh`) |
-| Cold stranger | `bash scripts/cold_verify.sh` | **PASS** — `ratio_30d: 504 of 2721`, `independent_oracle: PASS`, `boundary_probe: PASS`, old45=0 |
+| Cold stranger | `bash scripts/cold_verify.sh` | **PASS** — `ratio_30d: 504 of 2721`, `independent_oracle: PASS`, `boundary_probe: PASS`, `duration_vs_calendar` caveat, old45=0 |
 | Cold artifact | `docs/COLD-VERIFY-2026-08-30.md` | captured command output |
 | Baseline arm | `docs/BASELINE-ARM.md` | naive `find` wins retention; gate 8 vs naive 12 on coach fixture |
 | STEP 3 ruling | `docs/STEP-3-README-BELOEVED-RULING.md` | KEEP invented demo at README L66–88 |
@@ -53,12 +53,17 @@ $ bash scripts/cold_verify.sh
 … ASSERT fixture 504 of 2721 (old45=0): PASS
 … independent_oracle: PASS
 … boundary_probe: PASS
+… duration_vs_calendar: … counted_by_bang_newermt=0
+… caveat: article find method uses calendar midnight, not age_seconds > 30*86400
 … docs_cleanupPeriodDays_default_30: PASS
 … docs_desktop_default_0_no_age_limit: PASS
 … anti_conflation: PASS — 2721 records in 1 file ≠ 2721 files
 … naive type:user count: 12
 … transcripto human_turns (gated): 8
 … privacy_empty_index_exit: 1
+… cold_verify: PASS
+
+$ git clone … && bash scripts/cold_verify.sh   # stranger clone
 … cold_verify: PASS
 ```
 
