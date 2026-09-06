@@ -48,33 +48,38 @@ draft PR for Oscar review is the handoff, not a public post.
 
 ## PLAN (risk first)
 
-1. **Slice 1 — cold stranger at the file object + independent oracle.**
-   Risk: circular 504/2721 planter/assert, wrong-object conflation, green-on-outage.
-   Done-when: `bash scripts/cold_verify.sh` exits 0; prints `ratio_30d: 504 of 2721`,
-   `independent_oracle: PASS`, `anti_conflation: PASS`; output captured in
-   `docs/COLD-VERIFY-2026-08-30.md`.
-2. **Slice 2 — STEP 3 ruling at the README object.**
-   Done-when: `docs/STEP-3-README-BELOEVED-RULING.md` exists with line refs from
-   `sed`/`rg` tonight; checklist STEP 3 boxes unchecked for Oscar.
-3. **Slice 3 — STEP 0 logged.**
-   Done-when: `./test_small_n.sh` and `bash scripts/test_small_n.sh` → 7/7 in
-   checklist footer with command cited.
-4. **Slice 4 — baseline arm that can embarrass us.**
-   Done-when: `docs/BASELINE-ARM.md` measures naive `find` vs transcripto on
-   retention, and naive authorship vs gate on fixtures-coach; honest if naive wins.
+1. **Slice 1 — cold stranger at the file object + independent oracle.** DONE.
+   Ran `bash scripts/cold_verify.sh` → `cold_verify: PASS`,
+   `ratio_30d: 504 of 2721`, `independent_oracle: PASS`, `boundary_probe: PASS`.
+   Artifact: `docs/COLD-VERIFY-2026-08-30.md`.
+2. **Slice 2 — STEP 3 ruling at the README object.** DONE.
+   `docs/STEP-3-README-BELOEVED-RULING.md` recommends KEEP L66–88;
+   checklist boxes unchecked for Oscar.
+3. **Slice 3 — STEP 0 logged.** DONE.
+   `./test_small_n.sh` and `bash scripts/test_small_n.sh` → 7/7 in checklist footer.
+4. **Slice 4 — baseline arm that can embarrass us.** DONE.
+   `docs/BASELINE-ARM.md` — naive `find` wins retention; gate 8 vs naive 12.
 
 ## NOW
 
-**Slice 1** — cold stranger script + independent find↔stat oracle +
-embarrassment hunt on the retention claim. No other slice until this one's
-done-when has been RUN.
+Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
+`find` re-derive, article/X/PyPI.
 
 ## LOG
 
 - 2026-09-06 start: main has no `hack.md`, no `docs/`, no `scripts/`. Prior
-  night-wave branch `cursor/night-wave-p1-cold-verify-fed8` has a floor; this
-  wave treats that as the floor, not the plan — add independent oracle so
-  planted 504/2721 is not the only PASS path.
+  night-wave branch treated as floor; this wave adds independent oracle +
+  boundary probe + settings-reference default re-derive.
 - `python3 -m venv` required `apt install python3.12-venv` (was missing).
 - No live `~/.claude/projects` on this VM (OQ-1).
 - hack.md written before any code.
+- `./test_small_n.sh` → **7/7 green**; `bash scripts/test_small_n.sh` → **7/7**.
+- Baseline: naive `type:user`=12, coach `human_turns`=8 on fixtures-coach.
+- Embarrassment: planter/assert of 504/2721 is circular → independent oracle
+  (180 blind ages) + boundary probe added.
+- Docs object opened: `cleanupPeriodDays` Default **30**;
+  `desktopSessionCleanupPeriodDays` Default **0** (no age limit).
+- `bash scripts/cold_verify.sh` → **cold_verify: PASS** (captured in
+  `docs/COLD-VERIFY-2026-08-30.md`).
+- README object: invented demo at L66–88; author markers absent. STEP 3 = KEEP.
+- Privacy empty-index watched RED (exit 1). PyPI JSON re-derived: **0.2.0**.
