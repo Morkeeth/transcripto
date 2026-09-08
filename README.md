@@ -36,6 +36,42 @@ not whether the task was done correctly.
 Or install with `python3 -m pip install transcripto==0.2.0`, then run
 `transcripto ask "retry"`. Requires Python 3.9 or newer.
 
+## Try the stranger flow without your transcripts
+
+The bundled public example is synthetic. It works in an isolated home and does
+not depend on agent dotfiles:
+
+```sh
+INSTALL="$(mktemp -d)"
+python3 -m pip install --no-deps --no-build-isolation --target "$INSTALL" .
+export HOME="$(mktemp -d)"
+transcripto() { PYTHONPATH="$INSTALL" python3 -m transcripto "$@"; }
+
+transcripto import-example
+transcripto ask "What changed about the forecast cache?"
+transcripto changes
+```
+
+`ask` cites the imported JSONL line for every hit. `changes` is a focused view
+of the request that was revised, the correction, and its recorded follow-up.
+It labels missing results rather than turning a change of mind into a score.
+
+To carry that correction to a different receiver:
+
+```sh
+transcripto handoff "30 seconds" \
+  --to-harness codex --output "$HOME/codex-inbox/correction.json"
+transcripto receive-handoff \
+  "$HOME/codex-inbox/correction.json" --as-harness codex \
+  --output "$HOME/codex-work/receiver-brief.md"
+cat "$HOME/codex-work/receiver-brief.md"
+```
+
+The receiver brief adopts the cited correction and retains what is still
+missing before completion can be claimed. Handoff files are local and mode
+`0600`; they can contain transcript text and paths, so review them before
+sharing.
+
 **Your files remain yours.** Transcripto does not upload transcript content or
 execute commands found in it. Search output, replay and JSON can contain private
 words and paths; review anything you choose to share. It reads existing files,
