@@ -32,7 +32,10 @@ USAGE = """
   transcripto replay --demo           try a labelled synthetic session
   transcripto replay --failures       jump to a failed tool call
   transcripto replay "<request>"       find and replay something you asked
+  transcripto import-example           add a public synthetic trace locally
   transcripto ask "<topic>"            find your own words across harnesses
+  transcripto changes                  inspect cited before/correction sequences
+  transcripto handoff "<correction>"   prepare a correction for another receiver
   transcripto search "<topic>"         search prompts, replies, and tool text
   transcripto find <file>              find recorded attempts and file operations
   transcripto coach                    descriptive request history, never grades
@@ -46,7 +49,8 @@ USAGE = """
 
 HOME = os.path.expanduser("~")
 ROOTS = [os.path.join(HOME, ".claude", "projects"),
-         os.path.join(HOME, ".codex"), os.path.join(HOME, ".cursor")]
+         os.path.join(HOME, ".codex"), os.path.join(HOME, ".cursor"),
+         os.path.join(HOME, ".transcripto", "imports")]
 DB = os.path.join(HOME, ".trace", "trace.db")
 HARNESS = None
 
@@ -89,7 +93,7 @@ def connect(require_index=True):
     return con
 
 
-SCHEMA_VERSION = 3  # bump when a column/tokenizer change needs a full rebuild
+SCHEMA_VERSION = 4  # bump when a column/tokenizer change needs a full rebuild
 
 
 def _needs_rebuild(con):
@@ -101,7 +105,7 @@ def _needs_rebuild(con):
     if not t:
         return False  # fresh db — nothing to migrate
     cols = {r[1] for r in con.execute("PRAGMA table_info(messages)")}
-    if "is_human" not in cols or "harness" not in cols:
+    if "is_human" not in cols or "harness" not in cols or "source_line" not in cols:
         return True
     if "warnings" not in {r[1] for r in con.execute("PRAGMA table_info(indexed)")}:
         return True
@@ -121,7 +125,8 @@ def init_schema(con):
     CREATE TABLE IF NOT EXISTS messages(
       id INTEGER PRIMARY KEY, session_id TEXT, session_file TEXT, project TEXT,
       ts TEXT, role TEXT, cwd TEXT, git_branch TEXT, text TEXT,
-      is_human INTEGER DEFAULT 0, prompt_source TEXT, harness TEXT);
+      is_human INTEGER DEFAULT 0, prompt_source TEXT, harness TEXT,
+      source_line INTEGER);
     -- porter stemming: `ask "frustration"` also matches frustrated/frustrating.
     CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
       text, content='messages', content_rowid='id', tokenize="porter unicode61");
@@ -148,12 +153,12 @@ def init_schema(con):
       SELECT name, path, action, session_id, ts, cwd, harness FROM files;
     DROP VIEW IF EXISTS v_index_health;
     CREATE VIEW v_index_health AS SELECT session_file, mtime, warnings FROM indexed;
-    -- is_human=1 marks a turn Oscar actually typed (promptSource typed/queued, not
+    -- is_human=1 marks a turn the operator actually typed (promptSource typed/queued, not
     -- injected/tool/peer). See ask_gate() + READ-CONTRACT.md.
     DROP VIEW IF EXISTS v_messages;
     CREATE VIEW v_messages AS
       SELECT id, session_id, project, ts, role, cwd, git_branch, text,
-             is_human, prompt_source, harness FROM messages;
+             is_human, prompt_source, harness, source_line FROM messages;
     """)
     con.execute("PRAGMA user_version=%d" % SCHEMA_VERSION)
     con.commit()
@@ -207,7 +212,7 @@ def is_human_turn(d):
     ~95% of `type: user` records are NOT the operator — tool results, injected skill
     bodies, spawned sub-agent prompts, and cross-session peer messages all arrive as
     `type: user`. The one reliable signal is Claude Code's own `promptSource`.
-      keep:  promptSource in (typed, queued)   — he typed it, live or while busy
+      keep:  promptSource in (typed, queued)   — operator input, live or while busy
       drop:  isMeta (skill bodies/images) · toolUseResult (tool output) ·
              isSidechain (spawned agent's prompt) · sdk/system (judges, peers)
     """
@@ -281,8 +286,9 @@ def _index_once(con, progress=False):
             psrc = d.get("promptSource")
             if text:
                 cur = con.execute(
-                    "INSERT INTO messages(session_id,session_file,project,ts,role,cwd,git_branch,text,is_human,prompt_source,harness)"
-                    " VALUES(?,?,?,?,?,?,?,?,?,?,?)", (sid, f, proj, ts, role, cwd, gb, text, human, psrc, harness))
+                    "INSERT INTO messages(session_id,session_file,project,ts,role,cwd,git_branch,text,is_human,prompt_source,harness,source_line)"
+                    " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (sid, f, proj, ts, role, cwd, gb, text, human, psrc, harness, d.get("_line")))
                 con.execute("INSERT INTO messages_fts(rowid,text) VALUES(?,?)", (cur.lastrowid, text))
                 msgs += 1
             for action, path in fl:
@@ -322,13 +328,89 @@ def cmd_watch(args):
             print("  \033[32m+%d\033[0m messages · %d session(s) · %d total" % (msgs, new, tot), flush=True)
 
 
+_QUESTION_FILLER = {
+    "a", "an", "the", "about", "did", "do", "does", "i", "is", "my", "was",
+    "were", "what", "when", "where", "which", "who", "why", "how",
+}
+
+
 def _match(query):
-    terms = [t for t in query.split() if t]
+    words = re.findall(r"[\w.-]+", query.lower())
+    useful = [word for word in words if word not in _QUESTION_FILLER]
+    terms = useful or words
     return " AND ".join('"%s"' % t.replace('"', '') for t in terms) or '""'
 
 
 def _day(ts):
     return (ts or "")[:10] or "????-??-??"
+
+
+def _citation(path, line):
+    """A local source reference. Output is explicit because it may be private."""
+    shown = os.path.relpath(path, HOME) if path.startswith(HOME + os.sep) else path
+    return "%s:L%s" % (shown, line or "?")
+
+
+def _public_example_rows():
+    """An invented change-of-mind trace safe to install on an empty machine."""
+    base = {"sessionId": "public-change-example", "cwd": "/example/weather-service"}
+    rows = [
+        dict(base, type="user", promptSource="typed", timestamp="2026-01-12T10:00:00Z",
+             message={"role": "user", "content":
+                      "Set the forecast cache timeout to 60 seconds in config/cache.toml."}),
+        dict(base, type="assistant", timestamp="2026-01-12T10:00:05Z",
+             message={"role": "assistant", "content": [
+                 {"type": "text", "text": "I will update the forecast cache timeout."},
+                 {"type": "tool_use", "id": "edit-1", "name": "Edit",
+                  "input": {"file_path": "config/cache.toml",
+                            "old_string": "timeout = 15", "new_string": "timeout = 60"}}]}),
+        dict(base, type="user", timestamp="2026-01-12T10:00:06Z",
+             message={"role": "user", "content": [
+                 {"type": "tool_result", "tool_use_id": "edit-1",
+                  "content": "File updated successfully", "is_error": False}]}),
+        dict(base, type="user", promptSource="typed", timestamp="2026-01-12T10:02:00Z",
+             message={"role": "user", "content":
+                      "No, use 30 seconds instead for the forecast cache; upstream data changes twice a minute."}),
+        dict(base, type="assistant", timestamp="2026-01-12T10:02:05Z",
+             message={"role": "assistant", "content": [
+                 {"type": "text", "text": "I will apply the corrected 30-second timeout."},
+                 {"type": "tool_use", "id": "edit-2", "name": "Edit",
+                  "input": {"file_path": "config/cache.toml",
+                            "old_string": "timeout = 60", "new_string": "timeout = 30"}}]}),
+        dict(base, type="user", timestamp="2026-01-12T10:02:06Z",
+             message={"role": "user", "content": [
+                 {"type": "tool_result", "tool_use_id": "edit-2",
+                  "content": "File updated successfully", "is_error": False}]}),
+        dict(base, type="user", promptSource="typed", timestamp="2026-01-12T10:03:00Z",
+             message={"role": "user", "content": "Run the forecast cache tests."}),
+        dict(base, type="assistant", timestamp="2026-01-12T10:03:05Z",
+             message={"role": "assistant", "content": [
+                 {"type": "tool_use", "id": "test-1", "name": "Bash",
+                  "input": {"command": "python -m unittest tests.test_cache"}}]}),
+    ]
+    return rows
+
+
+def cmd_import_example(args):
+    """Install one labelled synthetic transcript into the local import corpus."""
+    root = os.path.join(HOME, ".transcripto", "imports", "claude")
+    os.makedirs(root, mode=0o700, exist_ok=True)
+    path = os.path.join(root, "public-change-example.jsonl")
+    payload = "".join(json.dumps(row, sort_keys=True) + "\n" for row in _public_example_rows())
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            if f.read() != payload and not args.force:
+                print("Refusing to replace a changed import. Use --force or choose an isolated HOME.",
+                      file=sys.stderr)
+                return 2
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(payload)
+    os.chmod(path, 0o600)
+    print("Imported synthetic public example: " + path)
+    print('Ask it: transcripto ask "What changed about the forecast cache?"')
+    print("Explore the disagreement: transcripto changes")
+    return 0
 
 
 def cmd_search(args):
@@ -377,14 +459,14 @@ def _repo(cwd, proj):
 def cmd_ask(args):
     """YOUR OWN messages about a topic — the question that kills 'did I lose something?'.
 
-    Filters to turns Oscar actually typed (is_human=1), newest first, each with
+    Filters to turns the operator actually typed (is_human=1), newest first, each with
     date + repo + session id + snippet, and opens with a deterministic rollup of
     the arc: how many, how long, which repos, and your latest thought on it.
     """
     con = connect()
     try:
         rows = con.execute(
-            "SELECT m.id,m.ts,m.project,m.cwd,m.session_id,m.text,"
+            "SELECT m.id,m.ts,m.project,m.cwd,m.session_id,m.text,m.session_file,m.source_line,"
             " snippet(messages_fts,0,'\033[1m','\033[0m','…',16)"
             " FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid"
             " WHERE messages_fts MATCH ? AND m.is_human=1"
@@ -393,7 +475,7 @@ def cmd_ask(args):
     except sqlite3.OperationalError as e:
         print("ask error:", e); return
     if not rows:
-        # Did the topic exist at all (just not in his own words)? Say so honestly.
+        # Did the topic exist at all (just not in the operator's words)? Say so honestly.
         try:
             any_hit = con.execute(
                 "SELECT COUNT(*) FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid WHERE messages_fts MATCH ?",
@@ -433,14 +515,16 @@ def cmd_ask(args):
     print("\033[2mwhat you were doing about this\033[0m")
     print("  most active in: " + " · ".join(
         "\033[36m%s\033[0m (%d)" % (r, c) for r, c in top[:4]))
-    lid, lts, lproj, lcwd, lsid, ltext, lsnip = rows[0]
+    lid, lts, lproj, lcwd, lsid, ltext, lfile, lline, lsnip = rows[0]
     latest = " ".join(ltext.split())[:240]
-    print("  latest (\033[2m%s\033[0m %s): \"%s\"" % (_day(lts), _repo(lcwd, lproj), latest))
+    print("  latest (\033[2m%s\033[0m %s): \"%s\" [%s]"
+          % (_day(lts), _repo(lcwd, lproj), latest, _citation(lfile, lline)))
 
     print("\n\033[2myour messages, newest first\033[0m")
-    for _id, ts, proj, cwd, sid, text, snip in rows:
-        print("%s  \033[36m%-20s\033[0m %s  \033[2m%s\033[0m"
-              % (_day(ts), _repo(cwd, proj)[:20], " ".join(snip.split()), (sid or "")[:8]))
+    for _id, ts, proj, cwd, sid, text, source, line, snip in rows:
+        print("%s  \033[36m%-20s\033[0m %s  \033[2m%s · %s\033[0m"
+              % (_day(ts), _repo(cwd, proj)[:20], " ".join(snip.split()),
+                 (sid or "")[:8], _citation(source, line)))
 
 
 def cmd_find(args):
@@ -1061,6 +1145,155 @@ def count_corrections(rows, pasted=None, version=None):
     return typed, corrections
 
 
+def _change_records(roots, harness=None):
+    """Return correction episodes with the request they revise and recorded follow-up."""
+    found = []
+    for path in _coach_files(roots, harness):
+        rows, detected = core.read_session(path)
+        eps = core.episodes(rows, path)
+        for number, ep in enumerate(eps):
+            if not is_correction(ep["prompt"]):
+                continue
+            prior = eps[number - 1] if number else None
+            found.append({
+                "timestamp": ep["timestamp"],
+                "harness": detected,
+                "correction": ep["prompt"],
+                "source": path,
+                "line": ep["line"],
+                "previous_request": prior["prompt"] if prior else None,
+                "previous_line": prior["line"] if prior else None,
+                "reply": ep["reply"] or None,
+                "events": ep["events"],
+            })
+    return sorted(found, key=lambda r: (r["timestamp"], r["source"], r["line"] or 0),
+                  reverse=True)
+
+
+def cmd_changes(args):
+    """Explore disagreements as before/correction/follow-up sequences."""
+    records = _change_records(_coach_roots(args.root, args.harness), args.harness)
+    if not records:
+        print("No correction-shaped requests found. The classifier can have misses.")
+        return 0
+    for item in records[:args.limit]:
+        print("CHANGE OF DIRECTION · %s · %s"
+              % (item["harness"], _citation(item["source"], item["line"])))
+        if item["previous_request"]:
+            print('  Before: "%s" [%s]' % (
+                " ".join(item["previous_request"].split()),
+                _citation(item["source"], item["previous_line"])))
+        else:
+            print("  Before: not present in this transcript")
+        print('  Correction: "%s"' % " ".join(item["correction"].split()))
+        statuses = [event["status"] for event in item["events"]]
+        if not statuses:
+            print("  Follow-up: no tool attempt recorded; receiver use is missing.")
+        else:
+            print("  Follow-up: %s" % ", ".join(
+                "%s %s (%s)" % (event["kind"], event["target"], event["status"])
+                for event in item["events"]))
+            if "unknown" in statuses:
+                print("  Missing: a matching result for at least one follow-up attempt.")
+        print()
+    print("Correction detection is lexical; inspect the cited source before relying on it.")
+    return 0
+
+
+def _write_private(path, text):
+    parent = os.path.dirname(os.path.abspath(path))
+    os.makedirs(parent, mode=0o700, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.chmod(path, 0o600)
+
+
+def cmd_handoff(args):
+    """Write one cited correction packet for an explicitly named receiver."""
+    matches = [item for item in _change_records(_coach_roots(args.root, args.harness),
+                                                 args.harness)
+               if args.query.lower() in item["correction"].lower()]
+    if not matches:
+        print("No correction-shaped request matches '%s'." % args.query, file=sys.stderr)
+        return 2
+    item = matches[0]
+    if item["harness"] == args.to_harness:
+        print("Choose a receiver harness different from the source harness (%s)."
+              % item["harness"], file=sys.stderr)
+        return 2
+    statuses = [event["status"] for event in item["events"]]
+    missing = ["receiver acknowledgement", "task correctness verification"]
+    if not statuses or "unknown" in statuses:
+        missing.insert(0, "matching result for the source follow-up")
+    packet = {
+        "schema": "transcripto.handoff/1",
+        "receiver_harness": args.to_harness,
+        "correction": item["correction"],
+        "citation": {"source": item["source"], "line": item["line"],
+                     "harness": item["harness"]},
+        "previous_request": item["previous_request"],
+        "recorded_follow_up": [
+            {"kind": event["kind"], "target": event["target"], "status": event["status"]}
+            for event in item["events"]],
+        "missing": missing,
+        "caveat": "A packet carries an instruction, not proof that the receiver completed it.",
+    }
+    _write_private(os.path.expanduser(args.output), json.dumps(packet, indent=2) + "\n")
+    print("Handoff written for %s: %s" % (args.to_harness, os.path.expanduser(args.output)))
+    print("Missing: " + "; ".join(missing))
+    return 0
+
+
+def cmd_receive_handoff(args):
+    """Write a prepared receiver brief from a packet. Does not invoke a receiver agent."""
+    source = os.path.abspath(os.path.expanduser(args.packet))
+    output = os.path.abspath(os.path.expanduser(args.output))
+    if source == output:
+        print("Receiver output must be a different path from the handoff packet.",
+              file=sys.stderr)
+        return 2
+    try:
+        with open(source, encoding="utf-8") as f:
+            packet = json.load(f)
+    except (OSError, ValueError) as exc:
+        print("Cannot read handoff: %s" % exc, file=sys.stderr)
+        return 2
+    if packet.get("schema") != "transcripto.handoff/1":
+        print("Unsupported handoff schema.", file=sys.stderr)
+        return 2
+    if packet.get("receiver_harness") != args.as_harness:
+        print("Packet targets %s, not %s."
+              % (packet.get("receiver_harness") or "(unnamed)", args.as_harness),
+              file=sys.stderr)
+        return 2
+    correction = core.safe_text(packet.get("correction"))
+    if not correction:
+        print("Handoff has no correction to use.", file=sys.stderr)
+        return 2
+    # Keep acknowledgement pending until a real receiver leaves evidence.
+    remaining = list(packet.get("missing") or [])
+    if "receiver acknowledgement" not in remaining:
+        remaining.append("receiver acknowledgement")
+    brief = (
+        "# Prepared receiver brief\n\n"
+        "Harness: %s\n\n"
+        "Status: acknowledgement pending — no receiver agent was invoked by this command.\n\n"
+        "Prepared instruction for receiver: %s\n\n"
+        "Source: %s:L%s\n\n"
+        "Still missing before completion can be claimed:\n%s\n"
+        % (args.as_harness, correction,
+           core.safe_text((packet.get("citation") or {}).get("source")),
+           (packet.get("citation") or {}).get("line") or "?",
+           "".join("- %s\n" % core.safe_text(item) for item in remaining)
+           or "- task correctness verification\n")
+    )
+    _write_private(output, brief)
+    print("Prepared receiver brief: " + output)
+    print("Still missing: " + ("; ".join(remaining) or "task correctness verification"))
+    return 0
+
+
 def _human_prompt(d):
     """The text of a genuine human turn, or '' — reuses the measured gate."""
     return core.human_text(d)
@@ -1603,6 +1836,9 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--version", action="version", version="%s %s" % (PROG, VERSION))
     sub = p.add_subparsers(dest="cmd")
+    s = sub.add_parser("import-example", help="install a synthetic public trace locally")
+    s.add_argument("--force", action="store_true", help="replace a changed example import")
+    s.set_defaults(fn=cmd_import_example)
     sub.add_parser("index").set_defaults(fn=cmd_index)
     s = sub.add_parser("watch"); s.add_argument("--interval", type=int, default=5); s.set_defaults(fn=cmd_watch)
     s = sub.add_parser("ask"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=25); s.set_defaults(fn=cmd_ask)
@@ -1615,6 +1851,19 @@ def main():
     s.add_argument("--all", action="store_true",
                    help="include sessions you never typed in (85%% of them, on a real corpus)")
     s.set_defaults(fn=cmd_sessions)
+    s = sub.add_parser("changes", help="show cited disagreement and correction sequences")
+    s.add_argument("-n", "--limit", type=int, default=10)
+    s.set_defaults(fn=cmd_changes)
+    s = sub.add_parser("handoff", help="write a cited correction packet")
+    s.add_argument("query", help="words from the correction to hand off")
+    s.add_argument("--to-harness", required=True, choices=["claude", "codex", "cursor"])
+    s.add_argument("--output", required=True, help="receiver inbox JSON path")
+    s.set_defaults(fn=cmd_handoff)
+    s = sub.add_parser("receive-handoff", help="prepare a receiver brief (does not invoke a receiver)")
+    s.add_argument("packet", help="handoff packet JSON")
+    s.add_argument("--as-harness", required=True, choices=["claude", "codex", "cursor"])
+    s.add_argument("--output", required=True, help="separate receiver brief path")
+    s.set_defaults(fn=cmd_receive_handoff)
     sub.add_parser("stats").set_defaults(fn=cmd_stats)
     s = sub.add_parser("cost")
     s.add_argument("--days", type=int, default=30, help="window in days (0 = all time)")
@@ -1654,7 +1903,7 @@ def main():
     output.add_argument("--share", action="store_true", help="counts and caveat only; no prompts or paths")
     s.set_defaults(fn=lambda a: sys.exit(cmd_replay(a, _coach_files(_coach_roots(a.root, a.harness), a.harness))))
     for name, parser in sub.choices.items():
-        if name not in ("coach", "cost", "export-run"):
+        if name not in ("coach", "cost", "export-run", "import-example", "receive-handoff"):
             parser.add_argument("--root", help="read transcripts in this directory")
             parser.add_argument("--harness", choices=["claude", "codex", "cursor"], help="default: all three")
     a = p.parse_args(["replay"] if len(sys.argv) == 1 else None)
@@ -1663,7 +1912,8 @@ def main():
     if getattr(a, "session", None) and a.target != "latest":
         p.error("use either a positional query/path or --session")
     global ROOTS, HARNESS
-    if a.cmd not in ("coach", "cost", "export-run", "replay"):
+    if a.cmd not in ("coach", "cost", "export-run", "replay",
+                     "import-example", "receive-handoff"):
         HARNESS = getattr(a, "harness", None)
         ROOTS = _coach_roots(getattr(a, "root", None), HARNESS)
     if not getattr(a, "fn", None):

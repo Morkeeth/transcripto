@@ -12,7 +12,7 @@ con = sqlite3.connect(
 Use the stable views:
 
 - `v_sessions`: session ID, project, first/last timestamps, message and assistant counts, cwd, harness.
-- `v_messages`: ID, session ID, project, timestamp, role, cwd, branch, text, human flag, prompt source, harness.
+- `v_messages`: ID, session ID, project, timestamp, role, cwd, branch, text, human flag, prompt source, harness, source line.
 - `v_file_touches`: name, path, action, session ID, timestamp, cwd, harness.
 - `v_index_health`: source file, indexed modification time, JSON warnings for partial reads.
 - `messages_fts`: full-text search joined to `v_messages.id`.
@@ -27,7 +27,8 @@ and `attempt:edit` include failed or unknown changes. `read` and other named
 actions describe recorded calls. Use replay JSON for full execution statuses
 and call/result line references; the SQLite file view is not an outcome API.
 
-`transcripto index` refreshes all default harnesses. Search also refreshes
+`transcripto index` refreshes all default harnesses and the local synthetic/import
+corpus under `~/.transcripto/imports`. Search also refreshes
 incrementally. `--root` and `--harness` scope CLI queries; external readers of
 the stable views see the full indexed corpus. Deleted transcript files are
 removed at refresh. Partially readable files index their valid records and retain diagnostics in

@@ -397,6 +397,67 @@ class CLITests(FixtureCase):
             self.assertIn('1 message you typed', p.stdout)
         self.assertEqual((self.root/'.trace'/'trace.db').stat().st_mode & 0o777, 0o600)
 
+    def test_public_example_cited_question_and_receiver_handoff(self):
+        imported = self.run_cli('import-example')
+        self.assertEqual(imported.returncode, 0, imported.stderr)
+        self.assertIn('synthetic public example', imported.stdout)
+
+        asked = self.run_cli('ask', 'What changed about the forecast cache?')
+        self.assertEqual(asked.returncode, 0, asked.stderr)
+        self.assertIn('1 message you typed', asked.stdout)
+        self.assertIn('public-change-example.jsonl:L', asked.stdout)
+
+        changes = self.run_cli('changes')
+        self.assertEqual(changes.returncode, 0, changes.stderr)
+        self.assertIn('CHANGE OF DIRECTION', changes.stdout)
+        self.assertIn('60 seconds', changes.stdout)
+        self.assertIn('30 seconds instead', changes.stdout)
+        self.assertIn('edit config/cache.toml (succeeded)', changes.stdout)
+
+        inbox = self.root/'codex-inbox'/'correction.json'
+        handoff = self.run_cli('handoff', '30 seconds', '--to-harness', 'codex',
+                               '--output', str(inbox))
+        self.assertEqual(handoff.returncode, 0, handoff.stderr)
+        packet = json.loads(inbox.read_text())
+        self.assertEqual(packet['receiver_harness'], 'codex')
+        self.assertIn('30 seconds', packet['correction'])
+        self.assertIn('task correctness verification', packet['missing'])
+        self.assertEqual(inbox.stat().st_mode & 0o777, 0o600)
+
+        brief = self.root/'codex-work'/'receiver-brief.md'
+        received = self.run_cli('receive-handoff', str(inbox), '--as-harness',
+                                'codex', '--output', str(brief))
+        self.assertEqual(received.returncode, 0, received.stderr)
+        self.assertIn('Prepared receiver brief:', received.stdout)
+        self.assertNotIn('Receiver used the correction', received.stdout)
+        text = brief.read_text()
+        self.assertIn('Prepared receiver brief', text)
+        self.assertIn('acknowledgement pending', text)
+        self.assertIn('Prepared instruction for receiver: No, use 30 seconds instead', text)
+        self.assertNotIn('Instruction adopted:', text)
+        self.assertIn('Still missing before completion can be claimed', text)
+        self.assertIn('task correctness verification', text)
+        self.assertIn('receiver acknowledgement', text)
+
+    def test_receiver_rejects_wrong_harness_and_same_path(self):
+        self.assertEqual(self.run_cli('import-example').returncode, 0)
+        inbox = self.root/'handoff.json'
+        self.assertEqual(self.run_cli('handoff', '30 seconds', '--to-harness',
+                                     'cursor', '--output', str(inbox)).returncode, 0)
+        inbox.chmod(0o644)
+        self.assertEqual(self.run_cli('handoff', '30 seconds', '--to-harness',
+                                     'cursor', '--output', str(inbox)).returncode, 0)
+        self.assertEqual(inbox.stat().st_mode & 0o777, 0o600)
+        same_harness = self.run_cli('handoff', '30 seconds', '--to-harness',
+                                    'claude', '--output', str(self.root/'claude.json'))
+        self.assertEqual(same_harness.returncode, 2)
+        wrong = self.run_cli('receive-handoff', str(inbox), '--as-harness',
+                             'claude', '--output', str(self.root/'brief.md'))
+        self.assertEqual(wrong.returncode, 2)
+        same = self.run_cli('receive-handoff', str(inbox), '--as-harness',
+                            'cursor', '--output', str(inbox))
+        self.assertEqual(same.returncode, 2)
+
     def test_reindex_removes_old_full_text_tokens(self):
         self.read([user('oldneedle')])
         self.assertIn('1 message you typed', self.run_cli('ask','oldneedle','--root',str(self.root)).stdout)
