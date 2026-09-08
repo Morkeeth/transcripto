@@ -105,3 +105,6 @@ Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
   **PASS**. Added to embarrassment hunt in COLD-VERIFY.
 - CI: `cold-verify` job added to `.github/workflows/tests.yml`.
 - README Development: stranger one-liner for `bash scripts/cold_verify.sh`.
+- GitHub Actions on tip `e450282`: test 3.9 + 3.13 + cold-verify all
+  **success**. Two intermediate pushes failed on the STEP-3 privacy leak
+  (caught by CI `test_privacy.sh`) before the scrub.
