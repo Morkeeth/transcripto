@@ -55,25 +55,26 @@ draft PR for Oscar review is the handoff, not a public post.
 
 ## PLAN (risk first)
 
-1. **Slice 1 — cold stranger at the file object + RED controls.** NOW.
-   Privacy fail-closed on empty index; `scripts/cold_verify.sh` with offline
-   core, independent oracle, boundary probe, negative planter (must RED),
-   anti-conflation, product boundary, stats near-miss detection, archive
-   stranger path. Artifact: `docs/COLD-VERIFY-2026-08-30.md` with tonight's
-   command output.
-2. **Slice 2 — STEP 3 ruling at the README object.**
-   Re-open README with `nl -ba`; write
-   `docs/STEP-3-README-BELOEVED-RULING.md`; checklist boxes unchecked.
-3. **Slice 3 — STEP 0 logged.**
-   Re-run `./test_small_n.sh` and `bash scripts/test_small_n.sh`; log in
-   checklist footer.
-4. **Slice 4 — baseline arm that can embarrass us.**
-   `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` — honest if
-   naive `find` / pip-only wins on simplicity.
+1. **Slice 1 — cold stranger at the file object + RED controls.** DONE.
+   Ran `bash scripts/cold_verify.sh` → `cold_verify: PASS`, `offline_core: PASS`,
+   `ratio_30d: 504 of 2721`, `independent_oracle: PASS`, `negative_planter: PASS`,
+   `tz_divergence: OBSERVED`, `stats_near_miss: DETECTED`. Archive stranger:
+   `bash scripts/archive_stranger.sh` → PASS. Artifact:
+   `docs/COLD-VERIFY-2026-08-30.md`.
+2. **Slice 2 — STEP 3 ruling at the README object.** DONE.
+   `nl -ba README.md | sed -n '64,88p'` → invented demo L66–88;
+   `docs/STEP-3-README-BELOEVED-RULING.md` recommends KEEP; checklist unchecked.
+3. **Slice 3 — STEP 0 logged.** DONE.
+   `./test_small_n.sh` and `bash scripts/test_small_n.sh` → 7/7 in checklist footer.
+4. **Slice 4 — baseline arm that can embarrass us.** DONE.
+   `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` — naive `find`
+   wins retention; pip-only `retention` exit 2; `stats` 2721/2721 near-miss
+   DETECTED; gate 8 vs naive 12.
 
 ## NOW
 
-Slice 1 — cold stranger at the file object + RED controls.
+Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
+`find` re-derive (with TZ), article/X/PyPI.
 
 ## LOG
 
@@ -81,9 +82,21 @@ Slice 1 — cold stranger at the file object + RED controls.
   night-wave branches (`fed8`, `caf5`, `7ea8`) exist on remote — treated as
   floor, not evidence. This wave must re-run at the object tonight.
 - START: `git pull origin main` ok; `python3 -m venv` initially failed
-  (`python3-venv` missing); `./test_small_n.sh` → **7/7 green**.
+  (`python3-venv` missing → `apt install python3-venv`); `./test_small_n.sh`
+  → **7/7 green**.
 - Embarrassment at start (main): empty `git init` + `test_privacy.sh` →
   printed `PRIVACY OK: 0 hits in 0 tracked files` and exited **0**.
 - No live `~/.claude/projects` (OQ-1).
 - PyPI JSON re-derived at start: **0.2.0**.
-- hack.md written before any code.
+- hack.md written before any code; committed; pushed.
+- Slice 1: privacy fail-closed; `scripts/cold_verify.sh` with offline core,
+  oracle, negative planter, boundary, TZ probe, stats near-miss, product
+  boundary. `bash scripts/cold_verify.sh` → **PASS**.
+- Archive stranger: `bash scripts/archive_stranger.sh` → **PASS**.
+- Slice 2: README L66–88 invented demo; KEEP ruling; Oscar ticks open.
+- Slice 3: both small-n paths **7/7**; logged in checklist footer.
+- Slice 4: `pip_only_baseline.sh` → find wins; pip-only `retention` exit 2;
+  `stats` prints 2721/2721 typed on retention fixture (near-miss DETECTED).
+- Unit tests: **73 OK**.
+- Docs object: `cleanupPeriodDays` Default **30**; desktop Default **0**.
+- TZ divergence OBSERVED (UTC `2026-08-09` vs LA `2026-08-08`).
