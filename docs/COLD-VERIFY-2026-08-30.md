@@ -231,31 +231,35 @@ cold_verify: PASS
 0. **Main at start of tonight:** empty `git init` + `test_privacy.sh` exited **0**
    with `PRIVACY OK: 0 hits in 0 tracked files`. Fixed fail-closed; watched RED
    inside cold_verify (`privacy_empty_index_exit: 1`).
-1. **Archive stranger is the bigger object.** `bash scripts/archive_stranger.sh`
+1. **STEP-3 ruling doc leaked a guarded author fragment** into the public tree
+   (quoted the privacy pattern itself). `./test_privacy.sh` went RED after the
+   docs commit. Scrubbed; `bash scripts/cold_verify.sh` re-run → PASS. Naming
+   the guarded phrase in a public ruling is itself a disclosure.
+2. **Archive stranger is the bigger object.** `bash scripts/archive_stranger.sh`
    runs cold_verify inside a `git archive` extract with no `.git`. Tonight: PASS
    via ephemeral privacy index.
-2. **Planter/assert is circular.** The independent oracle (180 blind ages,
+3. **Planter/assert is circular.** The independent oracle (180 blind ages,
    find == Python `st_mtime`) is the method control. Tonight:
    `independent_oracle: PASS` (python/find old30=79, old45=42).
-3. **Negative planter watched RED.** Planted 503 of 2720; the 504/2721 assert
+4. **Negative planter watched RED.** Planted 503 of 2720; the 504/2721 assert
    would reject it (`negative_planter: PASS`).
-4. **Anti-conflation:** 2721 records in 1 file ≠ 2721 files.
-5. **`stats` near-miss DETECTED tonight:** on the retention fixture,
+5. **Anti-conflation:** 2721 records in 1 file ≠ 2721 files.
+6. **`stats` near-miss DETECTED tonight:** on the retention fixture,
    `transcripto stats` printed `2,721 of the 2,721 messages… typed`. That
    number matches the retention denominator while measuring indexed messages.
    Do not quote it as retention evidence.
-6. **Exact Oscar counts are not cold-reproducible.** No `~/.claude/projects` on
+7. **Exact Oscar counts are not cold-reproducible.** No `~/.claude/projects` on
    this VM (OQ-1).
-7. **Two frozen stamps disagree** (504/2721 vs 579/2874). No death rate from delta.
-8. **`older_than_45d == 0`** on the fixture (and was the sharper live fact).
-9. **Naive `find` wins retention simplicity.** `product_boundary: PASS`.
-10. **Calendar midnight ≠ duration age.** `duration_vs_calendar=0` tonight.
-11. **TZ divergence OBSERVED.** UTC threshold `2026-08-09` vs America/Los_Angeles
+8. **Two frozen stamps disagree** (504/2721 vs 579/2874). No death rate from delta.
+9. **`older_than_45d == 0`** on the fixture (and was the sharper live fact).
+10. **Naive `find` wins retention simplicity.** `product_boundary: PASS`.
+11. **Calendar midnight ≠ duration age.** `duration_vs_calendar=0` tonight.
+12. **TZ divergence OBSERVED.** UTC threshold `2026-08-09` vs America/Los_Angeles
     `2026-08-08`. Publish timezone with any live figure.
-12. **Docs object re-derived:** `cleanupPeriodDays` Default **30**; desktop
+13. **Docs object re-derived:** `cleanupPeriodDays` Default **30**; desktop
     `desktopSessionCleanupPeriodDays` Default **0** (no age limit). Do not
     collapse CLI and Desktop into one sentence.
-13. **Green-on-outage traps watched RED:** missing settings → grep exit 2;
+14. **Green-on-outage traps watched RED:** missing settings → grep exit 2;
     empty git index → privacy exit 1.
 
 ## Oscar morning re-derive (live corpus)

@@ -11,7 +11,7 @@ Commands:
 
 ```sh
 nl -ba README.md | sed -n '64,88p'
-rg -n 'beloeved|NO-DURABLE|worst looped' README.md || true
+rg -n 'NO-DURABLE|worst looped' README.md || true
 ```
 
 Observed at `README.md:64–88` (via `nl -ba README.md | sed -n '64,88p'`):
@@ -22,8 +22,10 @@ Observed at `README.md:64–88` (via `nl -ba README.md | sed -n '64,88p'`):
   `You asked: "Fix the login redirect and run its tests."` (L69–88)
 - Closing: `Recorded: 3 succeeded · 2 failed · 0 unknown` (L86)
 
-`rg` for old author-prompt markers (`beloeved`, `NO-DURABLE`, `worst looped`)
-in `README.md`: **0 hits**.
+`rg` for old author-prompt markers (`NO-DURABLE`, `worst looped`)
+in `README.md`: **0 hits**. Tonight the same search including the
+privacy-guarded author fragment also returned **0 hits** (fragment not
+restated here — naming it in a public doc is itself a disclosure).
 
 ## What changed since older rulings
 
@@ -32,8 +34,8 @@ author worst-prompt example. Those line refs are **stale on current main**.
 Opening the object tonight shows the launch surface is the **invented**
 `replay --demo` block at **L66–88**, not an author prompt.
 
-Restoring the author prompt is **blocked** by `test_privacy.sh` (guarded
-phrase `beloeved routine`). Do not recommend RESTORE.
+Restoring the author prompt is **blocked** by `test_privacy.sh` (the
+guarded author-prompt phrases it scans for). Do not recommend RESTORE.
 
 ## Recommendation
 

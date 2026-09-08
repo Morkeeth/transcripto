@@ -100,3 +100,8 @@ Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
 - Unit tests: **73 OK**.
 - Docs object: `cleanupPeriodDays` Default **30**; desktop Default **0**.
 - TZ divergence OBSERVED (UTC `2026-08-09` vs LA `2026-08-08`).
+- Embarrassment after docs commit: STEP-3 ruling quoted a privacy-guarded
+  author fragment → `./test_privacy.sh` RED. Scrubbed; cold_verify re-run →
+  **PASS**. Added to embarrassment hunt in COLD-VERIFY.
+- CI: `cold-verify` job added to `.github/workflows/tests.yml`.
+- README Development: stranger one-liner for `bash scripts/cold_verify.sh`.
