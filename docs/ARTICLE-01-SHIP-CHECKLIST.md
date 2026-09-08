@@ -18,6 +18,7 @@ Agent does not post, publish, or bump PyPI.
 | Privacy | `./test_privacy.sh` | OK on real tree; empty-index exits **1** (watched RED) |
 | Suites inside cold_verify | coach/codex/cost/label_bands/small_n/cursor_partial/correction/version | all green |
 | Unit tests | `python3 -m unittest discover -s tests -v` | **73 OK** |
+| CI cold-verify job | `.github/workflows/tests.yml` job `cold-verify` | added; runs `bash scripts/cold_verify.sh` on push/PR |
 | Docs default | curl settings-reference.md | `cleanupPeriodDays` Default **30**; desktop Default **0** |
 | PyPI | `curl -sL https://pypi.org/pypi/transcripto/json` | **0.2.0** |
 
