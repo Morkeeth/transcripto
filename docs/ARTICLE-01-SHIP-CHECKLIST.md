@@ -86,6 +86,9 @@ $ bash scripts/pip_only_baseline.sh
 
 $ python3 -m unittest discover -s tests -v
 … Ran 73 tests … OK
+
+$ # GitHub Actions on e450282 (after privacy scrub)
+… test (3.9): success · test (3.13): success · cold-verify: success
 ```
 
 Not done (by design): article post · X post · PyPI bump · publish.
