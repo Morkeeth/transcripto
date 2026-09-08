@@ -1246,7 +1246,7 @@ def cmd_handoff(args):
 
 
 def cmd_receive_handoff(args):
-    """Adopt a packet into a separate receiver brief and preserve its missing evidence."""
+    """Write a prepared receiver brief from a packet. Does not invoke a receiver agent."""
     source = os.path.abspath(os.path.expanduser(args.packet))
     output = os.path.abspath(os.path.expanduser(args.output))
     if source == output:
@@ -1271,12 +1271,15 @@ def cmd_receive_handoff(args):
     if not correction:
         print("Handoff has no correction to use.", file=sys.stderr)
         return 2
-    remaining = [m for m in packet.get("missing", [])
-                 if m != "receiver acknowledgement"]
+    # Keep acknowledgement pending until a real receiver leaves evidence.
+    remaining = list(packet.get("missing") or [])
+    if "receiver acknowledgement" not in remaining:
+        remaining.append("receiver acknowledgement")
     brief = (
-        "# Receiver brief\n\n"
+        "# Prepared receiver brief\n\n"
         "Harness: %s\n\n"
-        "Instruction adopted: %s\n\n"
+        "Status: acknowledgement pending — no receiver agent was invoked by this command.\n\n"
+        "Prepared instruction for receiver: %s\n\n"
         "Source: %s:L%s\n\n"
         "Still missing before completion can be claimed:\n%s\n"
         % (args.as_harness, correction,
@@ -1286,7 +1289,7 @@ def cmd_receive_handoff(args):
            or "- task correctness verification\n")
     )
     _write_private(output, brief)
-    print("Receiver used the correction in: " + output)
+    print("Prepared receiver brief: " + output)
     print("Still missing: " + ("; ".join(remaining) or "task correctness verification"))
     return 0
 
@@ -1856,7 +1859,7 @@ def main():
     s.add_argument("--to-harness", required=True, choices=["claude", "codex", "cursor"])
     s.add_argument("--output", required=True, help="receiver inbox JSON path")
     s.set_defaults(fn=cmd_handoff)
-    s = sub.add_parser("receive-handoff", help="adopt a correction into a receiver brief")
+    s = sub.add_parser("receive-handoff", help="prepare a receiver brief (does not invoke a receiver)")
     s.add_argument("packet", help="handoff packet JSON")
     s.add_argument("--as-harness", required=True, choices=["claude", "codex", "cursor"])
     s.add_argument("--output", required=True, help="separate receiver brief path")

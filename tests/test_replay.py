@@ -428,11 +428,16 @@ class CLITests(FixtureCase):
         received = self.run_cli('receive-handoff', str(inbox), '--as-harness',
                                 'codex', '--output', str(brief))
         self.assertEqual(received.returncode, 0, received.stderr)
+        self.assertIn('Prepared receiver brief:', received.stdout)
+        self.assertNotIn('Receiver used the correction', received.stdout)
         text = brief.read_text()
-        self.assertIn('Instruction adopted: No, use 30 seconds instead', text)
+        self.assertIn('Prepared receiver brief', text)
+        self.assertIn('acknowledgement pending', text)
+        self.assertIn('Prepared instruction for receiver: No, use 30 seconds instead', text)
+        self.assertNotIn('Instruction adopted:', text)
         self.assertIn('Still missing before completion can be claimed', text)
         self.assertIn('task correctness verification', text)
-        self.assertNotIn('receiver acknowledgement', text)
+        self.assertIn('receiver acknowledgement', text)
 
     def test_receiver_rejects_wrong_harness_and_same_path(self):
         self.assertEqual(self.run_cli('import-example').returncode, 0)
