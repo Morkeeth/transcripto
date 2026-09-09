@@ -36,6 +36,43 @@ not whether the task was done correctly.
 Or install with `python3 -m pip install transcripto==0.2.0`, then run
 `transcripto ask "retry"`. Requires Python 3.9 or newer.
 
+## Continue in another harness
+
+Run `transcripto start` to see this path at any time. It uses a filtered local
+copy of one Claude Code, Codex, or Cursor JSONL session:
+
+```sh
+transcripto import-session path/to/session.jsonl
+transcripto ask "what matters about the release?"
+transcripto turn .transcripto/imports/claude/session.jsonl:L12
+transcripto correct .transcripto/imports/claude/session.jsonl:L12 \
+  "The release still needs the compatibility check."
+transcripto continue "release compatibility" --to-harness codex \
+  --next-action "Run the one compatibility check and record its result." \
+  --output continuation.md
+transcripto continuation-status continuation.md
+```
+
+The preview carries a goal, exact relevant turns, context backed by recorded
+tool results, decisions and corrections, open questions, and one next action.
+Every carried claim has a source reference. It also counts unrelated turns,
+assistant prose/tool-result bodies, and privacy-filtered records that were left
+out. Records shaped like credentials, private chat, or key material are omitted
+at import; only category counts are shown. The source file is never changed.
+
+`continuation-status` remains `UNACKNOWLEDGED` until the receiving harness
+creates a non-empty artifact containing the continuation ID. The receiver then
+runs:
+
+```sh
+transcripto consume-continuation continuation.md --as-harness codex \
+  --artifact receiver-result.md
+```
+
+That command hashes the brief and artifact into a local mode-`0600` receipt.
+It proves the artifact cited this continuation; it does not prove task
+correctness or authenticate the receiver identity.
+
 ## Try the stranger flow without your transcripts
 
 The bundled public example is synthetic. It works in an isolated home and does

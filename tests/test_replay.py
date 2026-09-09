@@ -5,6 +5,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -457,6 +458,146 @@ class CLITests(FixtureCase):
         same = self.run_cli('receive-handoff', str(inbox), '--as-harness',
                             'cursor', '--output', str(inbox))
         self.assertEqual(same.returncode, 2)
+
+    def test_import_correct_continue_and_consumption_receipt(self):
+        source = self.root/'synthetic-airport-session.jsonl'
+        records = [
+            dict(user('For the synthetic airport project, prepare the release checklist.'),
+                 sessionId='synthetic-airport-001', cwd='/synthetic/airport',
+                 timestamp='2026-09-09T08:00:00Z'),
+            {'type':'assistant','sessionId':'synthetic-airport-001',
+             'cwd':'/synthetic/airport','timestamp':'2026-09-09T08:00:05Z',
+             'message':{'content':[{'type':'tool_use','id':'edit-1','name':'Edit',
+                 'input':{'file_path':'CHECKLIST.md'}}]}},
+            {'type':'user','sessionId':'synthetic-airport-001',
+             'cwd':'/synthetic/airport','timestamp':'2026-09-09T08:00:06Z',
+             'message':{'content':[{'type':'tool_result','tool_use_id':'edit-1',
+                 'content':'File updated successfully','is_error':False}]}},
+            dict(user('The synthetic airport release conclusion is gate A.'),
+                 sessionId='synthetic-airport-001', cwd='/synthetic/airport',
+                 timestamp='2026-09-09T08:01:00Z'),
+            {'type':'assistant','sessionId':'synthetic-airport-001',
+             'cwd':'/synthetic/airport','timestamp':'2026-09-09T08:01:05Z',
+             'message':{'content':[{'type':'tool_use','id':'check-1','name':'Bash',
+                 'input':{'command':'python -m unittest tests.test_gate'}}]}},
+            dict(user('Update the unrelated database note.'),
+                 sessionId='synthetic-airport-001', cwd='/synthetic/airport',
+                 timestamp='2026-09-09T08:01:10Z'),
+            {'type':'assistant','sessionId':'synthetic-airport-001',
+             'cwd':'/synthetic/airport','timestamp':'2026-09-09T08:01:11Z',
+             'message':{'content':[{'type':'tool_use','id':'edit-2','name':'Edit',
+                 'input':{'file_path':'UNRELATED.md'}}]}},
+            {'type':'user','sessionId':'synthetic-airport-001',
+             'cwd':'/synthetic/airport','timestamp':'2026-09-09T08:01:12Z',
+             'message':{'content':[{'type':'tool_result','tool_use_id':'edit-2',
+                 'content':'File updated successfully','is_error':False}]}},
+            dict(user('Synthetic private record must not survive.'),
+                 sessionId='synthetic-airport-001', cwd='/synthetic/airport',
+                 timestamp='2026-09-09T08:02:00Z',
+                 credentials={'api_key':'SYNTHETIC-EXCLUDED-VALUE'}),
+            dict(user('SYNTHETIC-PRIVATE-CHAT-VALUE'),
+                 sessionId='synthetic-airport-001', cwd='/synthetic/airport',
+                 timestamp='2026-09-09T08:03:00Z', conversation_type='private'),
+            dict(user('SYNTHETIC-WALLET-VALUE'),
+                 sessionId='synthetic-airport-001', cwd='/synthetic/airport',
+                 timestamp='2026-09-09T08:04:00Z',
+                 wallet={'mnemonic':'SYNTHETIC-KEY-MATERIAL'}),
+        ]
+        source.write_text(''.join(json.dumps(record)+'\n' for record in records))
+
+        imported = self.run_cli('import-session', str(source), '--name', 'airport')
+        self.assertEqual(imported.returncode, 0, imported.stderr)
+        self.assertIn('Imported 8 claude records', imported.stdout)
+        self.assertIn('credentials (1)', imported.stdout)
+        self.assertIn('private chat (1)', imported.stdout)
+        self.assertIn('wallet/key material (1)', imported.stdout)
+        imported_path = self.root/'.transcripto'/'imports'/'claude'/'airport.jsonl'
+        self.assertNotIn('SYNTHETIC-EXCLUDED-VALUE', imported_path.read_text())
+        self.assertNotIn('SYNTHETIC-PRIVATE-CHAT-VALUE', imported_path.read_text())
+        self.assertNotIn('SYNTHETIC-WALLET-VALUE', imported_path.read_text())
+
+        asked = self.run_cli('ask', 'What about synthetic airport release?')
+        self.assertEqual(asked.returncode, 0, asked.stderr)
+        refs = re.findall(r'(\.transcripto/imports/claude/airport\.jsonl:L\d+)',
+                          asked.stdout)
+        self.assertTrue(refs, asked.stdout)
+        conclusion_ref = next(ref for ref in refs if ref.endswith(':L4'))
+        exact = self.run_cli('turn', conclusion_ref)
+        self.assertEqual(exact.returncode, 0, exact.stderr)
+        self.assertIn('conclusion is gate A', exact.stdout)
+
+        correction = 'Gate B is required; gate A alone is not sufficient.'
+        saved = self.run_cli('correct', conclusion_ref, correction)
+        self.assertEqual(saved.returncode, 0, saved.stderr)
+        self.assertIn('after restart or re-import', saved.stdout)
+        rejected = self.run_cli('correct', conclusion_ref,
+                                'api key: SYNTHETIC-DO-NOT-CARRY')
+        self.assertEqual(rejected.returncode, 2)
+
+        self.assertEqual(self.run_cli('import-session', str(source), '--name',
+                                     'airport').returncode, 0)
+        second_visit = self.run_cli('turn', conclusion_ref)
+        self.assertIn('saved correction: '+correction, second_visit.stdout)
+
+        brief = self.root/'handoff'/'airport-continuation.md'
+        prepared = self.run_cli(
+            'continue', 'synthetic airport release', '--to-harness', 'codex',
+            '--goal', 'Finish the synthetic airport release decision.',
+            '--next-action', 'Write one gate-B verification note.',
+            '--output', str(brief))
+        self.assertEqual(prepared.returncode, 0, prepared.stderr)
+        preview = brief.read_text()
+        for heading in ['## Goal', '## Relevant cited turns',
+                        '## Relevant verified context', '## Decisions and corrections',
+                        '## Open questions', '## Next action', '## Excluded']:
+            self.assertIn(heading, preview)
+        self.assertIn(correction, preview)
+        self.assertIn('edit CHECKLIST.md succeeded', preview)
+        self.assertIn('No matching result for check', preview)
+        self.assertIn('1 unrelated submitted turn', preview)
+        self.assertNotIn('UNRELATED.md', preview)
+        self.assertIn('credentials: 1', preview)
+        self.assertIn('private chat: 1', preview)
+        self.assertIn('wallet/key material: 1', preview)
+        self.assertNotIn('SYNTHETIC-EXCLUDED-VALUE', preview)
+        self.assertNotIn('SYNTHETIC-PRIVATE-CHAT-VALUE', preview)
+        self.assertNotIn('SYNTHETIC-WALLET-VALUE', preview)
+        self.assertEqual(brief.stat().st_mode & 0o777, 0o600)
+
+        pending = self.run_cli('continuation-status', str(brief))
+        self.assertEqual(pending.returncode, 3)
+        self.assertIn('UNACKNOWLEDGED', pending.stdout)
+        missing = self.run_cli('consume-continuation', str(brief),
+                               '--as-harness', 'codex',
+                               '--artifact', str(self.root/'missing.md'))
+        self.assertEqual(missing.returncode, 2)
+        self.assertFalse(Path(str(brief)+'.receipt.json').exists())
+        same_file = self.run_cli('consume-continuation', str(brief),
+                                 '--as-harness', 'codex', '--artifact', str(brief))
+        self.assertEqual(same_file.returncode, 2)
+
+        continuation_id = re.search(r'id=([0-9a-f]{16})', preview).group(1)
+        artifact = self.root/'receiver-artifact.md'
+        artifact.write_text('Continuation-ID: %s\nGate B verification note.\n'
+                            % continuation_id)
+        consumed = self.run_cli('consume-continuation', str(brief),
+                                '--as-harness', 'codex',
+                                '--artifact', str(artifact))
+        self.assertEqual(consumed.returncode, 0, consumed.stderr)
+        receipt = Path(str(brief)+'.receipt.json')
+        self.assertEqual(receipt.stat().st_mode & 0o777, 0o600)
+        status = self.run_cli('continuation-status', str(brief))
+        self.assertEqual(status.returncode, 0, status.stdout)
+        self.assertIn('CONSUMED', status.stdout)
+        artifact.write_text(artifact.read_text()+'changed\n')
+        self.assertEqual(self.run_cli('continuation-status', str(brief)).returncode, 2)
+
+    def test_start_makes_continuation_path_discoverable(self):
+        started = self.run_cli('start')
+        self.assertEqual(started.returncode, 0)
+        self.assertIn('import-session', started.stdout)
+        self.assertIn('continuation-status', started.stdout)
+        self.assertIn('UNACKNOWLEDGED', started.stdout)
 
     def test_reindex_removes_old_full_text_tokens(self):
         self.read([user('oldneedle')])

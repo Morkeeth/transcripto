@@ -3,7 +3,7 @@
 
 Local transcript inspection for Claude Code, Codex, and Cursor. Stdlib only.
 """
-import sys, os, json, glob, re, sqlite3, argparse, math
+import sys, os, json, glob, re, sqlite3, argparse, math, hashlib
 import transcripto_core as core
 from transcripto_replay import cmd_replay
 from datetime import datetime, timezone
@@ -32,8 +32,13 @@ USAGE = """
   transcripto replay --demo           try a labelled synthetic session
   transcripto replay --failures       jump to a failed tool call
   transcripto replay "<request>"       find and replay something you asked
+  transcripto start                     show the private continuation path
+  transcripto import-session <jsonl>    import your supported session safely
   transcripto import-example           add a public synthetic trace locally
   transcripto ask "<topic>"            find your own words across harnesses
+  transcripto turn <path:Lline>         inspect one exact cited turn
+  transcripto correct <path:Lline> ...  save a conclusion correction
+  transcripto continue "<topic>" ...    preview bounded work for another harness
   transcripto changes                  inspect cited before/correction sequences
   transcripto handoff "<correction>"   prepare a correction for another receiver
   transcripto search "<topic>"         search prompts, replies, and tool text
@@ -52,6 +57,8 @@ ROOTS = [os.path.join(HOME, ".claude", "projects"),
          os.path.join(HOME, ".codex"), os.path.join(HOME, ".cursor"),
          os.path.join(HOME, ".transcripto", "imports")]
 DB = os.path.join(HOME, ".trace", "trace.db")
+IMPORT_ROOT = os.path.join(HOME, ".transcripto", "imports")
+CONTINUATION_STATE = os.path.join(HOME, ".transcripto", "continuation-state.json")
 HARNESS = None
 
 FILE_TOOLS = {"Write": "write", "Edit": "edit", "Read": "read",
@@ -410,6 +417,163 @@ def cmd_import_example(args):
     print("Imported synthetic public example: " + path)
     print('Ask it: transcripto ask "What changed about the forecast cache?"')
     print("Explore the disagreement: transcripto changes")
+    return 0
+
+
+_SENSITIVE_KEY = re.compile(
+    r"(?:api.?key|(?:access|refresh|session).?token|^token$|bearer|"
+    r"auth(?:orization)?|credential|password|secret)",
+    re.I)
+_PRIVATE_CHAT_KEY = re.compile(r"(?:private.?chat|direct.?message|dm.?thread)", re.I)
+_WALLET_KEY = re.compile(r"(?:wallet|seed.?phrase|mnemonic|private.?key)", re.I)
+_SENSITIVE_TEXT = re.compile(
+    r"(?:api[ _-]?key|access[ _-]?token|authorization|password|secret|"
+    r"private[ _-]?chat|seed[ _-]?phrase|mnemonic)\s*[:=]\s*\S+", re.I)
+
+
+def _sensitive_categories(value):
+    """Category-only privacy scan; never return or print the matched value."""
+    categories = set()
+    if isinstance(value, dict):
+        for key, child in value.items():
+            label = str(key)
+            low_label = label.lower().replace("-", "_")
+            low_child = str(child).lower() if isinstance(child, (str, bool)) else ""
+            if ((low_label in ("visibility", "privacy", "channel_type",
+                               "conversation_type") and
+                 low_child in ("private", "direct", "dm"))
+                    or (low_label in ("is_private", "isprivate") and child is True)):
+                categories.add("private chat")
+            elif _WALLET_KEY.search(label):
+                categories.add("wallet/key material")
+            elif _PRIVATE_CHAT_KEY.search(label):
+                categories.add("private chat")
+            elif _SENSITIVE_KEY.search(label):
+                categories.add("credentials")
+            categories.update(_sensitive_categories(child))
+    elif isinstance(value, list):
+        for child in value:
+            categories.update(_sensitive_categories(child))
+    elif isinstance(value, str) and _SENSITIVE_TEXT.search(value):
+        categories.add("credentials/private text")
+    return categories
+
+
+def _load_json_state(path, default):
+    try:
+        with open(path, encoding="utf-8") as f:
+            value = json.load(f)
+        return value if isinstance(value, dict) else default
+    except (OSError, ValueError):
+        return default
+
+
+def _import_manifest():
+    return _load_json_state(os.path.join(IMPORT_ROOT, "manifest.json"),
+                            {"schema": "transcripto.imports/1", "imports": {}})
+
+
+def _save_import_manifest(manifest):
+    _write_private(os.path.join(IMPORT_ROOT, "manifest.json"),
+                   json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+
+
+def _safe_import_name(name):
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", name).strip(".-")
+    if not stem:
+        return ""
+    return stem if stem.endswith(".jsonl") else stem + ".jsonl"
+
+
+def cmd_import_session(args):
+    """Copy one supported JSONL session into a filtered, private local corpus."""
+    source = os.path.abspath(os.path.expanduser(args.session))
+    if not os.path.isfile(source):
+        print("Session file not found: " + core.safe_text(source), file=sys.stderr)
+        return 2
+    name = _safe_import_name(args.name or os.path.basename(source))
+    if not name:
+        print("Import name must contain a letter or number.", file=sys.stderr)
+        return 2
+    try:
+        detected = _sniff(source)
+    except OSError as exc:
+        print("Cannot inspect session: %s" % exc, file=sys.stderr)
+        return 2
+    if detected not in ("claude", "codex", "cursor"):
+        print("This is not a supported Claude Code, Codex, or Cursor session export.",
+              file=sys.stderr)
+        return 2
+
+    kept, excluded, excluded_count, malformed = [], {}, 0, []
+    try:
+        with open(source, encoding="utf-8") as f:
+            for number, line in enumerate(f, 1):
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                except ValueError:
+                    malformed.append(number)
+                    continue
+                if not isinstance(record, dict):
+                    malformed.append(number)
+                    continue
+                categories = _sensitive_categories(record)
+                if categories:
+                    excluded_count += 1
+                    for category in categories:
+                        excluded[category] = excluded.get(category, 0) + 1
+                    continue
+                kept.append(record)
+    except (OSError, UnicodeError) as exc:
+        print("Cannot read session: %s" % exc, file=sys.stderr)
+        return 2
+    if malformed:
+        print("Import stopped: malformed JSON at line(s) %s; no copy was written."
+              % ", ".join(map(str, malformed[:8])), file=sys.stderr)
+        return 2
+    if not kept:
+        print("Import stopped: every record was excluded by the privacy filter.",
+              file=sys.stderr)
+        return 2
+
+    root = os.path.join(IMPORT_ROOT, detected)
+    os.makedirs(root, mode=0o700, exist_ok=True)
+    destination = os.path.join(root, name)
+    candidate = destination + ".candidate"
+    payload = "".join(json.dumps(record, sort_keys=True) + "\n" for record in kept)
+    _write_private(candidate, payload)
+    diagnostics = []
+    rows, parsed_harness = core.read_session(candidate, diagnostics)
+    if diagnostics or parsed_harness != detected or not any(core.human_text(row) for row in rows):
+        try:
+            os.unlink(candidate)
+        except OSError:
+            pass
+        print("Import stopped: filtered records do not form a supported human session.",
+              file=sys.stderr)
+        return 2
+    os.replace(candidate, destination)
+    os.chmod(destination, 0o600)
+
+    manifest = _import_manifest()
+    imports = manifest.setdefault("imports", {})
+    rel = os.path.relpath(destination, HOME)
+    imports[rel] = {
+        "harness": detected,
+        "kept_records": len(kept),
+        "excluded_records": excluded_count,
+        "excluded_categories": dict(sorted(excluded.items())),
+    }
+    _save_import_manifest(manifest)
+    print("Imported %d %s records into %s" % (len(kept), detected, destination))
+    if excluded:
+        print("Excluded by privacy filter: " + ", ".join(
+            "%s (%d)" % item for item in sorted(excluded.items())))
+    else:
+        print("Excluded by privacy filter: none")
+    print('Next: transcripto ask "what matters?"  (use words from your session)')
     return 0
 
 
@@ -1294,6 +1458,403 @@ def cmd_receive_handoff(args):
     return 0
 
 
+def _parse_citation(reference):
+    match = re.fullmatch(r"(.+):L([1-9][0-9]*)", reference.strip())
+    if not match:
+        return None
+    shown, line = match.group(1), int(match.group(2))
+    path = os.path.expanduser(shown)
+    if not os.path.isabs(path):
+        path = os.path.join(HOME, path)
+    return os.path.abspath(path), line
+
+
+def _resolve_citation(reference):
+    parsed = _parse_citation(reference)
+    if not parsed:
+        return None
+    path, line = parsed
+    con = connect()
+    row = con.execute(
+        "SELECT text,role,is_human,harness,session_id FROM messages"
+        " WHERE session_file=? AND source_line=? ORDER BY id LIMIT 1",
+        (path, line)).fetchone()
+    if not row:
+        return None
+    return {
+        "source": path, "line": line, "text": row[0], "role": row[1],
+        "is_human": bool(row[2]), "harness": row[3], "session_id": row[4],
+        "reference": _citation(path, line),
+    }
+
+
+def _continuation_state():
+    return _load_json_state(
+        CONTINUATION_STATE,
+        {"schema": "transcripto.continuation-state/1", "corrections": []})
+
+
+def _save_continuation_state(state):
+    _write_private(CONTINUATION_STATE,
+                   json.dumps(state, indent=2, sort_keys=True) + "\n")
+
+
+def _correction_for(source, line):
+    for item in _continuation_state().get("corrections", []):
+        if item.get("source") == source and item.get("line") == line:
+            return item
+    return None
+
+
+def cmd_turn(args):
+    """Resolve one printed source reference back to the exact indexed turn."""
+    turn = _resolve_citation(args.reference)
+    if not turn:
+        print("Citation not found. Copy the complete `path:L<number>` from `ask`.",
+              file=sys.stderr)
+        return 2
+    print("%s · %s · %s" % (
+        turn["reference"], turn["harness"],
+        "submitted turn" if turn["is_human"] else turn["role"]))
+    print(turn["text"])
+    correction = _correction_for(turn["source"], turn["line"])
+    if correction:
+        current = hashlib.sha256(turn["text"].encode("utf-8")).hexdigest()
+        label = "saved correction" if correction.get("source_hash") == current \
+            else "saved correction (source changed; review before use)"
+        print("\n%s: %s" % (label, correction.get("text", "")))
+    return 0
+
+
+def cmd_correct(args):
+    """Persist a local conclusion correction anchored to one exact source turn."""
+    turn = _resolve_citation(args.reference)
+    if not turn:
+        print("Citation not found. Check it with `transcripto turn <path:Lline>`.",
+              file=sys.stderr)
+        return 2
+    text = " ".join(args.conclusion.split())
+    if not text:
+        print("Correction cannot be empty.", file=sys.stderr)
+        return 2
+    categories = _sensitive_categories(text)
+    if categories:
+        print("Correction not saved: privacy filter matched %s."
+              % ", ".join(sorted(categories)), file=sys.stderr)
+        return 2
+    state = _continuation_state()
+    corrections = [
+        item for item in state.get("corrections", [])
+        if not (item.get("source") == turn["source"] and item.get("line") == turn["line"])
+    ]
+    corrections.append({
+        "source": turn["source"],
+        "line": turn["line"],
+        "reference": turn["reference"],
+        "source_hash": hashlib.sha256(turn["text"].encode("utf-8")).hexdigest(),
+        "text": text,
+    })
+    state["corrections"] = corrections
+    _save_continuation_state(state)
+    print("Saved correction for %s" % turn["reference"])
+    print("It will be included in continuation previews after restart or re-import.")
+    return 0
+
+
+def _file_hash(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        while True:
+            chunk = f.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _continuation_model(query, goal, next_action, receiver):
+    con = connect()
+    import_root = os.path.abspath(IMPORT_ROOT)
+    import_prefix = import_root + os.sep
+    rows = con.execute(
+        "SELECT m.text,m.session_file,m.source_line,m.session_id,m.ts"
+        " FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid"
+        " WHERE messages_fts MATCH ? AND m.is_human=1"
+        " AND substr(m.session_file,1,?)=?"
+        " ORDER BY m.ts DESC LIMIT 12",
+        (_match(query), len(import_prefix), import_prefix)).fetchall()
+    if not rows:
+        return None
+    sources = sorted({row[1] for row in rows})
+    source_harnesses = set()
+    relevant = []
+    verified = []
+    open_questions = []
+    decisions = []
+    total_human = 0
+    relevant_refs = {(row[1], row[2]) for row in rows}
+    state = _continuation_state()
+
+    for text, source, line, _sid, _ts in reversed(rows[:6]):
+        relevant.append(("%s" % " ".join(text.split()), _citation(source, line)))
+    for source in sources:
+        session_rows, harness = core.read_session(source)
+        source_harnesses.add(harness)
+        eps = core.episodes(session_rows, source)
+        total_human += len(eps)
+        for ep in eps:
+            is_relevant = (source, ep["line"]) in relevant_refs
+            if is_correction(ep["prompt"]) and is_relevant:
+                decisions.append((" ".join(ep["prompt"].split()),
+                                  _citation(source, ep["line"])))
+            for event in ep["events"]:
+                call_ref = _citation(source, event["line"])
+                if event["status"] == "succeeded" and is_relevant:
+                    result_ref = _citation(source, event["result_line"])
+                    verified.append(("%s %s succeeded" % (
+                        event["kind"], event["target"]), "%s → %s" % (call_ref, result_ref)))
+                elif event["status"] == "unknown" and is_relevant:
+                    open_questions.append((
+                        "No matching result for %s %s" % (event["kind"], event["target"]),
+                        call_ref))
+        for item in state.get("corrections", []):
+            if item.get("source") != source:
+                continue
+            turn = _resolve_citation(item.get("reference", ""))
+            current_hash = hashlib.sha256(turn["text"].encode("utf-8")).hexdigest() \
+                if turn else None
+            if turn and current_hash == item.get("source_hash"):
+                decisions.append((item.get("text", ""), item.get("reference", "")))
+            else:
+                open_questions.append((
+                    "A saved correction needs review because its source changed",
+                    item.get("reference", "")))
+    if len(source_harnesses) == 1 and receiver in source_harnesses:
+        return {"error": "Choose a receiver harness different from the imported source harness."}
+
+    manifest = _import_manifest().get("imports", {})
+    excluded_categories = {}
+    excluded_records = 0
+    for source in sources:
+        meta = manifest.get(os.path.relpath(source, HOME), {})
+        excluded_records += int(meta.get("excluded_records") or 0)
+        for category, count in (meta.get("excluded_categories") or {}).items():
+            excluded_categories[category] = excluded_categories.get(category, 0) + int(count)
+    return {
+        "goal": goal or relevant[0][0],
+        "relevant": relevant[:6],
+        "verified": verified[:6],
+        "decisions": list(dict.fromkeys(decisions))[:6],
+        "open_questions": list(dict.fromkeys(open_questions))[:6],
+        "next_action": next_action,
+        "receiver": receiver,
+        "source_harnesses": sorted(source_harnesses),
+        "excluded_records": excluded_records,
+        "excluded_categories": excluded_categories,
+        "unrelated_turns": max(0, total_human - len(relevant)),
+    }
+
+
+def _render_continuation(model):
+    def bullets(items, empty):
+        if not items:
+            return "- " + empty
+        return "\n".join("- %s [%s]" % item for item in items)
+
+    privacy = ("%d record(s) removed at import" % model["excluded_records"])
+    if model["excluded_categories"]:
+        privacy += " (%s)" % ", ".join(
+            "%s: %d" % item for item in sorted(model["excluded_categories"].items()))
+    body = """# Continuation preview
+
+Receiver harness: {receiver}
+Source harness: {sources}
+
+## Goal
+{goal}
+
+## Relevant cited turns
+{relevant}
+
+## Relevant verified context
+{verified}
+
+## Decisions and corrections
+{decisions}
+
+## Open questions
+{questions}
+
+## Next action
+{next_action}
+
+## Excluded
+- {privacy}
+- {unrelated} unrelated submitted turn(s) outside this bounded preview
+- assistant prose and tool-result bodies are omitted; only result status and source references are carried
+- credential, private-chat, and key-material values are never included
+
+## Consumption
+Unacknowledged until the receiver creates a non-empty artifact containing
+`Continuation-ID: <id>` and `consume-continuation` records matching hashes.
+""".format(
+        receiver=model["receiver"], sources=", ".join(model["source_harnesses"]),
+        goal=model["goal"],
+        relevant=bullets(model["relevant"], "No matching submitted turns."),
+        verified=bullets(model["verified"], "No successful result is recorded."),
+        decisions=bullets(model["decisions"], "No explicit correction is saved."),
+        questions=bullets(model["open_questions"], "No missing result in the bounded context."),
+        next_action=model["next_action"], privacy=privacy,
+        unrelated=model["unrelated_turns"])
+    continuation_id = hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
+    body = body.replace("<id>", continuation_id)
+    header = "<!-- transcripto-continuation/1 id=%s receiver=%s -->\n" % (
+        continuation_id, model["receiver"])
+    return header + body, continuation_id
+
+
+def cmd_continue(args):
+    """Preview or write a bounded continuation assembled from imported evidence."""
+    goal = " ".join(core.safe_text(args.goal or "").split()) or None
+    next_action = " ".join(core.safe_text(args.next_action).split())
+    for label, value in (("goal", goal or ""), ("next action", next_action)):
+        categories = _sensitive_categories(value)
+        if categories:
+            print("%s not accepted: privacy filter matched %s."
+                  % (label.capitalize(), ", ".join(sorted(categories))), file=sys.stderr)
+            return 2
+    model = _continuation_model(args.query, goal, next_action,
+                                args.to_harness)
+    if not model:
+        print("No imported submitted turns match that question. Run `import-session`,"
+              " then use words shown by `ask`.", file=sys.stderr)
+        return 2
+    if model.get("error"):
+        print(model["error"], file=sys.stderr)
+        return 2
+    preview, continuation_id = _render_continuation(model)
+    print(preview)
+    if args.output:
+        output = os.path.abspath(os.path.expanduser(args.output))
+        _write_private(output, preview)
+        print("Prepared continuation %s at %s" % (continuation_id, output))
+        print("Status: transcripto continuation-status %s" % output)
+    return 0
+
+
+_CONTINUATION_HEADER = re.compile(
+    r"^<!-- transcripto-continuation/1 id=([0-9a-f]{16}) receiver=(claude|codex|cursor) -->")
+
+
+def _read_continuation(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except (OSError, UnicodeError):
+        return None, None, None
+    match = _CONTINUATION_HEADER.match(text)
+    if not match:
+        return None, None, None
+    return text, match.group(1), match.group(2)
+
+
+def cmd_consume_continuation(args):
+    """Record consumption only after inspecting a receiver-created artifact."""
+    brief = os.path.abspath(os.path.expanduser(args.brief))
+    artifact = os.path.abspath(os.path.expanduser(args.artifact))
+    if brief == artifact:
+        print("Consumption not recorded: receiver artifact must be separate from the brief.",
+              file=sys.stderr)
+        return 2
+    text, continuation_id, receiver = _read_continuation(brief)
+    if not text:
+        print("Not a supported continuation brief.", file=sys.stderr)
+        return 2
+    if receiver != args.as_harness:
+        print("Brief targets %s, not %s." % (receiver, args.as_harness),
+              file=sys.stderr)
+        return 2
+    try:
+        if not os.path.isfile(artifact) or os.path.getsize(artifact) == 0:
+            raise OSError("artifact is missing or empty")
+        if os.path.getmtime(artifact) < os.path.getmtime(brief):
+            raise OSError("artifact predates the continuation")
+        with open(artifact, "rb") as f:
+            sample = f.read(1024 * 1024).decode("utf-8", "replace")
+    except OSError as exc:
+        print("Consumption not recorded: %s." % exc, file=sys.stderr)
+        return 2
+    if "Continuation-ID: " + continuation_id not in sample:
+        print("Consumption not recorded: artifact does not cite the continuation ID.",
+              file=sys.stderr)
+        return 2
+    receipt = {
+        "schema": "transcripto.consumption/1",
+        "continuation_id": continuation_id,
+        "receiver_harness": receiver,
+        "brief": brief,
+        "brief_sha256": _file_hash(brief),
+        "artifact": artifact,
+        "artifact_sha256": _file_hash(artifact),
+        "consumed": True,
+        "caveat": "Artifact linkage proves use of this brief, not task correctness or receiver identity.",
+    }
+    receipt_path = brief + ".receipt.json"
+    _write_private(receipt_path, json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+    print("Recorded consumption receipt: " + receipt_path)
+    print("Artifact linked to continuation %s; task correctness remains unverified."
+          % continuation_id)
+    return 0
+
+
+def cmd_continuation_status(args):
+    """Verify the receipt and artifact hashes for one prepared continuation."""
+    brief = os.path.abspath(os.path.expanduser(args.brief))
+    _text, continuation_id, receiver = _read_continuation(brief)
+    if not continuation_id:
+        print("FAILED: not a supported continuation brief.")
+        return 2
+    receipt_path = brief + ".receipt.json"
+    if not os.path.exists(receipt_path):
+        print("UNACKNOWLEDGED: no receiver consumption receipt.")
+        print("Expected: " + receipt_path)
+        return 3
+    receipt = _load_json_state(receipt_path, {})
+    try:
+        valid = (
+            receipt.get("schema") == "transcripto.consumption/1"
+            and receipt.get("consumed") is True
+            and receipt.get("continuation_id") == continuation_id
+            and receipt.get("receiver_harness") == receiver
+            and receipt.get("brief_sha256") == _file_hash(brief)
+            and receipt.get("artifact_sha256") == _file_hash(receipt["artifact"])
+        )
+    except (OSError, KeyError):
+        valid = False
+    if not valid:
+        print("FAILED: receipt or linked artifact no longer matches.")
+        return 2
+    print("CONSUMED: %s receiver artifact matches continuation %s."
+          % (receiver, continuation_id))
+    print("Task correctness and receiver identity are not established by this receipt.")
+    return 0
+
+
+def cmd_start(args):
+    print("""Continue useful work in another harness:
+  1. transcripto import-session path/to/session.jsonl
+  2. transcripto ask "what matters about this work?"
+  3. transcripto turn <path:Lline>
+  4. transcripto correct <path:Lline> "the conclusion to carry"
+  5. transcripto continue "topic words" --to-harness codex \\
+       --next-action "one bounded action" --output continuation.md
+  6. transcripto continuation-status continuation.md
+
+Privacy default: imports omit credential/private-chat/key-material records.
+Status stays UNACKNOWLEDGED until a receiver-linked artifact is hashed.""")
+    return 0
+
+
 def _human_prompt(d):
     """The text of a genuine human turn, or '' — reuses the measured gate."""
     return core.human_text(d)
@@ -1836,12 +2397,41 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--version", action="version", version="%s %s" % (PROG, VERSION))
     sub = p.add_subparsers(dest="cmd")
+    sub.add_parser("start", help="show the import-to-continuation first-use path").set_defaults(fn=cmd_start)
+    s = sub.add_parser("import-session", help="privacy-filter and import one supported session")
+    s.add_argument("session", help="Claude Code, Codex, or Cursor JSONL session")
+    s.add_argument("--name", help="stable local import name (default: source filename)")
+    s.set_defaults(fn=cmd_import_session)
     s = sub.add_parser("import-example", help="install a synthetic public trace locally")
     s.add_argument("--force", action="store_true", help="replace a changed example import")
     s.set_defaults(fn=cmd_import_example)
     sub.add_parser("index").set_defaults(fn=cmd_index)
     s = sub.add_parser("watch"); s.add_argument("--interval", type=int, default=5); s.set_defaults(fn=cmd_watch)
     s = sub.add_parser("ask"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=25); s.set_defaults(fn=cmd_ask)
+    s = sub.add_parser("turn", help="show the exact turn behind an ask citation")
+    s.add_argument("reference", help="complete path:Lnumber citation from ask")
+    s.set_defaults(fn=cmd_turn)
+    s = sub.add_parser("correct", help="save a local conclusion correction at a citation")
+    s.add_argument("reference", help="complete path:Lnumber citation from ask")
+    s.add_argument("conclusion", help="corrected conclusion to carry forward")
+    s.set_defaults(fn=cmd_correct)
+    s = sub.add_parser("continue", help="preview bounded context for another harness")
+    s.add_argument("query", help="question or topic words selecting imported turns")
+    s.add_argument("--goal", help="goal override (default: earliest relevant submitted turn)")
+    s.add_argument("--to-harness", required=True, choices=["claude", "codex", "cursor"])
+    s.add_argument("--next-action", required=True, help="one bounded action for the receiver")
+    s.add_argument("--output", help="write the private continuation brief")
+    s.set_defaults(fn=cmd_continue)
+    s = sub.add_parser("consume-continuation",
+                       help="record a receiver-created artifact against a brief")
+    s.add_argument("brief")
+    s.add_argument("--as-harness", required=True, choices=["claude", "codex", "cursor"])
+    s.add_argument("--artifact", required=True)
+    s.set_defaults(fn=cmd_consume_continuation)
+    s = sub.add_parser("continuation-status",
+                       help="verify whether a receiver artifact consumed a brief")
+    s.add_argument("brief")
+    s.set_defaults(fn=cmd_continuation_status)
     s = sub.add_parser("search"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=25); s.set_defaults(fn=cmd_search)
     s = sub.add_parser("find"); s.add_argument("name"); s.set_defaults(fn=cmd_find)
     s = sub.add_parser("trace"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=10)
@@ -1903,17 +2493,22 @@ def main():
     output.add_argument("--share", action="store_true", help="counts and caveat only; no prompts or paths")
     s.set_defaults(fn=lambda a: sys.exit(cmd_replay(a, _coach_files(_coach_roots(a.root, a.harness), a.harness))))
     for name, parser in sub.choices.items():
-        if name not in ("coach", "cost", "export-run", "import-example", "receive-handoff"):
+        if name not in ("coach", "cost", "export-run", "start", "import-session",
+                        "import-example", "turn", "correct", "continue",
+                        "consume-continuation", "continuation-status",
+                        "receive-handoff"):
             parser.add_argument("--root", help="read transcripts in this directory")
             parser.add_argument("--harness", choices=["claude", "codex", "cursor"], help="default: all three")
     a = p.parse_args(["replay"] if len(sys.argv) == 1 else None)
     if getattr(a, "events", 1) < 1 or getattr(a, "limit", 1) < 1 or (getattr(a, "episode", None) is not None and a.episode < 1):
         p.error("episode, events, and limit must be positive")
-    if getattr(a, "session", None) and a.target != "latest":
+    if a.cmd == "replay" and getattr(a, "session", None) and a.target != "latest":
         p.error("use either a positional query/path or --session")
     global ROOTS, HARNESS
     if a.cmd not in ("coach", "cost", "export-run", "replay",
-                     "import-example", "receive-handoff"):
+                     "start", "import-session", "import-example", "turn", "correct",
+                     "continue", "consume-continuation", "continuation-status",
+                     "receive-handoff"):
         HARNESS = getattr(a, "harness", None)
         ROOTS = _coach_roots(getattr(a, "root", None), HARNESS)
     if not getattr(a, "fn", None):
