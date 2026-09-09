@@ -16,7 +16,7 @@ Agent does not post, publish, or bump PyPI.
 | Cold artifact | `docs/COLD-VERIFY-2026-08-30.md` | captured command output (2026-09-09 re-run) |
 | Baseline arm | `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` | naive `find` wins retention; pip-only cannot answer file-age; gate 8 vs naive 12 |
 | STEP 3 ruling | `docs/STEP-3-README-BELOEVED-RULING.md` | KEEP invented demo at README L66–88 |
-| Privacy | `./test_privacy.sh` | OK on real tree; empty-index exits **1** (watched RED) |
+| Privacy | `./test_privacy.sh` + `./test_privacy_empty_index.sh` | OK on real tree; empty-index exits **1** (watched RED; also in main matrix) |
 | Suites inside cold_verify | coach/codex/cost/label_bands/small_n/cursor_partial/correction/version | all green |
 | Unit tests | `python3 -m unittest discover -s tests -v` | **73 OK** |
 | CI cold-verify job | `.github/workflows/tests.yml` job `cold-verify` | added; first push hit docs `printf\|awk` pipefail — fixed file-then-awk |
@@ -96,8 +96,12 @@ $ bash scripts/pip_only_baseline.sh
 $ python3 -m unittest discover -s tests -v
 … Ran 73 tests … OK
 
+$ ./test_privacy_empty_index.sh
+… privacy_empty_index_exit: 1
+… privacy_empty_index_watched_red: PASS
+
 $ # CI note: first cold-verify job on 738e9d7 failed on docs printf|awk
-$ # pipefail (Broken pipe). File-then-awk fix follows on this tip.
+$ # pipefail (Broken pipe). File-then-awk fix on tip; empty-index gate in matrix.
 ```
 
 Not done (by design): article post · X post · PyPI bump · publish.
