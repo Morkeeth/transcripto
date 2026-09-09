@@ -68,7 +68,8 @@ draft PR for Oscar review is the handoff, not a public post.
    `tz_divergence: OBSERVED`, `tz_pair_trap: DETECTED`,
    `frozen_quote_reconcile: FAIL-TO-RECONCILE`, `stats_near_miss: DETECTED`.
    Archive + wheel strangers PASS. Artifact: `docs/COLD-VERIFY-2026-08-30.md`.
-   CI tip `67f3e5f`: test 3.9 + 3.13 + cold-verify **success**.
+   CI tip `45ae36a` (docs) and `67f3e5f` (scripts): test 3.9 + 3.13 +
+   cold-verify **success**.
 2. **Slice 2 — STEP 3 ruling at the README object.** DONE.
    `nl -ba README.md | sed -n '64,88p'` → invented demo L66–88;
    `docs/STEP-3-README-BELOEVED-RULING.md` recommends KEEP; checklist unchecked.
@@ -121,5 +122,5 @@ Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
 - New beyond floor: multi-TZ pair trap + frozen-quote FAIL-TO-RECONCILE probe.
 - Unit tests: **73 OK**. Empty-index gate in matrix via
   `test_privacy_empty_index.sh`.
-- GitHub Actions on tip `67f3e5f`: test 3.9 + 3.13 + cold-verify all
-  **success**.
+- GitHub Actions on tip `67f3e5f` (scripts) and `45ae36a` (docs+checklist):
+  test 3.9 + 3.13 + cold-verify all **success**.
