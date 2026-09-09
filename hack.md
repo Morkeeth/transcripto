@@ -115,3 +115,6 @@ Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
   `printf | awk` Broken pipe under pipefail when parsing settings-reference.
   Fixed to file-then-awk; re-ran cold_verify → **PASS**.
 - README Development: stranger one-liner for `bash scripts/cold_verify.sh`.
+- Added `test_privacy_empty_index.sh` to the main test matrix so the
+  empty-index green-on-outage trap is caught without waiting for cold-verify.
+  Ran → `privacy_empty_index_watched_red: PASS`.
