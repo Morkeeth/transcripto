@@ -56,27 +56,26 @@ draft PR for Oscar review is the handoff, not a public post.
 
 ## PLAN (risk first)
 
-1. **Slice 1 — cold stranger at the file object + RED controls.** NOW.
-   Risk: planter/assert is circular; empty-index privacy greens on main;
-   clone-only "stranger" misses archive extracts; calendar `find` ≠ duration;
-   `stats` can launder 2721 as retention. Ship `scripts/cold_verify.sh` with
-   offline core, independent oracle, negative planter, boundary/TZ probes,
-   anti-conflation, product boundary, stats near-miss, privacy fail-closed,
-   plus archive stranger. Artifact: `docs/COLD-VERIFY-2026-08-30.md`.
-2. **Slice 2 — STEP 3 ruling at the README object.**
-   Open `README.md` line refs tonight; write KEEP/TRIM recommendation;
-   Oscar ticks. No code change for KEEP.
-3. **Slice 3 — STEP 0 logged.**
-   Re-run `./test_small_n.sh` and `bash scripts/test_small_n.sh` → 7/7;
-   log commands in checklist footer.
-4. **Slice 4 — baseline arm that can embarrass us.**
-   Document naive `find` / pip-only vs transcripto. Honest if naive wins
-   retention. `docs/BASELINE-ARM.md` + `scripts/pip_only_baseline.sh`.
+1. **Slice 1 — cold stranger at the file object + RED controls.** DONE.
+   Ran `bash scripts/cold_verify.sh` → `cold_verify: PASS`, `offline_core: PASS`,
+   `ratio_30d: 504 of 2721`, `independent_oracle: PASS` (88/45), 
+   `negative_planter: PASS`, `tz_divergence: OBSERVED`, `stats_near_miss: DETECTED`.
+   Archive + wheel strangers PASS. Artifact: `docs/COLD-VERIFY-2026-08-30.md`.
+   CI docs pipefail found and fixed (file-then-awk).
+2. **Slice 2 — STEP 3 ruling at the README object.** DONE.
+   `nl -ba README.md | sed -n '64,88p'` → invented demo L66–88;
+   `docs/STEP-3-README-BELOEVED-RULING.md` recommends KEEP; checklist unchecked.
+3. **Slice 3 — STEP 0 logged.** DONE.
+   `./test_small_n.sh` and `bash scripts/test_small_n.sh` → 7/7 in checklist footer.
+4. **Slice 4 — baseline arm that can embarrass us.** DONE.
+   `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` — naive `find`
+   wins retention; pip-only `retention` exit 2; `stats` 2721/2721 near-miss
+   DETECTED; gate 8 vs naive 12; wheel cwd-shadow DETECTED.
 
 ## NOW
 
-**Slice 1** — cold stranger path + RED controls + COLD-VERIFY artifact.
-(hack.md exists; no product code until this file landed.)
+Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
+`find` re-derive (with TZ), article/X/PyPI.
 
 ## LOG
 
@@ -98,5 +97,21 @@ draft PR for Oscar review is the handoff, not a public post.
 - TZ tonight: host `UTC`; `date -d '30 days ago'` → `2026-08-10` (UTC) vs
   `2026-08-09` (America/Los_Angeles).
 - README object opened: invented demo at L66–88; `rg` for old author-prompt
-  markers → 0 hits. STEP 3 ruling deferred to Slice 2 (Oscar ticks).
-- hack.md written before any product/scripts code; this commit is Slice 0.
+  markers → 0 hits.
+- hack.md written before any product/scripts code; committed; pushed.
+- Slice 1: privacy fail-closed; `scripts/cold_verify.sh` with offline core,
+  oracle (seed 20260909), negative planter, boundary, TZ, stats near-miss,
+  product boundary. `bash scripts/cold_verify.sh` → **PASS**.
+- Archive stranger: `bash scripts/archive_stranger.sh` → **PASS**.
+- Wheel stranger first run **FAIL**ed on cwd shadow (`import` bound
+  `/workspace/transcripto.py` after wheel install). Trap made explicit;
+  clean-cwd path → **PASS**. New embarrassment beyond prior waves.
+- Slice 2: README L66–88 invented demo; KEEP ruling; Oscar ticks open.
+- Slice 3: both small-n paths **7/7**; logged in checklist footer.
+- Slice 4: `pip_only_baseline.sh` → find wins; pip-only `retention` exit 2;
+  `stats` prints 2721/2721 typed on retention fixture (near-miss DETECTED).
+- Unit tests: **73 OK**.
+- CI tip `738e9d7`: test 3.9 + 3.13 **success**; cold-verify **failure** on
+  `printf | awk` Broken pipe under pipefail when parsing settings-reference.
+  Fixed to file-then-awk; re-ran cold_verify → **PASS**.
+- README Development: stranger one-liner for `bash scripts/cold_verify.sh`.

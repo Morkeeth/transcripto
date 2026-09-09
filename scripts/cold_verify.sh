@@ -577,16 +577,20 @@ docs_rc=$?
 set -e
 if [ "$docs_rc" -eq 0 ] && [ -n "$DOCS_MD" ]; then
   echo "docs_object: https://code.claude.com/docs/en/settings-reference.md"
-  DEF=$(printf '%s\n' "$DOCS_MD" | awk '
+  # Write to a file then awk — `printf | awk` under pipefail dies with
+  # "Broken pipe" when awk exits early on a large docs page (seen in CI).
+  DOCS_FILE="$WORK/settings-reference.md"
+  printf '%s\n' "$DOCS_MD" > "$DOCS_FILE"
+  DEF=$(awk '
     /^### `cleanupPeriodDays`/ {insec=1; next}
     /^### / {if(insec) exit}
     insec && /^\* \*\*Default\*\*:/ {print; exit}
-  ')
-  DDEF=$(printf '%s\n' "$DOCS_MD" | awk '
+  ' "$DOCS_FILE")
+  DDEF=$(awk '
     /^### `desktopSessionCleanupPeriodDays`/ {insec=1; next}
     /^### / {if(insec) exit}
     insec && /^\* \*\*Default\*\*:/ {print; exit}
-  ')
+  ' "$DOCS_FILE")
   echo "cleanupPeriodDays_default_line: $DEF"
   echo "desktopSessionCleanupPeriodDays_default_line: $DDEF"
   if printf '%s' "$DEF" | grep -q '`30`'; then

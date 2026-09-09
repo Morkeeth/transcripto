@@ -2,9 +2,14 @@
 # wheel_stranger.sh — cold retention method from a local wheel (no editable, no .git).
 #
 # Bigger packaging object than `pip install -e .` inside a clone: build a wheel,
-# extract a git-archive tree WITHOUT the source checkout on PYTHONPATH, install
-# the wheel offline into a fresh venv, then re-derive 504/2721 via find and prove
+# install it offline into a fresh venv, then re-derive 504/2721 via find and prove
 # the installed CLI still has no file-age retention verb.
+#
+# Embarrassing trap (found 2026-09-09): with cwd == the source checkout, Python
+# puts '' first on sys.path and `import transcripto` silently binds the TREE,
+# not the wheel — even after a successful `pip install`. pip_only_baseline
+# avoided this by `cd` away from the repo; this script watches the trap go RED
+# then re-proves the wheel from a clean cwd.
 #
 # Usage: bash scripts/wheel_stranger.sh
 set -euo pipefail
@@ -29,14 +34,13 @@ python3 -m venv "$WORK/build-venv"
 # shellcheck disable=SC1091
 source "$WORK/build-venv/bin/activate"
 python -m pip install -U pip -q
-python -m pip install -e "$REPO_ROOT" -q >/dev/null 2>&1 || true
 python -m pip wheel --no-deps "$REPO_ROOT" --wheel-dir "$WHEEL_DIR" -q
 deactivate
 WHEEL=$(ls "$WHEEL_DIR"/transcripto-*.whl | head -1)
 echo "wheel: $WHEEL"
 echo
 
-# Archive extract proves we are not leaning on an editable checkout.
+# Archive extract proves packaging is not leaning on a live .git worktree.
 git -C "$REPO_ROOT" archive --format=tar.gz -o "$WORK/src.tar.gz" HEAD
 mkdir -p "$EXTRACT"
 tar -xzf "$WORK/src.tar.gz" -C "$EXTRACT"
@@ -56,12 +60,36 @@ export ALL_PROXY=http://127.0.0.1:9
 export NO_PROXY=
 python -m pip install --no-index --find-links="$WHEEL_DIR" transcripto -q
 echo "wheel_install: $(transcripto --version)"
+echo
+
+# --- CWD SHADOW TRAP: must be watched from inside the source checkout ---
+echo "=== CWD SHADOW TRAP (source checkout on sys.path[0]) ==="
+cd "$REPO_ROOT"
+SHADOW=$(python - <<'PY'
+import os, transcripto
+p = os.path.realpath(transcripto.__file__)
+print(p)
+if "site-packages" in p:
+    raise SystemExit("unexpected: cwd shadow did not bind the tree")
+PY
+)
+echo "import_from_repo_cwd: $SHADOW"
+if printf '%s' "$SHADOW" | grep -q "$REPO_ROOT"; then
+  echo "cwd_shadow_trap: DETECTED — import transcripto from repo cwd binds the TREE, not the wheel"
+  echo "cwd_shadow_trap_ruling: never verify a wheel install while cwd is the source checkout"
+else
+  echo "cwd_shadow_trap: FAIL — expected tree bind from repo cwd"
+  FAIL=1
+fi
+echo
+
+# --- Prove the wheel from a clean cwd (the real packaging object) ---
+echo "=== WHEEL IMPORT FROM CLEAN CWD ==="
+cd "$WORK"
 python - <<'PY'
 import os, transcripto
 p = os.path.realpath(transcripto.__file__)
 print("transcripto.__file__:", p)
-if "/workspace" in p and "site-packages" not in p:
-    raise SystemExit("FAIL: imported workspace tree instead of wheel site-packages")
 if "site-packages" not in p:
     raise SystemExit("FAIL: expected site-packages import path, got " + p)
 print("import_source: wheel site-packages OK")
@@ -102,7 +130,7 @@ else
   FAIL=1
 fi
 
-# Product boundary on the WHEEL install (not the editable clone).
+# Product boundary on the WHEEL install from clean cwd.
 set +e
 HELP=$(transcripto --help 2>&1)
 printf '%s\n' "$HELP" | grep -Eiq 'retention|cleanupPeriod|older than|mtime'
