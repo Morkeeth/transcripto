@@ -118,3 +118,5 @@ Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
 - Added `test_privacy_empty_index.sh` to the main test matrix so the
   empty-index green-on-outage trap is caught without waiting for cold-verify.
   Ran → `privacy_empty_index_watched_red: PASS`.
+- GitHub Actions on tip `619f364`: test 3.9 + 3.13 + cold-verify all
+  **success**. Intermediate `738e9d7` was the only RED (docs pipefail).
