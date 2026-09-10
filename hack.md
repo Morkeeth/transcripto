@@ -125,3 +125,6 @@ Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
 - Unit tests after: **73 OK**.
 - README Development points at `bash scripts/cold_verify.sh`.
 - `test_privacy_empty_index.sh` added to the matrix via `test_*.sh` glob.
+- Remote stranger clone of this branch → `bash scripts/cold_verify.sh` →
+  **PASS**.
+- GitHub Actions tip `c27361a`: test 3.9 + 3.13 + cold-verify all **success**.

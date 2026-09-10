@@ -21,6 +21,7 @@ Agent does not post, publish, or bump PyPI.
 | Docs default | curl settings-reference.md | `cleanupPeriodDays` Default **30**; desktop Default **0**; background sweep after session start |
 | PyPI | `curl -sL https://pypi.org/pypi/transcripto/json` | **0.2.0**; wheel has **no** cold_verify |
 | Unit tests | `python3 -m unittest discover -s tests -v` | **73 OK** |
+| CI tip `c27361a` | GitHub Actions `tests` workflow | test 3.9 + 3.13 + **cold-verify** all success |
 
 ## STEP 3 — README launch example
 

@@ -73,12 +73,13 @@ the 504/2721 target.
 
 ## Captured output
 
-Command run tonight: `bash scripts/cold_verify.sh` (exit 0).
+Command run tonight: `bash scripts/cold_verify.sh` (exit 0). Final re-capture
+after docs landed (privacy tracked-file count includes docs/).
 
 ```text
-=== COLD VERIFY · 2026-09-10T12:17:48Z ===
+=== COLD VERIFY · 2026-09-10T12:21:04Z ===
 repo: /workspace
-work: /tmp/transcripto-cold-verify-tonight
+work: /tmp/transcripto-cold-verify-XcWf4N
 
 transcripto: transcripto 0.2.0
 
@@ -86,20 +87,20 @@ transcripto: transcripto 0.2.0
 
 generating fixture: 2721 jsonl files (504 aged 31–44d)…
 fixture_files_written: 2721 old_planted: 504
-retention source: FIXTURE /tmp/transcripto-cold-verify-tonight/fixtures-retention-504-of-2721
+retention source: FIXTURE /tmp/transcripto-cold-verify-XcWf4N/fixtures-retention-504-of-2721
   (no live ~/.claude/projects on this machine — method + arithmetic only)
 
 === RETENTION (find method, re-derived) ===
 mode: fixture
-as_of: 2026-09-10T12:17:55Z
+as_of: 2026-09-10T12:21:11Z
 threshold_30d: mtime <= 2026-08-11
 threshold_45d: mtime <= 2026-07-27
 total_jsonl: 2721
 older_than_30d: 504
 older_than_45d: 0
 ratio_30d: 504 of 2721
-oldest_file: /tmp/transcripto-cold-verify-tonight/fixtures-retention-504-of-2721/demo-project/sessions/session-0055.jsonl
-oldest_mtime: 2026-07-28T12:17:52Z
+oldest_file: /tmp/transcripto-cold-verify-XcWf4N/fixtures-retention-504-of-2721/demo-project/sessions/session-0055.jsonl
+oldest_mtime: 2026-07-28T12:21:08Z
 
 frozen_quote (Oscar 2026-08-28, NOT re-derived on this VM unless mode=live): 504 of 2,721
 frozen_rederive (Oscar 2026-08-29, NOT re-derived here): 579 of 2,874
@@ -159,7 +160,7 @@ control_note: no settings file → default 30-day cleanup applies per Claude Cod
 control_watched_red: PASS
 
 === ANTI-CONFLATION (wrong object must not look like retention) ===
-wrote 2721 records into /tmp/transcripto-cold-verify-tonight/wrong-object-authorship-gate/retention-gate.jsonl
+wrote 2721 records into /tmp/transcripto-cold-verify-XcWf4N/wrong-object-authorship-gate/retention-gate.jsonl
 wrong_object_files: 1
 wrong_object_records: 2721
 wrong_object_old30_files: 0
@@ -171,7 +172,7 @@ help_exit: 0
 
 === STATS NEAR-MISS (message counts ≠ file-age) ===
 stats_exit: 0
-stats_home: /tmp/transcripto-cold-verify-tonight/fake-home-stats (isolated; does not touch ~/.trace)
+stats_home: /tmp/transcripto-cold-verify-XcWf4N/fake-home-stats (isolated; does not touch ~/.trace)
 stats_out:
 2,721 of the 2,721 messages in your index are things you typed.  100.0%
 the rest is the machine answering. `coach` counts raw transcript records instead
@@ -207,7 +208,7 @@ baseline: naive overcounts (gate is stricter) — expected
 
 === PRIVACY ===
 privacy_mode: git-worktree
-PRIVACY OK: 0 hits in 214 tracked files
+PRIVACY OK: 0 hits in 218 tracked files
 privacy on real tree: PASS
 PRIVACY FAIL: git ls-files returned 0 files (empty index is not a clean tree)
 privacy_empty_index_exit: 1
@@ -238,14 +239,13 @@ docs_desktop_immortal_ruling: do not flatten '30-day deletion' onto Desktop sess
 pypi_transcripto_version: 0.2.0 (re-derived)
 
 === PYPI PACKAGE AUDIT (published wheel vs repo stranger path) ===
-pypi_wheel: /tmp/transcripto-cold-verify-tonight/pypi-audit/transcripto-0.2.0-py3-none-any.whl
+pypi_wheel: /tmp/transcripto-cold-verify-XcWf4N/pypi-audit/transcripto-0.2.0-py3-none-any.whl
 pypi_wheel_entries: 9
 pypi_wheel_cold_verify_hits: 0
 pypi_package_audit: PASS — published wheel has no cold_verify script
 pypi_package_audit_ruling: stranger retention method requires the repo (clone/archive), not pip-only
 
 cold_verify: PASS
-work dir kept: /tmp/transcripto-cold-verify-tonight
 ```
 
 ## Archive stranger
