@@ -43,7 +43,7 @@ draft PR for Oscar review is the handoff, not a public post.
    projects root (`find … ! -newermt`), **not** an authorship-gate count of
    human turns, and **not** `stats` message counts. Do not conflate.
 4. A control that has not been watched going RED is not a control. Empty-input
-   greens are bugs. `grep -qv` on empty input is not a pass.
+   greens are bugs. `grep -q` on empty input is not a pass.
 5. No outward acts. Branch push + draft PR for Oscar review is allowed; public
    post/publish/PyPI is not.
 6. Do not reorganise, rename, or start a new project.
@@ -64,26 +64,27 @@ draft PR for Oscar review is the handoff, not a public post.
 ## PLAN (risk first)
 
 1. **Slice 1 — cold stranger at the file object + RED controls + death-rate
-   impossibility + docs desktop caveat.** (NOW)
-   Done-when: `bash scripts/cold_verify.sh` exits 0; output captured in
-   `docs/COLD-VERIFY-2026-08-30.md` with tonight's timestamp; includes
-   `independent_oracle`, `negative_planter`, `death_rate_impossible`,
-   `offline_core`, and docs defaults re-derived from
-   `https://code.claude.com/docs/en/settings-reference.md`.
-2. **Slice 2 — STEP 3 ruling at the README object.**
-   Done-when: `nl -ba README.md | sed -n '64,88p'` opened; ruling doc written;
-   checklist boxes left unchecked for Oscar.
-3. **Slice 3 — STEP 0 logged.**
-   Done-when: `./test_small_n.sh` and `bash scripts/test_small_n.sh` both
-   print 7/7; commands logged in checklist footer.
-4. **Slice 4 — baseline arm that can embarrass us.**
-   Done-when: `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh`
-   show naive `find` vs transcripto honestly; archive + wheel strangers PASS;
-   any near-miss DETECTED.
+   impossibility + docs desktop caveat.** DONE.
+   Ran `bash scripts/cold_verify.sh` → `cold_verify: PASS`,
+   `death_rate_impossible: PASS`, `empty_grep_control: PASS`,
+   `independent_oracle: PASS` (96/45), `negative_planter: PASS`,
+   `offline_core: PASS`, docs sweep-lag + desktop immortal,
+   `pypi_package_audit: PASS`. Artifact: `docs/COLD-VERIFY-2026-08-30.md`.
+2. **Slice 2 — STEP 3 ruling at the README object.** DONE.
+   `nl -ba README.md | sed -n '64,88p'` → invented demo L66–88;
+   `docs/STEP-3-README-BELOEVED-RULING.md` recommends KEEP; checklist unchecked.
+3. **Slice 3 — STEP 0 logged.** DONE.
+   `./test_small_n.sh` and `bash scripts/test_small_n.sh` → 7/7 in checklist footer.
+4. **Slice 4 — baseline arm that can embarrass us.** DONE.
+   `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` — naive `find`
+   wins retention; pip-only `retention` exit 2; stats 2721/2721 near-miss
+   DETECTED; gate 8 vs naive 12; archive + wheel strangers PASS;
+   cwd-shadow DETECTED; PyPI wheel has no cold_verify.
 
 ## NOW
 
-Slice 1 only.
+Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
+`find` re-derive (with TZ + Desktop mix check), article/X/PyPI.
 
 ## LOG
 
@@ -103,4 +104,24 @@ Slice 1 only.
   `cleanupPeriodDays` **Default: `30`**;
   `desktopSessionCleanupPeriodDays` **Default: `0`** (no age limit);
   deletion is a **background sweep after a session starts** (not continuous).
-- hack.md written before any product/scripts code.
+- hack.md written before any product/scripts code; committed; pushed.
+- Slice 1: privacy fail-closed; `scripts/cold_verify.sh` with offline core,
+  oracle (seed 20260910), negative planter, death-rate impossibility,
+  empty-grep control, boundary, TZ, stats near-miss, docs sweep-lag,
+  desktop immortal, PyPI package audit. `bash scripts/cold_verify.sh` →
+  **PASS** (captured in `docs/COLD-VERIFY-2026-08-30.md`).
+- Oracle tonight: old30=**96**, old45=**45** (not carried from prior waves).
+- Death-rate: frozen delta old +75 / total +153 → laundered "75 deaths"
+  FORBIDDEN.
+- Stats near-miss: `2,721 of the 2,721 messages … 100.0%` DETECTED.
+- duration_vs_calendar counted_by_bang_newermt=**0** tonight.
+- TZ: UTC and LA agreed on `2026-08-11` at this clock (no divergence tonight;
+  still publish TZ with live figures).
+- Archive stranger → **PASS**. Wheel stranger → **PASS** (cwd shadow
+  DETECTED). pip-only baseline → **PASS** (naive find wins).
+- Slice 2: README L66–88 invented demo; KEEP ruling; Oscar ticks open.
+- Slice 3: both small-n paths **7/7**; logged in checklist footer.
+- Slice 4: baseline doc + pip_only; PyPI wheel audit 0 cold_verify hits.
+- Unit tests after: **73 OK**.
+- README Development points at `bash scripts/cold_verify.sh`.
+- `test_privacy_empty_index.sh` added to the matrix via `test_*.sh` glob.
