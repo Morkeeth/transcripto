@@ -56,54 +56,74 @@ draft PR for Oscar review is the handoff, not a public post.
 11. Ambition beyond the floor must be able to embarrass us: naive `find`
     winning retention, `stats` near-miss looking like retention, empty-index
     privacy going green on outage, frozen quotes that do not reconcile, wheel
-    cwd-shadow binding the tree, TZ pair traps, calendar↔duration count
-    deltas on the planted fixture, touch↔utime planter disagreement — all
-    must be watched, not narrated.
+    cwd-shadow binding the tree, TZ pair traps (including the inverse of
+    prior-wave detectors), calendar↔duration count deltas, touch↔utime
+    planter disagreement — all must be watched, not narrated.
 
 ## PLAN (risk first)
 
-1. **Slice 1 — cold stranger at the file object + RED controls.** NOW.
-   `scripts/cold_verify.sh`: arithmetic fixture 504/2721, independent oracle,
-   negative planter, offline core, multi-TZ, frozen-quote non-reconciliation,
-   calendar↔duration delta on the fixture (beyond floor), touch↔utime planter
-   probe (beyond floor), archive + wheel strangers, privacy fail-closed.
-   Done-when: `bash scripts/cold_verify.sh` exits 0 and
-   `docs/COLD-VERIFY-2026-08-30.md` holds tonight's command output.
-2. **Slice 2 — STEP 3 ruling at the README object.**
-   Open `README.md` with `nl -ba`; write
-   `docs/STEP-3-README-BELOEVED-RULING.md`; checklist boxes unchecked.
-3. **Slice 3 — STEP 0 logged.**
-   Re-run `./test_small_n.sh` and `bash scripts/test_small_n.sh`; log 7/7
-   in checklist footer with the command.
-4. **Slice 4 — baseline arm that can embarrass us.**
-   `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` — honest if
-   naive `find` wins retention.
+1. **Slice 1 — cold stranger at the file object + RED controls.** DONE.
+   Ran `TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-tonight bash scripts/cold_verify.sh`
+   → `cold_verify: PASS`, `offline_core: PASS`, `ratio_30d: 504 of 2721`,
+   `independent_oracle: PASS` (103/44, seed 20260911), `negative_planter: PASS`,
+   `tz_divergence: OBSERVED`, `tz_pair_trap: DETECTED` (UTC↔Tokyo agree; LA
+   differs — inverse of prior-wave detector), `frozen_quote_reconcile:
+   FAIL-TO-RECONCILE`, `stats_near_miss: DETECTED`,
+   `calendar_duration_delta: none` on fixture / boundary file counted=0,
+   `touch_utime_planter: PASS` (7/10). Archive + wheel strangers PASS.
+   Artifact: `docs/COLD-VERIFY-2026-08-30.md`.
+2. **Slice 2 — STEP 3 ruling at the README object.** DONE.
+   `nl -ba README.md | sed -n '64,88p'` → invented demo L66–88;
+   `docs/STEP-3-README-BELOEVED-RULING.md` recommends KEEP; checklist unchecked.
+3. **Slice 3 — STEP 0 logged.** DONE.
+   `./test_small_n.sh` and `bash scripts/test_small_n.sh` → 7/7 in checklist footer.
+4. **Slice 4 — baseline arm that can embarrass us.** DONE.
+   `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` — naive `find`
+   wins retention; pip-only `retention` exit 2; `stats` 2721/2721 near-miss
+   DETECTED; gate 8 vs naive 12; wheel cwd-shadow DETECTED; inverse TZ pair
+   trap DETECTED; frozen-quote FAIL-TO-RECONCILE.
 
 ## NOW
 
-**Slice 1 — cold stranger at the file object + RED controls.**
-
-Done-when command (must be RUN before any PASS claim):
-
-```sh
-TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-tonight bash scripts/cold_verify.sh
-```
+Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
+`find` re-derive (with TZ; no invented death rate; name calendar vs duration),
+article/X/PyPI.
 
 ## LOG
 
 - 2026-09-11 ~00:11 UTC start: main tip `fa15f1b`. No `hack.md`, no `docs/`,
   no `scripts/`. Prior remotes (`night-wave-p1-cold-verify-904c`, `launch-83da`,
   `cold-verify-9e69`, …) are the floor — treated as evidence of what was
-  attempted, **not** tonight's PASS. This wave re-runs at the object.
+  attempted, **not** tonight's PASS. This wave re-ran at the object.
 - Branch: `cursor/night-wave-p1-cold-verify-910a`.
-- START: `git pull` (already up to date). System
-  `pip install -e .` wrote to `~/.local` (PEP 668 warning path). Root
-  `./test_small_n.sh` → **7/7 green**. Unit tests → **73 OK**.
+- START: `git pull` (already up to date). System `pip install -e .` wrote to
+  `~/.local`. Root `./test_small_n.sh` → **7/7 green**. Unit tests → **73 OK**.
 - Embarrassment at start (main, RUN): empty `git init` + copy of
   `test_privacy.sh` → printed `PRIVACY OK: 0 hits in 0 tracked files` and
-  exited **0**. Must fail-closed tonight.
+  exited **0**. Fixed fail-closed tonight.
 - README object opened: invented demo at L66–88
   (`nl -ba README.md | sed -n '64,90p'`).
 - No live `~/.claude/projects` (OQ-1).
-- PyPI JSON re-derived at start: **0.2.0**.
-- hack.md written before any product/scripts code; committing now.
+- PyPI JSON re-derived: **0.2.0**.
+- Docs object (`curl` settings-reference.md): `cleanupPeriodDays` Default
+  **30**; `desktopSessionCleanupPeriodDays` Default **0** (no age limit).
+- TZ tonight: host `UTC`. Calendar cuts: UTC/Tokyo/London `2026-08-12`;
+  LA `2026-08-11` → **tz_pair_trap: DETECTED** (UTC↔Tokyo agree; LA differs).
+  Prior-wave detector (UTC↔LA agree / Tokyo differs) would have missed this.
+- `python3-venv` missing → `apt install python3.12-venv`.
+- hack.md written before any product/scripts code; committed; pushed.
+- Slice 1: privacy fail-closed; `scripts/cold_verify.sh` with offline core,
+  oracle (seed 20260911), negative planter, boundary, multi-TZ + inverse pair
+  trap, frozen-quote non-reconciliation, calendar↔duration fixture delta,
+  touch↔utime planter, stats near-miss, product boundary.
+  `bash scripts/cold_verify.sh` → **PASS**.
+- Archive stranger: `bash scripts/archive_stranger.sh` → **PASS**.
+- Wheel stranger: `cwd_shadow_trap: DETECTED`; clean-cwd → **PASS**.
+- Slice 2: README L66–88 invented demo; KEEP ruling; Oscar ticks open.
+- Slice 3: both small-n paths **7/7**; logged in checklist footer.
+- Slice 4: `pip_only_baseline.sh` → find wins; pip-only `retention` exit 2;
+  `stats` prints 2721/2721 typed on retention fixture (near-miss DETECTED).
+- Beyond floor: calendar↔duration full-fixture delta + touch↔utime planter +
+  inverse TZ pair-trap detector (caught tonight's LA outlier).
+- Unit tests: **73 OK**. Empty-index gate in matrix via
+  `test_privacy_empty_index.sh`.

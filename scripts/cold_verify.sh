@@ -438,6 +438,16 @@ if [ "$TZ_UNIQ" -gt 1 ]; then
   if [ "$UTC_THIRTY" = "$LA_THIRTY" ] && [ "$UTC_THIRTY" != "$TOKYO_THIRTY" ]; then
     echo "tz_pair_trap: DETECTED — UTC↔LA agree ($UTC_THIRTY) while Tokyo differs ($TOKYO_THIRTY)"
     echo "tz_pair_trap_ruling: a two-zone probe can miss divergence that a third zone catches"
+  elif [ "$UTC_THIRTY" = "$TOKYO_THIRTY" ] && [ "$UTC_THIRTY" != "$LA_THIRTY" ]; then
+    # Tonight 2026-09-11 ~00:14Z: UTC/Tokyo/London=2026-08-12, LA=2026-08-11.
+    # The prior-wave trap (UTC↔LA agree, Tokyo differs) did not fire; the inverse did.
+    echo "tz_pair_trap: DETECTED — UTC↔Tokyo agree ($UTC_THIRTY) while LA differs ($LA_THIRTY)"
+    echo "tz_pair_trap_ruling: which pair you pick decides whether divergence looks absent"
+  elif [ "$UTC_THIRTY" = "$LONDON_THIRTY" ] && [ "$UTC_THIRTY" != "$LA_THIRTY" ]; then
+    echo "tz_pair_trap: DETECTED — UTC↔London agree ($UTC_THIRTY) while LA differs ($LA_THIRTY)"
+    echo "tz_pair_trap_ruling: European pair can hide Pacific divergence"
+  else
+    echo "tz_pair_trap: mixed pattern tonight (UTC=$UTC_THIRTY LA=$LA_THIRTY Tokyo=$TOKYO_THIRTY London=$LONDON_THIRTY)"
   fi
 else
   echo "tz_divergence: none at this clock (all four thresholds: $UTC_THIRTY); still document TZ with live figures"
