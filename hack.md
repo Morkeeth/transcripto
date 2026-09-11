@@ -71,7 +71,8 @@ draft PR for Oscar review is the handoff, not a public post.
    FAIL-TO-RECONCILE`, `stats_near_miss: DETECTED`,
    `calendar_duration_delta: none` on fixture / boundary file counted=0,
    `touch_utime_planter: PASS` (7/10). Archive + wheel strangers PASS.
-   Artifact: `docs/COLD-VERIFY-2026-08-30.md`.
+   Artifact: `docs/COLD-VERIFY-2026-08-30.md`. CI tip `f766d6e`: test 3.9 +
+   3.13 + cold-verify **success**.
 2. **Slice 2 — STEP 3 ruling at the README object.** DONE.
    `nl -ba README.md | sed -n '64,88p'` → invented demo L66–88;
    `docs/STEP-3-README-BELOEVED-RULING.md` recommends KEEP; checklist unchecked.
@@ -127,3 +128,5 @@ article/X/PyPI.
   inverse TZ pair-trap detector (caught tonight's LA outlier).
 - Unit tests: **73 OK**. Empty-index gate in matrix via
   `test_privacy_empty_index.sh`.
+- GitHub Actions on tip `f766d6e`: test 3.9 + 3.13 + cold-verify all
+  **success** (`gh run view 34545928908`).

@@ -19,6 +19,7 @@ Agent does not post, publish, or bump PyPI.
 | Privacy | `./test_privacy.sh` + `./test_privacy_empty_index.sh` | OK on real tree; empty-index exits **1** (watched RED; also in main matrix) |
 | Suites inside cold_verify | coach/codex/cost/label_bands/small_n/cursor_partial/correction/version | all green |
 | Unit tests | `python3 -m unittest discover -s tests -v` | **73 OK** |
+| CI | GitHub Actions tip `f766d6e` | test 3.9 + 3.13 + cold-verify all **success** |
 | Docs default | curl settings-reference.md | `cleanupPeriodDays` Default **30**; desktop Default **0** |
 | PyPI | `curl -sL https://pypi.org/pypi/transcripto/json` | **0.2.0** |
 
@@ -104,6 +105,7 @@ $ ./test_privacy_empty_index.sh
 … privacy_empty_index_exit: 1
 … privacy_empty_index_watched_red: PASS
 
+$ # CI tip f766d6e: test 3.9 + 3.13 + cold-verify all success (run 34545928908)
 $ # Main empty-index embarrassment (RUN at start): PRIVACY OK 0/0 exit 0 — fixed fail-closed
 ```
 
