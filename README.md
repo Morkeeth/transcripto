@@ -214,6 +214,8 @@ owns replay selection and presentation. All fixtures committed here are syntheti
 ```sh
 python3 -m unittest discover -s tests -v
 for test in test_*.sh; do bash "$test" || exit; done
+# Stranger cold path (no key, no Oscar corpus): file-age retention method
+bash scripts/cold_verify.sh
 ```
 
 The regression cases include failed edits and commits, missing/mismatched

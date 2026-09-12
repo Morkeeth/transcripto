@@ -21,3 +21,14 @@ jobs:
         run: |
           transcripto --version
           transcripto replay --demo --json | python -c 'import json,sys; r=json.load(sys.stdin); assert r["synthetic"] and r["episodes"][0]["events"][0]["status"] == "failed"'
+
+  # Stranger retention method: file ages under a projects root, not authorship.
+  # Must stay green without Oscar's corpus (fixture + independent oracle).
+  cold-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: bash scripts/cold_verify.sh
