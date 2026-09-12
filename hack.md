@@ -63,33 +63,38 @@ draft PR for Oscar review is the handoff, not a public post.
     privacy going green on outage, frozen quotes that do not reconcile, wheel
     cwd-shadow binding the tree, TZ pair traps (including inverse pairs),
     calendar↔duration count deltas, touch↔utime planter disagreement,
-    symlink inflation of `find` totals, death-rate laundering of two stamps —
-    all must be watched, not narrated.
+    symlink inflation of `find` totals, death-rate laundering of two stamps,
+    HEAD-archive privacy while worktree looks clean — all must be watched,
+    not narrated.
 
 ## PLAN (risk first)
 
-1. **Slice 1 — cold stranger at the file object + RED controls.** NOW.
-   One command: fresh venv, offline core, arithmetic fixture, independent
-   oracle, negative planter, empty-grep + empty-privacy RED, death-rate
-   impossibility, symlink `-type f` trap, multi-TZ + pair trap, frozen-quote
-   non-reconciliation, calendar↔duration, touch↔utime, stats near-miss,
-   product boundary (no `retention` CLI), docs/PyPI probes separate.
-   Artifact: `docs/COLD-VERIFY-2026-08-30.md`. Archive + wheel strangers.
-2. **Slice 2 — STEP 3 ruling at the README object.**
-   Open README with line refs; write
-   `docs/STEP-3-README-BELOEVED-RULING.md`; checklist leaves Oscar ticks open.
-3. **Slice 3 — STEP 0 logged.**
-   Re-run `./test_small_n.sh` and `bash scripts/test_small_n.sh` at object;
-   log 7/7 in checklist footer with the commands.
-4. **Slice 4 — baseline arm that can embarrass us.**
+1. **Slice 1 — cold stranger at the file object + RED controls.** DONE.
+   Ran `TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-final3 bash scripts/cold_verify.sh`
+   → `cold_verify: PASS`, `offline_core: PASS`, `ratio_30d: 504 of 2721`,
+   `independent_oracle: PASS` (83/39, seed 20260912), `negative_planter: PASS`,
+   `death_rate_impossible: PASS`, `empty_grep_control: PASS` (-q and -qv),
+   `symlink_inflation: DETECTED`, `tz_divergence: none` (all four 2026-08-13),
+   `frozen_quote_reconcile: FAIL-TO-RECONCILE`, `stats_near_miss: DETECTED`,
+   `calendar_duration_delta: none` on fixture / boundary counted=0,
+   `touch_utime_planter: PASS` (7/10), `privacy_HEAD_vs_worktree: PASS`.
+   Archive + wheel strangers PASS. Artifact: `docs/COLD-VERIFY-2026-08-30.md`.
+   Tip `34ab34a` archive re-run PASS.
+2. **Slice 2 — STEP 3 ruling at the README object.** DONE.
+   `nl -ba README.md | sed -n '64,88p'` → invented demo L66–88;
+   `docs/STEP-3-README-BELOEVED-RULING.md` recommends KEEP; checklist unchecked.
+3. **Slice 3 — STEP 0 logged.** DONE.
+   `./test_small_n.sh` and `bash scripts/test_small_n.sh` → 7/7 in checklist footer.
+4. **Slice 4 — baseline arm that can embarrass us.** DONE.
    `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` — naive `find`
-   vs pip-only transcripto; honest if naive wins.
+   wins retention; pip-only `retention` exit 2; `stats` 2721/2721 near-miss
+   DETECTED; gate 8 vs naive 12; wheel cwd-shadow DETECTED.
 
 ## NOW
 
-Slice 1 — cold stranger path + RED controls + beyond-floor symlink /
-death-rate / empty-grep embarrassment hunt. hack.md is this file; no other
-product/scripts code exists yet on this branch.
+Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
+`find` re-derive (with TZ; no invented death rate; name calendar vs duration;
+Desktop mix), article/X/PyPI.
 
 ## LOG
 
@@ -104,24 +109,38 @@ product/scripts code exists yet on this branch.
   `./test_small_n.sh` → **7/7 green**. Unit tests → **73 OK**.
 - Embarrassment at start (main, RUN): empty `git init` + copy of
   `test_privacy.sh` → printed `PRIVACY OK: 0 hits in 0 tracked files` and
-  exited **0**. Must fail-closed tonight.
+  exited **0**. Fixed fail-closed tonight.
 - `grep -qv` on empty input → exit **1** (confirmed). `grep -q` on empty →
-  exit **1**. Callers that treat exit 1 as CLEAN without a non-empty guard
-  are broken.
+  exit **1**.
 - README object opened: invented demo at L66–88
-  (`nl -ba README.md | sed -n '64,90p'`). Author worst-prompt fragment absent from README (privacy guard
-  still watches the guarded phrases in `test_privacy.sh`).
+  (`nl -ba README.md | sed -n '64,90p'`). Author worst-prompt fragment absent
+  from README (privacy guard still watches the guarded phrases).
 - No live `~/.claude/projects` (OQ-1).
 - PyPI JSON re-derived: **0.2.0**.
-- CLI object: `transcripto` subcommands are
-  `index,watch,ask,search,find,trace,sessions,stats,cost,coach,export-run,replay`
-  — **no `retention`**. Naive `find` is the only honest file-age answer.
+- CLI object: no `retention` subcommand.
 - Docs object (`curl` settings-reference.md): `cleanupPeriodDays` Default
-  **30**; `desktopSessionCleanupPeriodDays` Default **0** (no age limit);
-  deletion is a background sweep after a session starts.
-- Host `TZ=UTC`. `python3-venv` was missing → installed `python3.12-venv`
-  via apt; `python3 -m venv` now succeeds.
-- Symlink probe (RUN): one real `.jsonl` + one symlink → `find -name '*.jsonl'`
-  counted **2**; `find -type f` counted **1**. Symlink inflation is a live
-  trap for anyone who omits `-type f`.
-- hack.md written before any product/scripts code.
+  **30**; `desktopSessionCleanupPeriodDays` Default **0** (no age limit).
+- Host `TZ=UTC`. Installed `python3.12-venv`.
+- Symlink probe (RUN): name-only=2, `-type f`=1.
+- hack.md written before any product/scripts code; committed; pushed.
+- Slice 1: privacy fail-closed; `scripts/cold_verify.sh` with offline core,
+  oracle (seed 20260912 → 83/39), negative planter, death-rate, empty-grep
+  -q/-qv, symlink inflation, boundary, multi-TZ, frozen-quote, calendar↔
+  duration, touch↔utime, stats near-miss, product boundary, HEAD-archive
+  privacy. `bash scripts/cold_verify.sh` → **PASS**.
+- Intermediate FAIL (RUN): first archive stranger after docs commit failed —
+  STEP-3 ruling quoted a privacy-guarded fragment while worktree privacy
+  looked green. Scrubbed; added HEAD-archive privacy control; archive
+  re-run → **PASS** (tip `34ab34a`).
+- Archive stranger: **PASS**. Wheel stranger: **PASS** (cwd-shadow DETECTED).
+- Slice 2: README L66–88 invented demo; KEEP ruling; Oscar ticks open.
+- Slice 3: both small-n paths **7/7**; logged in checklist footer.
+- Slice 4: `pip_only_baseline.sh` → find wins; pip-only `retention` exit 2;
+  `stats` prints 2721/2721 typed on retention fixture (near-miss DETECTED).
+- Beyond floor vs prior waves: symlink `-type f` trap + `grep -qv` empty
+  control + HEAD-archive privacy (caught tonight's real leak) + death-rate
+  merged from fcb9 into the 910a floor.
+- Unit tests: **73 OK**. Empty-index gate in matrix via
+  `test_privacy_empty_index.sh`.
+- TZ tonight: no divergence (all four zones `2026-08-13`). Still publish TZ
+  with live figures — absence of divergence is clock-local.
