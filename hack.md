@@ -144,3 +144,4 @@ Desktop mix), article/X/PyPI.
   `test_privacy_empty_index.sh`.
 - TZ tonight: no divergence (all four zones `2026-08-13`). Still publish TZ
   with live figures — absence of divergence is clock-local.
+- GitHub Actions tip `7a17de3` (run 34696040300): test 3.9 + 3.13 + cold-verify all **success**.

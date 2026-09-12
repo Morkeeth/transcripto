@@ -21,6 +21,7 @@ Agent does not post, publish, or bump PyPI.
 | Unit tests | `python3 -m unittest discover -s tests -v` | **73 OK** |
 | Docs default | curl settings-reference.md | `cleanupPeriodDays` Default **30**; desktop Default **0** |
 | PyPI | `curl -sL https://pypi.org/pypi/transcripto/json` | **0.2.0** |
+| CI | GitHub Actions tip `7a17de3` | test 3.9 + 3.13 + cold-verify all **success** (run 34696040300) |
 
 ## STEP 3 — README launch example
 
@@ -111,6 +112,9 @@ $ ./test_privacy_empty_index.sh
 $ # Intermediate FAIL (RUN): archive stranger caught STEP-3 quoting a
 $ #   privacy-guarded fragment while worktree privacy looked green.
 $ #   Scrubbed; HEAD-archive privacy control added; archive re-run PASS.
+
+$ # CI tip 7a17de3 (gh run view 34696040300):
+$ #   test (3.9) success · test (3.13) success · cold-verify success
 ```
 
 Not done (by design): article post · X post · PyPI bump · publish.
