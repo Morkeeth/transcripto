@@ -109,8 +109,8 @@ product/scripts code exists yet on this branch.
   exit **1**. Callers that treat exit 1 as CLEAN without a non-empty guard
   are broken.
 - README object opened: invented demo at L66–88
-  (`nl -ba README.md | sed -n '64,90p'`). Author "beloeved" text absent from
-  README (privacy pattern still guards the fragment in `test_privacy.sh`).
+  (`nl -ba README.md | sed -n '64,90p'`). Author worst-prompt fragment absent from README (privacy guard
+  still watches the guarded phrases in `test_privacy.sh`).
 - No live `~/.claude/projects` (OQ-1).
 - PyPI JSON re-derived: **0.2.0**.
 - CLI object: `transcripto` subcommands are

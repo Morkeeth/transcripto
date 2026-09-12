@@ -1,40 +1,59 @@
-# STEP 3 — README launch example ruling
+# STEP 3 — README launch example ruling (Oscar ticks)
 
-**Oscar ticks. Cloud does not guess the tick.**
+**Cloud recommendation: KEEP** the invented `replay --demo` block.
+**Oscar ticks.** Agent does not guess the tick and does not post.
 
-## Object opened tonight
+Measured at the README object tonight (`nl -ba README.md | sed -n '64,88p'`,
+2026-09-12 ~13:10 UTC, tip `fa15f1b` / branch worktree).
 
-```sh
-nl -ba README.md | sed -n '64,90p'
-```
+## What is on the page right now
 
-Current object is the **invented** `replay --demo` block at `README.md:66–88`:
+`README.md` L64–88 (via `nl -ba README.md | sed -n '64,88p'`):
 
-- L66–67: explicitly labelled invented ("All prompts and results in this example
-  are invented.")
-- L69–88: synthetic comeback sequence (login redirect / pytest)
-- Goes through the same parser as a real transcript (`replay --demo`)
+- Heading `## The replay` (L64)
+- Explicit label: all prompts and results in the example are **invented** (L66–67)
+- Demo block: `THE COMEBACK · claude · request 1` with
+  `You asked: "Fix the login redirect and run its tests."` (L69–88)
+- Closing: `Recorded: 3 succeeded · 2 failed · 0 unknown` (L86)
 
-Author worst-prompt / "beloeved routine" text is **absent** from the README
-(scrubbed earlier). The privacy guard in `test_privacy.sh` still watches the
-fragment so it cannot re-enter the public tree.
+`rg` for old author-prompt markers (`NO-DURABLE`, `worst looped`)
+in `README.md`: **0 hits**. A search that includes the privacy-guarded
+author fragment is intentionally not restated here — naming that fragment
+in a public ruling is itself a disclosure (caught on a prior night-wave
+branch when the ruling quoted the guard pattern).
 
-## Cloud recommendation: KEEP
+## What changed since older rulings
 
-Keep the invented replay demo at `README.md:66–88`.
+Earlier ship checklists cited `README.md:79-81` (and sometimes `:64-66`) for an
+author worst-prompt example. Those line refs are **stale on current main**.
+Opening the object tonight shows the launch surface is the **invented**
+`replay --demo` block at **L66–88**, not an author prompt.
 
-Reasons (for Oscar, not a substitute for his tick):
+Restoring the author prompt is **blocked** by `test_privacy.sh` (the
+guarded author-prompt phrases it scans for). Do not recommend RESTORE.
 
-1. It is labelled invented — the evidence contract is visible in the first
-   viewport of the section.
-2. It demonstrates failed → succeeded without grading the user or the agent.
-3. Trimming further would remove the only concrete replay a stranger sees
-   before installing.
+## Recommendation
 
-## Oscar ticks (leave unchecked until morning)
+| option | meaning | cloud view |
+|--------|---------|------------|
+| **KEEP** | leave invented demo at L66–88 | **recommended** — honest label ("invented"), shows evidence contract, no author text |
+| **TRIM** | shorten or drop the demo block | allowed if Oscar wants less README surface; product still has `replay --demo` |
+| RESTORE author prompt | put the old worst-prompt back | **rejected** — privacy guard; users must not see author prompts on the front page |
 
-- [ ] **Oscar:** keep invented replay demo (`README.md:66–88`) — recommended
-- [ ] **Oscar:** or trim the demo further
+## Why KEEP
 
-Do not agent-tick. OQ-2 is blocking for ship surface only in the sense that
-Oscar must choose; the cloud recommendation above is not a decision.
+1. The demo is explicitly labelled invented (L66–67).
+2. It exercises the real parser (`replay --demo`) — same evidence contract the
+   tool ships.
+3. Author text is already scrubbed; KEEP preserves that scrub.
+4. Article 01 / launch posts that still quote an older cut are Oscar's edit
+   problem on those drafts, not a reason to re-pollute the README.
+
+## Oscar tick (do not guess)
+
+On the checklist:
+
+- `[ ] Oscar: keep invented replay demo (README.md:66–88) — recommended`
+- `[ ] Oscar: or trim the demo further`
+
+No code change is required for KEEP.
