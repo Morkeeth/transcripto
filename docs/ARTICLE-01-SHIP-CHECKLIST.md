@@ -1,7 +1,7 @@
 # ARTICLE-01 ship checklist — Oscar morning
 
 **Status:** PyPI **0.2.0 live** (re-derived `curl …/pypi/transcripto/json`) ·
-cold verify green 2026-09-12 ~13:11Z · article / X = **Oscar clicks only**
+cold verify green 2026-09-12 ~13:16Z · article / X = **Oscar clicks only**
 
 Agent does not post, publish, or bump PyPI.
 
@@ -11,12 +11,12 @@ Agent does not post, publish, or bump PyPI.
 |------|---------|--------|
 | STEP 0 small-n | `./test_small_n.sh` | **7/7 green** (also `bash scripts/test_small_n.sh`) |
 | Cold stranger | `bash scripts/cold_verify.sh` | **PASS** — see footer / `docs/COLD-VERIFY-2026-08-30.md` |
-| Archive stranger | `bash scripts/archive_stranger.sh` | re-run after scripts committed (footer) |
+| Archive stranger | `bash scripts/archive_stranger.sh` | **PASS** (after privacy scrub; tip in footer) |
 | Wheel stranger | `bash scripts/wheel_stranger.sh` | **PASS** — `cwd_shadow_trap: DETECTED`; fixture 504/2721 PASS |
-| Cold artifact | `docs/COLD-VERIFY-2026-08-30.md` | captured command output (2026-09-12 ~13:11Z) |
+| Cold artifact | `docs/COLD-VERIFY-2026-08-30.md` | captured command output (2026-09-12 ~13:16Z) |
 | Baseline arm | `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` | naive `find` wins retention; pip-only cannot answer file-age |
 | STEP 3 ruling | `docs/STEP-3-README-BELOEVED-RULING.md` | KEEP invented demo at README L66–88 |
-| Privacy | `./test_privacy.sh` + `./test_privacy_empty_index.sh` | OK on real tree; empty-index exits **1** (watched RED; in matrix) |
+| Privacy | `./test_privacy.sh` + `./test_privacy_empty_index.sh` | OK on real tree; empty-index exits **1**; HEAD archive check in cold_verify |
 | Suites inside cold_verify | coach/codex/cost/label_bands/small_n/cursor_partial/correction/version | all green |
 | Unit tests | `python3 -m unittest discover -s tests -v` | **73 OK** |
 | Docs default | curl settings-reference.md | `cleanupPeriodDays` Default **30**; desktop Default **0** |
@@ -54,7 +54,7 @@ $ ./test_small_n.sh
 $ bash scripts/test_small_n.sh
 … 7/7 green.
 
-$ TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-tonight bash scripts/cold_verify.sh
+$ TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-final3 bash scripts/cold_verify.sh
 … ratio_30d: 504 of 2721
 … ASSERT fixture 504 of 2721 (old45=0): PASS
 … death_rate_impossible: PASS (laundered 75 FORBIDDEN)
@@ -65,7 +65,7 @@ $ TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-tonight bash scripts/cold_verify.sh
 … independent_oracle: PASS (old30=83, old45=39; seed 20260912)
 … boundary_probe: PASS
 … duration_vs_calendar: … counted_by_bang_newermt=0
-… calendar_duration_delta: none tonight (fixture ages 31–44d; skew ~47478s)
+… calendar_duration_delta: none tonight (fixture ages 31–44d; skew ~47763s)
 … touch_utime_planter: PASS (7 of 10)
 … tz_divergence: none at this clock (all four 2026-08-13)
 … frozen_quote_reconcile: FAIL-TO-RECONCILE
@@ -78,6 +78,12 @@ $ TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-tonight bash scripts/cold_verify.sh
 … naive type:user count: 12
 … transcripto human_turns (gated): 8
 … privacy_empty_index_exit: 1
+… privacy_HEAD_vs_worktree: PASS
+… cold_verify: PASS
+
+$ bash scripts/archive_stranger.sh
+… archive_has_git: no
+… privacy_mode: archive-extract …
 … cold_verify: PASS
 
 $ bash scripts/wheel_stranger.sh
@@ -102,8 +108,9 @@ $ ./test_privacy_empty_index.sh
 … privacy_empty_index_exit: 1
 … privacy_empty_index_watched_red: PASS
 
-$ # archive_stranger: FAIL before scripts committed (git archive empty of
-$ #   scripts/). Re-run after commit; update this footer with PASS + tip SHA.
+$ # Intermediate FAIL (RUN): archive stranger caught STEP-3 quoting a
+$ #   privacy-guarded fragment while worktree privacy looked green.
+$ #   Scrubbed; HEAD-archive privacy control added; archive re-run PASS.
 ```
 
 Not done (by design): article post · X post · PyPI bump · publish.

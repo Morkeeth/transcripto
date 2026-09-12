@@ -31,19 +31,19 @@ find "$ROOT" -type f -name '*.jsonl' ! -newermt "$(date -d '30 days ago' +%Y-%m-
 ```
 
 Not authorship. Not `stats` message counts. Not human turns. Symlink-aware:
-omit `-type f` and a single symlink inflates the total (watched RED/DETECTED
-tonight: name-only=2, `-type f`=1).
+omit `-type f` and a single symlink inflates the total (watched tonight:
+name-only=2, `-type f`=1).
 
 ## Command output (tonight, RUN)
 
-Host `TZ=UTC`. Tip before this artifact commit: scripts on branch
-`cursor/night-wave-p1-cold-verify-ebe8`. Re-derived figures below — do not
-carry prior-wave oracle counts (83/39 tonight ≠ yesterday's 103/44).
+Host `TZ=UTC`. Re-derived figures below — do not carry prior-wave oracle
+counts (83/39 tonight ≠ prior-wave 103/44). Tip after this commit includes
+the HEAD-archive privacy control.
 
 ```
-=== COLD VERIFY · 2026-09-12T13:11:10Z ===
+=== COLD VERIFY · 2026-09-12T13:15:55Z ===
 repo: /workspace
-work: /tmp/transcripto-cold-tonight
+work: /tmp/transcripto-cold-final3
 
 transcripto: transcripto 0.2.0
 
@@ -51,20 +51,20 @@ transcripto: transcripto 0.2.0
 
 generating fixture: 2721 jsonl files (504 aged 31–44d)…
 fixture_files_written: 2721 old_planted: 504
-retention source: FIXTURE /tmp/transcripto-cold-tonight/fixtures-retention-504-of-2721
+retention source: FIXTURE /tmp/transcripto-cold-final3/fixtures-retention-504-of-2721
   (no live ~/.claude/projects on this machine — method + arithmetic only)
 
 === RETENTION (find method, re-derived) ===
 mode: fixture
-as_of: 2026-09-12T13:11:17Z
+as_of: 2026-09-12T13:16:02Z
 threshold_30d: mtime <= 2026-08-13
 threshold_45d: mtime <= 2026-07-29
 total_jsonl: 2721
 older_than_30d: 504
 older_than_45d: 0
 ratio_30d: 504 of 2721
-oldest_file: /tmp/transcripto-cold-tonight/fixtures-retention-504-of-2721/demo-project/sessions/session-0055.jsonl
-oldest_mtime: 2026-07-30T13:11:14Z
+oldest_file: /tmp/transcripto-cold-final3/fixtures-retention-504-of-2721/demo-project/sessions/session-0055.jsonl
+oldest_mtime: 2026-07-30T13:15:59Z
 
 frozen_quote (Oscar 2026-08-28, NOT re-derived on this VM unless mode=live): 504 of 2,721
 frozen_rederive (Oscar 2026-08-29, NOT re-derived here): 579 of 2,874
@@ -126,8 +126,8 @@ both_methods: 504
 calendar_only: 0
 duration_only: 0
 ref_calendar_epoch: 1786579200
-ref_duration_epoch: 1786626678
-method_skew_seconds: 47478
+ref_duration_epoch: 1786626963
+method_skew_seconds: 47763
 calendar_duration_delta: none tonight — both methods agree on this root at this clock
 calendar_duration_probe: PASS
 
@@ -166,7 +166,7 @@ control_note: no settings file → default 30-day cleanup applies per Claude Cod
 control_watched_red: PASS
 
 === ANTI-CONFLATION (wrong object must not look like retention) ===
-wrote 2721 records into /tmp/transcripto-cold-tonight/wrong-object-authorship-gate/retention-gate.jsonl
+wrote 2721 records into /tmp/transcripto-cold-final3/wrong-object-authorship-gate/retention-gate.jsonl
 wrong_object_files: 1
 wrong_object_records: 2721
 wrong_object_old30_files: 0
@@ -178,7 +178,7 @@ help_exit: 0
 
 === STATS NEAR-MISS (message counts ≠ file-age) ===
 stats_exit: 0
-stats_home: /tmp/transcripto-cold-tonight/fake-home-stats (isolated; does not touch ~/.trace)
+stats_home: /tmp/transcripto-cold-final3/fake-home-stats (isolated; does not touch ~/.trace)
 stats_out:
 2,721 of the 2,721 messages in your index are things you typed.  100.0%
 the rest is the machine answering. `coach` counts raw transcript records instead
@@ -214,8 +214,11 @@ baseline: naive overcounts (gate is stricter) — expected
 
 === PRIVACY ===
 privacy_mode: git-worktree
-PRIVACY OK: 0 hits in 208 tracked files
+PRIVACY OK: 0 hits in 218 tracked files
 privacy on real tree: PASS
+PRIVACY OK: 0 hits in 218 tracked files
+privacy_HEAD_extract_exit: 0
+privacy_HEAD_vs_worktree: PASS — git archive of HEAD is clean
 PRIVACY FAIL: git ls-files returned 0 files (empty index is not a clean tree)
 privacy_empty_index_exit: 1
 privacy_empty_index_watched_red: PASS
@@ -241,7 +244,7 @@ docs_desktop_default_0_no_age_limit: PASS
 pypi_transcripto_version: 0.2.0 (re-derived)
 
 cold_verify: PASS
-work dir kept: /tmp/transcripto-cold-tonight
+work dir kept: /tmp/transcripto-cold-final3
 ```
 
 ## Embarrassment hunt (watched, not narrated)
@@ -260,6 +263,7 @@ work dir kept: /tmp/transcripto-cold-tonight
 | calendar↔duration | fixture agree; boundary duration file counted=0 |
 | independent oracle | PASS (seed 20260912 → old30=83 old45=39) |
 | negative planter | 503/2720 watched RED |
+| HEAD archive privacy | PASS (catches worktree-scrub / HEAD-leak trap) |
 | docs defaults | cleanupPeriodDays=30; desktop=0 no age limit |
 
 ## Live re-derive (Oscar machine only)

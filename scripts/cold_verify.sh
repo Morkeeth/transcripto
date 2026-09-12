@@ -26,6 +26,7 @@
 #  11. DEATH-RATE IMPOSSIBILITY — refuse laundering +75 old / +153 total as deaths.
 #  12. EMPTY-GREP + EMPTY-GREP -qv controls (outage must not read clean).
 #  13. SYMLINK INFLATION — find without -type f double-counts; retention uses -type f.
+#  14. HEAD archive privacy — committed tree must pass the same guard as worktree.
 #
 # Usage: bash scripts/cold_verify.sh
 # Optional: TRANSCRIPTO_COLD_DIR=/path  keep work dir for inspection
@@ -764,6 +765,32 @@ fi
 if [ -n "$ARCHIVE_GIT_CLEANUP" ]; then
   rm -rf "$ARCHIVE_GIT_CLEANUP"
   echo "privacy_archive_ephemeral_git: removed"
+fi
+# HEAD vs worktree: privacy greps working-tree bytes of tracked paths. A staged
+# scrub can pass while HEAD (and git archive) still leaks. Verify by extracting
+# HEAD and running the same guard — without restating guarded fragments here.
+if git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  HEAD_TREE="$WORK/privacy-head-extract"
+  rm -rf "$HEAD_TREE"
+  mkdir -p "$HEAD_TREE"
+  git -C "$REPO_ROOT" archive HEAD | tar -x -C "$HEAD_TREE"
+  (
+    cd "$HEAD_TREE"
+    git init -q
+    git add -A
+    set +e
+    OUT=$(bash test_privacy.sh 2>&1)
+    rc=$?
+    set -e
+    printf '%s\n' "$OUT"
+    echo "privacy_HEAD_extract_exit: $rc"
+    if [ "$rc" -ne 0 ]; then
+      echo "privacy_HEAD_vs_worktree: FAIL — committed tree fails privacy (worktree scrub is not enough)"
+      exit 1
+    fi
+    echo "privacy_HEAD_vs_worktree: PASS — git archive of HEAD is clean"
+  ) || { FAIL=1; OFFLINE_CORE_FAIL=1; }
+  rm -rf "$HEAD_TREE"
 fi
 EMPTY_DIR="$WORK/privacy-empty-index"
 rm -rf "$EMPTY_DIR"
