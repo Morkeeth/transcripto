@@ -33,9 +33,12 @@ USAGE = """
   transcripto replay --failures       jump to a failed tool call
   transcripto replay "<request>"       find and replay something you asked
   transcripto import-example           add a public synthetic trace locally
+  transcripto import-lab               add labelled cross-harness failed/ok/? traces
   transcripto ask "<topic>"            find your own words across harnesses
   transcripto changes                  inspect cited before/correction sequences
   transcripto handoff "<correction>"   prepare a correction for another receiver
+  transcripto receive-handoff …        prepare a brief with Open + outcomes
+  transcripto quickstart               offline wheel install / search / reopen
   transcripto search "<topic>"         search prompts, replies, and tool text
   transcripto find <file>              find recorded attempts and file operations
   transcripto coach                    descriptive request history, never grades
@@ -393,25 +396,161 @@ def _public_example_rows():
     return rows
 
 
-def cmd_import_example(args):
-    """Install one labelled synthetic transcript into the local import corpus."""
-    root = os.path.join(HOME, ".transcripto", "imports", "claude")
-    os.makedirs(root, mode=0o700, exist_ok=True)
-    path = os.path.join(root, "public-change-example.jsonl")
-    payload = "".join(json.dumps(row, sort_keys=True) + "\n" for row in _public_example_rows())
+def _write_labelled_import(path, rows, force=False):
+    """Write a private labelled import; refuse to clobber unexpected edits."""
+    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+    payload = "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows)
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
-            if f.read() != payload and not args.force:
+            if f.read() != payload and not force:
                 print("Refusing to replace a changed import. Use --force or choose an isolated HOME.",
                       file=sys.stderr)
-                return 2
+                return None
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(payload)
     os.chmod(path, 0o600)
-    print("Imported synthetic public example: " + path)
+    return path
+
+
+def cmd_import_example(args):
+    """Install one labelled synthetic transcript into the local import corpus."""
+    path = os.path.join(HOME, ".transcripto", "imports", "claude", "public-change-example.jsonl")
+    written = _write_labelled_import(path, _public_example_rows(), force=args.force)
+    if written is None:
+        return 2
+    print("Imported synthetic public example: " + written)
     print('Ask it: transcripto ask "What changed about the forecast cache?"')
     print("Explore the disagreement: transcripto changes")
+    return 0
+
+
+def _lab_rows():
+    """Invented cross-harness records: failed Claude edit, succeeded Codex check, unknown Cursor."""
+    mark = {"transcripto_synthetic": True}
+    claude = [
+        dict(mark, type="user", promptSource="typed", sessionId="lab-claude",
+             timestamp="2026-09-14T18:00:00Z",
+             message={"role": "user", "content": "We retried the amber upload."}),
+        dict(mark, type="assistant", sessionId="lab-claude", timestamp="2026-09-14T18:00:01Z",
+             message={"role": "assistant", "content": [
+                 {"type": "tool_use", "name": "Edit", "id": "edit",
+                  "input": {"file_path": "upload.py"}}]}),
+        dict(mark, type="user", sessionId="lab-claude", timestamp="2026-09-14T18:00:02Z",
+             message={"role": "user", "content": [
+                 {"type": "tool_result", "tool_use_id": "edit", "is_error": True,
+                  "content": "Permission denied"}]}),
+        dict(mark, type="user", promptSource="typed", sessionId="lab-claude",
+             timestamp="2026-09-14T18:01:00Z",
+             message={"role": "user", "content": "Explain caching instead."}),
+    ]
+    codex = [
+        dict(mark, type="session_meta", payload={"id": "lab-codex", "cwd": "/example/upload"}),
+        dict(mark, type="response_item",
+             payload={"type": "message", "role": "user",
+                      "content": [{"type": "input_text", "text": "We retried the cobalt upload."}]}),
+        dict(mark, type="response_item",
+             payload={"type": "function_call", "call_id": "shell", "name": "exec_command",
+                      "arguments": json.dumps({"cmd": "pytest upload.py"})}),
+        dict(mark, type="response_item",
+             payload={"type": "function_call_output", "call_id": "shell",
+                      "output": json.dumps({"exit_code": 0, "output": "1 passed"})}),
+    ]
+    cursor = [
+        dict(mark, role="user",
+             message={"content": "<user_query>We retried the jade upload.</user_query>"}),
+        dict(mark, role="assistant",
+             message={"content": [{"type": "tool_use", "name": "StrReplace", "id": "replace",
+                                   "input": {"path": "upload.py", "old_string": "a",
+                                             "new_string": "b"}}]}),
+        dict(mark, role="assistant", message={"content": "All fixed."}),
+    ]
+    return {
+        "claude": ("cross-harness-lab.jsonl", claude),
+        "codex": ("cross-harness-lab.jsonl", codex),
+        "cursor": ("cross-harness-lab.jsonl", cursor),
+    }
+
+
+def cmd_import_lab(args):
+    """Install labelled synthetic failed/succeeded/unknown traces for receiving-agent practice."""
+    written = []
+    for harness, (name, rows) in _lab_rows().items():
+        path = os.path.join(HOME, ".transcripto", "imports", harness, name)
+        result = _write_labelled_import(path, rows, force=args.force)
+        if result is None:
+            return 2
+        written.append(result)
+    print("Imported SYNTHETIC cross-harness lab (invented; not measured user data):")
+    for path in written:
+        print("  " + path)
+    print('Find them: transcripto ask "retry"')
+    print("Open each printed Open command. Expect failed / succeeded / unknown.")
+    return 0
+
+
+OFFLINE_QUICKSTART = """# Transcripto offline quickstart (flight)
+
+Use a built wheel. Do not require PyPI. All lab records are invented.
+
+## 1. Install from a wheel path
+
+```sh
+WHEEL=/absolute/path/to/transcripto-0.2.0-py3-none-any.whl
+python3 -m venv /tmp/transcripto-flight
+/tmp/transcripto-flight/bin/python -m pip install --no-index --no-deps "$WHEEL"
+export PATH="/tmp/transcripto-flight/bin:$PATH"
+export HOME="$(mktemp -d)"   # optional clean home; skip to use your own
+```
+
+Replace WHEEL with the path printed by `python3 -m build` (dist/*.whl) or the
+file you copied onto the laptop.
+
+## 2. Seed labelled synthetic history
+
+```sh
+transcripto import-lab
+transcripto ask "retry"
+```
+
+## 3. Reopen exact evidence
+
+Run each printed `Open:` line, or:
+
+```sh
+transcripto replay /path/from/open --line N
+transcripto replay /path/from/open --line N --json
+```
+
+Claude lab hit: failed edit. Codex: succeeded check. Cursor: unknown (no result).
+
+## 4. Receiver brief with outcomes
+
+```sh
+transcripto import-example
+transcripto handoff "30 seconds" --to-harness codex --output "$HOME/packet.json"
+transcripto receive-handoff "$HOME/packet.json" --as-harness codex --output "$HOME/brief.md"
+cat "$HOME/brief.md"
+```
+
+The brief includes recorded follow-up statuses and an Open command. If the source
+moved or vanished, the brief marks evidence uncertain and keeps packet statuses
+as provisional. Re-run ask after restoring the file, or pass the new path to replay.
+
+Status describes tool execution, not task correctness. Missing results stay unknown.
+"""
+
+
+def cmd_quickstart(args):
+    """Print the offline wheel install / search / reopen card."""
+    text = OFFLINE_QUICKSTART
+    if args.wheel:
+        wheel = os.path.abspath(os.path.expanduser(args.wheel))
+        text = text.replace("/absolute/path/to/transcripto-0.2.0-py3-none-any.whl", wheel)
+        if not os.path.isfile(wheel):
+            print("warning: wheel path does not exist yet: " + core.safe_text(wheel),
+                  file=sys.stderr)
+    print(text.rstrip())
     return 0
 
 
@@ -1277,6 +1416,38 @@ def cmd_handoff(args):
     return 0
 
 
+def _source_evidence_state(citation, correction):
+    """Check whether the cited source still opens the intended request.
+
+    Returns (state, open_command, live_follow_up).
+    state is 'available', 'missing', or 'uncertain'.
+    """
+    citation = citation or {}
+    path = citation.get("source")
+    line = citation.get("line")
+    if not path or not isinstance(line, int) or line < 1:
+        return "uncertain", None, None
+    path = os.path.expanduser(path)
+    open_cmd = "%s replay %s --line %d" % (PROG, shlex.quote(path), line)
+    if not os.path.isfile(path):
+        return "missing", open_cmd, None
+    diagnostics = []
+    rows, _harness = core.read_session(path, diagnostics)
+    if diagnostics and not rows:
+        return "uncertain", open_cmd, None
+    eps = core.episodes(rows, path)
+    match = next((ep for ep in eps if ep["line"] == line), None)
+    if match is None:
+        return "uncertain", open_cmd, None
+    if correction and correction.lower() not in match["prompt"].lower():
+        return "uncertain", open_cmd, [
+            {"kind": event["kind"], "target": event["target"], "status": event["status"]}
+            for event in match["events"]]
+    return "available", open_cmd, [
+        {"kind": event["kind"], "target": event["target"], "status": event["status"]}
+        for event in match["events"]]
+
+
 def cmd_receive_handoff(args):
     """Write a prepared receiver brief from a packet. Does not invoke a receiver agent."""
     source = os.path.abspath(os.path.expanduser(args.packet))
@@ -1307,25 +1478,63 @@ def cmd_receive_handoff(args):
     remaining = list(packet.get("missing") or [])
     if "receiver acknowledgement" not in remaining:
         remaining.append("receiver acknowledgement")
+    citation = packet.get("citation") or {}
+    state, open_cmd, live = _source_evidence_state(citation, correction)
+    packet_follow = packet.get("recorded_follow_up") or []
+    follow = live if live is not None else packet_follow
+    if state == "missing" and "matching source transcript" not in remaining:
+        remaining.insert(0, "matching source transcript")
+    elif state == "uncertain" and "source request confirmation" not in remaining:
+        remaining.insert(0, "source request confirmation")
+
+    if state == "available":
+        evidence_status = "source available; Open command below reopens the exact request."
+    elif state == "missing":
+        evidence_status = (
+            "source missing or moved. Recorded follow-up below is provisional from the packet. "
+            "Restore the file and re-run ask, or pass the new path to replay --line.")
+    else:
+        evidence_status = (
+            "source present but request match is uncertain. Treat outcomes as provisional. "
+            "Re-run ask to refresh citations, then Open again.")
+
+    follow_lines = "".join(
+        "- %s %s (%s)\n" % (core.safe_text(item.get("kind")),
+                            core.safe_text(item.get("target")),
+                            core.safe_text(item.get("status") or "unknown"))
+        for item in follow) or "- (none recorded)\n"
+    previous = core.safe_text(packet.get("previous_request") or "")
     brief = (
         "# Prepared receiver brief\n\n"
         "Harness: %s\n\n"
         "Provenance: %s\n\n"
-        "Status: acknowledgement pending — no receiver agent was invoked by this command.\n\n"
+        "Status: acknowledgement pending. No receiver agent was invoked by this command.\n\n"
+        "Evidence: %s\n\n"
         "Prepared instruction for receiver: %s\n\n"
+        "Previous request: %s\n\n"
         "Source: %s:L%s\n\n"
+        "%s"
+        "Recorded follow-up (tool execution, not task correctness):\n%s\n"
         "Still missing before completion can be claimed:\n%s\n"
         % (args.as_harness,
-           "SYNTHETIC EXAMPLE — invented instruction; not a real user request"
+           "SYNTHETIC EXAMPLE. Invented instruction; not a real user request"
            if packet.get("synthetic") is True else "source transcript (not independently verified)",
+           evidence_status,
            correction,
-           core.safe_text((packet.get("citation") or {}).get("source")),
-           (packet.get("citation") or {}).get("line") or "?",
+           previous or "(not recorded)",
+           core.safe_text(citation.get("source")),
+           citation.get("line") or "?",
+           ("Open: %s\n\n" % open_cmd) if open_cmd else "",
+           follow_lines,
            "".join("- %s\n" % core.safe_text(item) for item in remaining)
            or "- task correctness verification\n")
     )
     _write_private(output, brief)
     print("Prepared receiver brief: " + output)
+    if open_cmd:
+        print("Open: " + open_cmd)
+    if state != "available":
+        print("Evidence: " + evidence_status, file=sys.stderr)
     print("Still missing: " + ("; ".join(remaining) or "task correctness verification"))
     return 0
 
@@ -1876,6 +2085,12 @@ def main():
     s = sub.add_parser("import-example", help="install a synthetic public trace locally")
     s.add_argument("--force", action="store_true", help="replace a changed example import")
     s.set_defaults(fn=cmd_import_example)
+    s = sub.add_parser("import-lab", help="install labelled cross-harness failed/ok/? traces")
+    s.add_argument("--force", action="store_true", help="replace a changed lab import")
+    s.set_defaults(fn=cmd_import_lab)
+    s = sub.add_parser("quickstart", help="print offline wheel install / search / reopen card")
+    s.add_argument("--wheel", help="absolute wheel path to embed in the install commands")
+    s.set_defaults(fn=cmd_quickstart)
     sub.add_parser("index").set_defaults(fn=cmd_index)
     s = sub.add_parser("watch"); s.add_argument("--interval", type=int, default=5); s.set_defaults(fn=cmd_watch)
     s = sub.add_parser("ask"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=25); s.set_defaults(fn=cmd_ask)
@@ -1942,7 +2157,8 @@ def main():
     output.add_argument("--share", action="store_true", help="counts and caveat only; no prompts or paths")
     s.set_defaults(fn=lambda a: sys.exit(cmd_replay(a, _coach_files(_coach_roots(a.root, a.harness), a.harness))))
     for name, parser in sub.choices.items():
-        if name not in ("coach", "cost", "export-run", "import-example", "receive-handoff"):
+        if name not in ("coach", "cost", "export-run", "import-example", "import-lab",
+                        "quickstart", "receive-handoff"):
             parser.add_argument("--root", help="read transcripts in this directory")
             parser.add_argument("--harness", choices=["claude", "codex", "cursor"], help="default: all three")
     a = p.parse_args(["replay"] if len(sys.argv) == 1 else None)
@@ -1956,7 +2172,7 @@ def main():
         p.error("--root does not exist: " + core.safe_text(a.root))
     global ROOTS, HARNESS
     if a.cmd not in ("coach", "cost", "export-run", "replay",
-                     "import-example", "receive-handoff"):
+                     "import-example", "import-lab", "quickstart", "receive-handoff"):
         HARNESS = getattr(a, "harness", None)
         ROOTS = _coach_roots(getattr(a, "root", None), HARNESS)
     if not getattr(a, "fn", None):

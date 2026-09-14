@@ -71,11 +71,36 @@ transcripto receive-handoff \
 cat "$HOME/codex-work/receiver-brief.md"
 ```
 
-The command prepares a brief with the cited correction and retains what is still
-missing before completion can be claimed. It does not invoke a receiver agent or
-prove adoption. Synthetic provenance stays visible in search, changes, and handoffs. Handoff files are local and mode
-`0600`; they can contain transcript text and paths, so review them before
-sharing.
+The brief includes the cited correction, recorded follow-up statuses
+(failed / succeeded / unknown), and an `Open:` command for the exact request.
+If the source moved or disappeared, the brief marks evidence uncertain and keeps
+packet statuses as provisional. It does not invoke a receiver agent or prove
+adoption. Synthetic provenance stays visible in search, changes, and handoffs.
+Handoff files are local and mode `0600`; they can contain transcript text and
+paths, so review them before sharing.
+
+### Cross-harness lab (failed / succeeded / unknown)
+
+For a receiving agent that needs to find a prior episode and reopen exact
+evidence without private history:
+
+```sh
+transcripto import-lab
+transcripto ask "retry"
+# run each printed Open: command
+```
+
+All lab records are labelled synthetic. Claude shows a failed edit, Codex a
+succeeded check, Cursor an unknown missing result.
+
+### Offline flight card
+
+```sh
+transcripto quickstart --wheel /absolute/path/to/transcripto-0.2.0-py3-none-any.whl
+```
+
+Prints install, `import-lab`, search, and reopen commands for a built wheel
+without PyPI. See also `docs/OFFLINE-QUICKSTART.md`.
 
 **Your files remain yours.** Transcripto does not upload transcript content or
 execute commands found in it. Search output, replay and JSON can contain private

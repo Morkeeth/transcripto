@@ -442,6 +442,9 @@ class CLITests(FixtureCase):
         self.assertIn('Still missing before completion can be claimed', text)
         self.assertIn('task correctness verification', text)
         self.assertIn('receiver acknowledgement', text)
+        self.assertIn('Open: transcripto replay', text)
+        self.assertIn('edit config/cache.toml (succeeded)', text)
+        self.assertIn('Previous request:', text)
 
     def test_synthetic_provenance_survives_replay_and_index(self):
         self.assertEqual(self.run_cli('import-example').returncode, 0)

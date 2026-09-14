@@ -311,6 +311,7 @@ def read_session(path, diagnostics=None):
     calls, results = {}, []
     last_ts = ""
     for d in iter_json(path, diagnostics):
+        synthetic = d.get("transcripto_synthetic") is True
         if d.get("type") == "session_meta":
             harness = "codex"
             p = d.get("payload") or {}
@@ -364,6 +365,8 @@ def read_session(path, diagnostics=None):
             d.update(timestamp=d.get("timestamp") or last_ts, sessionId=sid)
         if d.get("type") not in ("user", "assistant"):
             continue
+        if synthetic:
+            d["transcripto_synthetic"] = True
         d.setdefault("sessionId", sid)
         for field in ("sessionId", "timestamp", "cwd", "gitBranch"):
             if field in d and not isinstance(d[field], str):

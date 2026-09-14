@@ -116,8 +116,58 @@ class PublicFlowTests(unittest.TestCase):
         self.assertEqual(prepared.returncode, 0, prepared.stderr)
         self.assertIn('SYNTHETIC EXAMPLE', brief.read_text())
         self.assertIn('acknowledgement pending', brief.read_text())
+        self.assertIn('Open: transcripto replay', brief.read_text())
+        self.assertIn('edit config/cache.toml (succeeded)', brief.read_text())
         self.assertEqual(packet.stat().st_mode & 0o777, 0o600)
         self.assertEqual(brief.stat().st_mode & 0o777, 0o600)
+
+    def test_import_lab_search_open_preserves_three_outcomes(self):
+        imported = self.run_cli('import-lab')
+        self.assertEqual(imported.returncode, 0, imported.stderr)
+        self.assertIn('SYNTHETIC', imported.stdout)
+        query = self.run_cli('ask', 'retry')
+        self.assertEqual(query.returncode, 0, query.stderr)
+        self.assertIn('SYNTHETIC EXAMPLE', query.stdout)
+        commands = [shlex.split(line.strip()[6:]) for line in query.stdout.splitlines()
+                    if line.strip().startswith('Open: ')]
+        self.assertEqual(len(commands), 3, query.stdout)
+        observed = {}
+        for command in commands:
+            result = self.run_cli(*command[1:], '--json')
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            data = json.loads(result.stdout)
+            self.assertTrue(data['synthetic'])
+            ep = data['episodes'][0]
+            self.assertIn('retried', ep['prompt'])
+            observed[ep['harness']] = ep['events'][0]['status']
+        self.assertEqual(observed, {'claude': 'failed', 'codex': 'succeeded', 'cursor': 'unknown'})
+
+    def test_receive_handoff_marks_missing_source_uncertain(self):
+        self.assertEqual(self.run_cli('import-example').returncode, 0)
+        packet = self.home / 'packet.json'
+        self.assertEqual(self.run_cli('handoff', '30 seconds', '--to-harness', 'codex',
+                                      '--output', str(packet)).returncode, 0)
+        source = Path(json.loads(packet.read_text())['citation']['source'])
+        source.unlink()
+        brief = self.home / 'brief.md'
+        prepared = self.run_cli('receive-handoff', str(packet), '--as-harness',
+                                'codex', '--output', str(brief))
+        self.assertEqual(prepared.returncode, 0, prepared.stderr)
+        text = brief.read_text()
+        self.assertIn('source missing or moved', text)
+        self.assertIn('matching source transcript', text)
+        self.assertIn('edit config/cache.toml (succeeded)', text)
+        self.assertIn('Open: transcripto replay', text)
+        self.assertIn('provisional', text)
+
+    def test_quickstart_embeds_wheel_path(self):
+        wheel = self.home / 'transcripto-0.2.0-py3-none-any.whl'
+        wheel.write_text('not a real wheel')
+        result = self.run_cli('quickstart', '--wheel', str(wheel))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(str(wheel), result.stdout)
+        self.assertIn('import-lab', result.stdout)
+        self.assertIn('ask "retry"', result.stdout)
 
     def test_exact_line_does_not_fall_back_to_another_request(self):
         path = self.write('session.jsonl', [
