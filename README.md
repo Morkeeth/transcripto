@@ -20,7 +20,11 @@ automatically. The first search indexes the selected history; a large archive
 can take minutes. Add `--harness claude`, `--harness codex`, or `--harness cursor`
 to limit that scan. It does not generate a diary or interpret your personality.
 
-Then open the surrounding work:
+Each hit prints an `Open:` command. Run that command to open the exact request
+and its recorded work. This also works when search matches a word variant
+(such as `retry` matching `retried`) or several requests share the same words.
+
+You can also search replay directly:
 
 ```sh
 uvx --from transcripto==0.2.0 transcripto replay "retry"
@@ -35,6 +39,43 @@ not whether the task was done correctly.
 
 Or install with `python3 -m pip install transcripto==0.2.0`, then run
 `transcripto ask "retry"`. Requires Python 3.9 or newer.
+
+## Try the stranger flow without your transcripts
+
+The bundled public example is synthetic. It works in an isolated home and does
+not depend on agent dotfiles:
+
+```sh
+INSTALL="$(mktemp -d)"
+python3 -m pip install --no-deps --no-build-isolation --target "$INSTALL" .
+export HOME="$(mktemp -d)"
+transcripto() { PYTHONPATH="$INSTALL" python3 -m transcripto "$@"; }
+
+transcripto import-example
+transcripto ask "What changed about the forecast cache?"
+transcripto changes
+```
+
+`ask` cites the imported JSONL line for every hit. `changes` is a focused view
+of the request that was revised, the correction, and its recorded follow-up.
+It labels missing results rather than turning a change of mind into a score.
+
+To carry that correction to a different receiver:
+
+```sh
+transcripto handoff "30 seconds" \
+  --to-harness codex --output "$HOME/codex-inbox/correction.json"
+transcripto receive-handoff \
+  "$HOME/codex-inbox/correction.json" --as-harness codex \
+  --output "$HOME/codex-work/receiver-brief.md"
+cat "$HOME/codex-work/receiver-brief.md"
+```
+
+The command prepares a brief with the cited correction and retains what is still
+missing before completion can be claimed. It does not invoke a receiver agent or
+prove adoption. Synthetic provenance stays visible in search, changes, and handoffs. Handoff files are local and mode
+`0600`; they can contain transcript text and paths, so review them before
+sharing.
 
 **Your files remain yours.** Transcripto does not upload transcript content or
 execute commands found in it. Search output, replay and JSON can contain private
@@ -105,6 +146,7 @@ transcripto replay "login redirect"         # find requests containing these wor
 transcripto replay path/to/session.jsonl    # inspect one transcript
 transcripto replay --session 3f9c1a2b        # explicitly select a session prefix
 transcripto replay path/to/session.jsonl --episode 3 --all
+transcripto replay path/to/session.jsonl --line 42  # exact request from an ask hit
 transcripto replay latest --json            # structured events, evidence, source lines
 transcripto replay latest --share           # counts + caveat; no prompts or paths
 ```
@@ -215,6 +257,11 @@ owns replay selection and presentation. All fixtures committed here are syntheti
 python3 -m unittest discover -s tests -v
 for test in test_*.sh; do bash "$test" || exit; done
 ```
+
+`test_distribution.sh` requires the development-only `build` package. It builds
+an sdist, builds the wheel from that archive, installs without dependencies in a
+fresh virtual environment, and exercises discovery, search and exact replay
+across all three harnesses in an isolated synthetic HOME.
 
 The regression cases include failed edits and commits, missing/mismatched
 results, Cursor call shapes, Codex wrappers, result attribution across prompts,

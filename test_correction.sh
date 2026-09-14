@@ -79,7 +79,7 @@ ok "is_correction is pure: text + prev_agent + an explicit version, no state" \
 # v1 is a DIFFERENT classifier and gets its own cases, from the failures that
 # produced it (docs/CORRECTION-PRECISION-2026-09-03.md). v0's cases above stay
 # green because v0 still ships behind TRANSCRIPTO_CORRECTION=v0 — deleting them
-# would leave the version Oscar can still select with no coverage at all.
+# would leave the version an operator can still select with no coverage at all.
 V1=$(python3 - <<'PY'
 import transcripto as t
 cases = [

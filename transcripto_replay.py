@@ -60,6 +60,16 @@ def cmd_replay(args, paths):
             target = os.path.join(temp.name, "demo.jsonl")
             _demo(target)
         is_path = os.path.isfile(os.path.expanduser(target))
+        source_line = getattr(args, "line", None)
+        if source_line is not None and not is_path:
+            warning = "Cannot open transcript path: " + safe_text(target)
+            if args.json:
+                print(json.dumps({"schema": "transcripto.replay/1", "episodes": [],
+                                  "warnings": [warning], "proxy": PROXY}))
+            else:
+                print(warning)
+                print("The source may have moved or been deleted. Run ask again to refresh the index.")
+            return 2
         if is_path:
             candidates = [os.path.expanduser(target)]
             query = None
@@ -86,6 +96,8 @@ def cmd_replay(args, paths):
                 ep.update(number=i, harness=harness, title=title(ep))
             if args.episode is not None:
                 eps = [ep for ep in eps if ep["number"] == args.episode]
+            if source_line is not None:
+                eps = [ep for ep in eps if ep["line"] == source_line]
             if query:
                 eps = [ep for ep in eps if query in ep["prompt"].lower()]
             if args.failures:
@@ -107,28 +119,33 @@ def cmd_replay(args, paths):
             if args.json:
                 print(json.dumps({"schema": "transcripto.replay/1", "episodes": [], "warnings": diagnostics, "proxy": PROXY}))
             else:
-                print("No matching human session found.")
+                if source_line is not None:
+                    print("No human request starts at line %d in this transcript. The source may have changed; run ask again." % source_line)
+                else:
+                    print("No matching human session found.")
                 print("Try: transcripto replay --demo, --harness codex, --harness cursor, or --root <dir>.")
                 for warning in diagnostics:
                     print("warning: " + safe_text(warning))
             return 2
+        synthetic = args.demo or any(ep.get("synthetic") for ep in selected)
         if args.share:
             counts = Counter(e["status"] for ep in selected for e in ep["events"])
             print("Transcripto replay · %d request(s) · %d succeeded · %d failed · %d unknown" % (
                 len(selected), counts["succeeded"], counts["failed"], counts["unknown"]))
             print(PROXY)
-            if args.demo:
-                print("Synthetic demo; not measured user data.")
+            if synthetic:
+                print("Synthetic demo/examples; not measured user data.")
             return 0
         if args.json:
-            print(json.dumps({"schema": "transcripto.replay/1", "synthetic": args.demo,
+            print(json.dumps({"schema": "transcripto.replay/1", "synthetic": synthetic,
                               "episodes": selected, "warnings": diagnostics, "proxy": PROXY}, indent=2))
             return 0
-        if args.demo:
-            print("SYNTHETIC DEMO · all prompts and results below are invented\n")
+        if synthetic:
+            print("SYNTHETIC DEMO · contains invented prompts and results\n")
         for ep in selected:
             print("%s · %s · request %d" % (ep["title"], ep["harness"], ep["number"]))
-            print('You asked: "%s"\n' % _short(ep["prompt"], 160))
+            label = "Invented request" if args.demo or ep.get("synthetic") else "You asked"
+            print('%s: "%s"\n' % (label, _short(ep["prompt"], 160)))
             if ep["events"] and all(e["result_line"] is None for e in ep["events"]):
                 print("  This export has no matching result records. These are attempts; '?' does not mean failure.\n")
             if not ep["events"]:
