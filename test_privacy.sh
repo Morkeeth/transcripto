@@ -13,6 +13,14 @@
 # The GitHub handle in repo URLs is public by definition and is allowed.
 set -u
 cd "$(dirname "$0")"
+# Empty-index trap: `git ls-files` on a fresh `git init` is empty. A prior form of
+# this guard printed "PRIVACY OK: 0 hits in 0 tracked files" and exited 0 — the
+# green-on-outage failure mode. Fail closed when nothing is tracked.
+n=$(git ls-files | wc -l | tr -d ' ')
+if [ "$n" -eq 0 ]; then
+  echo "PRIVACY FAIL: git ls-files returned 0 files (empty index is not a clean tree)"
+  exit 1
+fi
 pat='/Users/morkeeth|-Users-morkeeth|omorke|beloeved routine|mTERMINAL 8|0d98a2c7|Obsidian LIFE|~/…/'
 # The author's notes use a numbered-folder convention. Match the CONVENTION, not a list
 # of folder names. A hand-written list of folder names caught 5 of 11 real paths on
@@ -23,4 +31,4 @@ pat='/Users/morkeeth|-Users-morkeeth|omorke|beloeved routine|mTERMINAL 8|0d98a2c
 vault='(^|[^0-9])[0-9]{2} [A-Z][A-Za-z ]*/[^"]*\.md'
 hits=$(git ls-files | grep -v -E '^test_privacy\.sh$' | xargs grep -n -i -E "$pat|$vault" 2>/dev/null)
 if [ -n "$hits" ]; then echo "PRIVACY FAIL:"; echo "$hits" | head -20; exit 1; fi
-echo "PRIVACY OK: 0 hits in $(git ls-files | wc -l | tr -d ' ') tracked files"
+echo "PRIVACY OK: 0 hits in $n tracked files"
