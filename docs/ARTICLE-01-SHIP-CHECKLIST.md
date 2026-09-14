@@ -21,6 +21,7 @@ Agent does not post, publish, or bump PyPI.
 | Unit tests | `python3 -m unittest discover -s tests -v` | **73 OK** |
 | Docs default | curl settings-reference.md | `cleanupPeriodDays` Default **30**; desktop Default **0** |
 | PyPI | `curl -sL https://pypi.org/pypi/transcripto/json` | **0.2.0** |
+| CI | tip `d4bcd94` run [34792279799](https://github.com/Morkeeth/transcripto/actions/runs/34792279799) | test 3.9 + 3.13 + cold-verify all **success** |
 
 ## STEP 3 — README launch example
 
