@@ -148,3 +148,5 @@ Desktop mix), article/X/PyPI.
   Pacific divergence.
 - Final cold_verify tip: `TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-ok`
   → **PASS** (artifact refreshed).
+- GitHub Actions tip `d4bcd94` (run 34792279799): test 3.9 + 3.13 +
+  cold-verify all **success** (watched at object via check-runs API).
