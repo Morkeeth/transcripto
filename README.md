@@ -20,7 +20,11 @@ automatically. The first search indexes the selected history; a large archive
 can take minutes. Add `--harness claude`, `--harness codex`, or `--harness cursor`
 to limit that scan. It does not generate a diary or interpret your personality.
 
-Then open the surrounding work:
+Each hit prints an `Open:` command. Run that command to open the exact request
+and its recorded work. This also works when search matches a word variant
+(such as `retry` matching `retried`) or several requests share the same words.
+
+You can also search replay directly:
 
 ```sh
 uvx --from transcripto==0.2.0 transcripto replay "retry"
@@ -141,6 +145,7 @@ transcripto replay "login redirect"         # find requests containing these wor
 transcripto replay path/to/session.jsonl    # inspect one transcript
 transcripto replay --session 3f9c1a2b        # explicitly select a session prefix
 transcripto replay path/to/session.jsonl --episode 3 --all
+transcripto replay path/to/session.jsonl --line 42  # exact request from an ask hit
 transcripto replay latest --json            # structured events, evidence, source lines
 transcripto replay latest --share           # counts + caveat; no prompts or paths
 ```
@@ -251,6 +256,11 @@ owns replay selection and presentation. All fixtures committed here are syntheti
 python3 -m unittest discover -s tests -v
 for test in test_*.sh; do bash "$test" || exit; done
 ```
+
+`test_distribution.sh` requires the development-only `build` package. It builds
+an sdist, builds the wheel from that archive, installs without dependencies in a
+fresh virtual environment, and exercises discovery, search and exact replay
+across all three harnesses in an isolated synthetic HOME.
 
 The regression cases include failed edits and commits, missing/mismatched
 results, Cursor call shapes, Codex wrappers, result attribution across prompts,

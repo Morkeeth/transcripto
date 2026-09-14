@@ -3,7 +3,7 @@
 
 Local transcript inspection for Claude Code, Codex, and Cursor. Stdlib only.
 """
-import sys, os, json, glob, re, sqlite3, argparse, math
+import sys, os, json, glob, re, sqlite3, argparse, math, shlex
 import transcripto_core as core
 from transcripto_replay import cmd_replay
 from datetime import datetime, timezone
@@ -436,7 +436,7 @@ def cmd_search(args):
     except sqlite3.OperationalError as e:
         print("search error:", e); return
     if not rows:
-        print("no matches. try `%s index` first, or broader terms." % PROG); return
+        print("no matches. Try broader terms, or --root <dir> to select your transcript folder."); return
     for ts, proj, role, human, cwd, snip in rows:
         repo = os.path.basename(cwd.rstrip("/")) if cwd else proj
         if human:
@@ -487,8 +487,8 @@ def cmd_ask(args):
                   "\ntry `%s search \"%s\"` to see those, or `%s index` if it's new."
                   % (args.query, any_hit, PROG, args.query, PROG))
         else:
-            print("nothing about '%s' yet. try `%s index` first, or broader terms."
-                  % (args.query, PROG))
+            print("nothing about '%s' in the selected history. Try broader terms, or --root <dir> to select your transcript folder."
+                  % args.query)
         return
 
     # ---- rollup: the arc across ALL your matches, not just the shown page ----
@@ -525,6 +525,8 @@ def cmd_ask(args):
         print("%s  \033[36m%-20s\033[0m %s  \033[2m%s · %s\033[0m"
               % (_day(ts), _repo(cwd, proj)[:20], " ".join(snip.split()),
                  (sid or "")[:8], _citation(source, line)))
+        if line and core.safe_text(source) == source:
+            print("  Open: %s replay %s --line %d" % (PROG, shlex.quote(source), line))
 
 
 def cmd_find(args):
@@ -1892,7 +1894,9 @@ def main():
     s = sub.add_parser("replay", help="replay requests and their recorded tool results")
     s.add_argument("target", nargs="?", default="latest", help="latest, a transcript path, or words from a request")
     s.add_argument("--session", help="explicit session ID or an unambiguous filename prefix")
-    s.add_argument("--episode", type=int, help="request number within the session")
+    selection = s.add_mutually_exclusive_group()
+    selection.add_argument("--episode", type=int, help="request number within the session")
+    selection.add_argument("--line", type=int, help="exact human request source line (requires a transcript path)")
     s.add_argument("--events", type=int, default=12, help="events displayed per request (default 12)")
     s.add_argument("--limit", type=int, default=5, help="matching requests to show")
     s.add_argument("--all", action="store_true", help="all requests and events in the selected session")
@@ -1909,8 +1913,12 @@ def main():
     a = p.parse_args(["replay"] if len(sys.argv) == 1 else None)
     if getattr(a, "events", 1) < 1 or getattr(a, "limit", 1) < 1 or (getattr(a, "episode", None) is not None and a.episode < 1):
         p.error("episode, events, and limit must be positive")
+    if getattr(a, "line", None) is not None and (a.line < 1 or a.target == "latest" or getattr(a, "session", None) or a.demo):
+        p.error("--line requires a positive line number and an explicit transcript path")
     if getattr(a, "session", None) and a.target != "latest":
         p.error("use either a positional query/path or --session")
+    if getattr(a, "root", None) and not os.path.exists(os.path.expanduser(a.root)):
+        p.error("--root does not exist: " + core.safe_text(a.root))
     global ROOTS, HARNESS
     if a.cmd not in ("coach", "cost", "export-run", "replay",
                      "import-example", "receive-handoff"):

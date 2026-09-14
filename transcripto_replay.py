@@ -60,6 +60,16 @@ def cmd_replay(args, paths):
             target = os.path.join(temp.name, "demo.jsonl")
             _demo(target)
         is_path = os.path.isfile(os.path.expanduser(target))
+        source_line = getattr(args, "line", None)
+        if source_line is not None and not is_path:
+            warning = "Cannot open transcript path: " + safe_text(target)
+            if args.json:
+                print(json.dumps({"schema": "transcripto.replay/1", "episodes": [],
+                                  "warnings": [warning], "proxy": PROXY}))
+            else:
+                print(warning)
+                print("The source may have moved or been deleted. Run ask again to refresh the index.")
+            return 2
         if is_path:
             candidates = [os.path.expanduser(target)]
             query = None
@@ -86,6 +96,8 @@ def cmd_replay(args, paths):
                 ep.update(number=i, harness=harness, title=title(ep))
             if args.episode is not None:
                 eps = [ep for ep in eps if ep["number"] == args.episode]
+            if source_line is not None:
+                eps = [ep for ep in eps if ep["line"] == source_line]
             if query:
                 eps = [ep for ep in eps if query in ep["prompt"].lower()]
             if args.failures:
@@ -107,7 +119,10 @@ def cmd_replay(args, paths):
             if args.json:
                 print(json.dumps({"schema": "transcripto.replay/1", "episodes": [], "warnings": diagnostics, "proxy": PROXY}))
             else:
-                print("No matching human session found.")
+                if source_line is not None:
+                    print("No human request starts at line %d in this transcript. The source may have changed; run ask again." % source_line)
+                else:
+                    print("No matching human session found.")
                 print("Try: transcripto replay --demo, --harness codex, --harness cursor, or --root <dir>.")
                 for warning in diagnostics:
                     print("warning: " + safe_text(warning))
