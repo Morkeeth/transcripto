@@ -127,23 +127,25 @@ def cmd_replay(args, paths):
                 for warning in diagnostics:
                     print("warning: " + safe_text(warning))
             return 2
+        synthetic = args.demo or any(ep.get("synthetic") for ep in selected)
         if args.share:
             counts = Counter(e["status"] for ep in selected for e in ep["events"])
             print("Transcripto replay · %d request(s) · %d succeeded · %d failed · %d unknown" % (
                 len(selected), counts["succeeded"], counts["failed"], counts["unknown"]))
             print(PROXY)
-            if args.demo:
-                print("Synthetic demo; not measured user data.")
+            if synthetic:
+                print("Synthetic demo/examples; not measured user data.")
             return 0
         if args.json:
-            print(json.dumps({"schema": "transcripto.replay/1", "synthetic": args.demo,
+            print(json.dumps({"schema": "transcripto.replay/1", "synthetic": synthetic,
                               "episodes": selected, "warnings": diagnostics, "proxy": PROXY}, indent=2))
             return 0
-        if args.demo:
-            print("SYNTHETIC DEMO · all prompts and results below are invented\n")
+        if synthetic:
+            print("SYNTHETIC DEMO · contains invented prompts and results\n")
         for ep in selected:
             print("%s · %s · request %d" % (ep["title"], ep["harness"], ep["number"]))
-            print('You asked: "%s"\n' % _short(ep["prompt"], 160))
+            label = "Invented request" if args.demo or ep.get("synthetic") else "You asked"
+            print('%s: "%s"\n' % (label, _short(ep["prompt"], 160)))
             if ep["events"] and all(e["result_line"] is None for e in ep["events"]):
                 print("  This export has no matching result records. These are attempts; '?' does not mean failure.\n")
             if not ep["events"]:

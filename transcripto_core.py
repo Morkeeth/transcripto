@@ -411,7 +411,8 @@ def episodes(rows, source=""):
         prompt = human_text(row)
         if prompt:
             current = {"prompt": prompt, "line": row.get("_line"), "timestamp": row.get("timestamp", ""),
-                       "source": source, "session_id": row.get("sessionId", ""), "events": [], "reply": ""}
+                       "source": source, "synthetic": row.get("transcripto_synthetic") is True,
+                       "session_id": row.get("sessionId", ""), "events": [], "reply": ""}
             out.append(current)
             continue
         if current is None or row.get("type") != "assistant":

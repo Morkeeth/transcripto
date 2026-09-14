@@ -3,7 +3,7 @@
 
 Local transcript inspection for Claude Code, Codex, and Cursor. Stdlib only.
 """
-import sys, os, json, glob, re, sqlite3, argparse, math, shlex
+import sys, os, json, glob, re, sqlite3, argparse, math, shlex, tempfile
 import transcripto_core as core
 from transcripto_replay import cmd_replay
 from datetime import datetime, timezone
@@ -93,7 +93,7 @@ def connect(require_index=True):
     return con
 
 
-SCHEMA_VERSION = 4  # bump when a column/tokenizer change needs a full rebuild
+SCHEMA_VERSION = 5  # bump when a column/tokenizer change needs a full rebuild
 
 
 def _needs_rebuild(con):
@@ -105,7 +105,7 @@ def _needs_rebuild(con):
     if not t:
         return False  # fresh db — nothing to migrate
     cols = {r[1] for r in con.execute("PRAGMA table_info(messages)")}
-    if "is_human" not in cols or "harness" not in cols or "source_line" not in cols:
+    if "is_human" not in cols or "harness" not in cols or "source_line" not in cols or "synthetic" not in cols:
         return True
     if "warnings" not in {r[1] for r in con.execute("PRAGMA table_info(indexed)")}:
         return True
@@ -126,7 +126,7 @@ def init_schema(con):
       id INTEGER PRIMARY KEY, session_id TEXT, session_file TEXT, project TEXT,
       ts TEXT, role TEXT, cwd TEXT, git_branch TEXT, text TEXT,
       is_human INTEGER DEFAULT 0, prompt_source TEXT, harness TEXT,
-      source_line INTEGER);
+      source_line INTEGER, synthetic INTEGER DEFAULT 0);
     -- porter stemming: `ask "frustration"` also matches frustrated/frustrating.
     CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
       text, content='messages', content_rowid='id', tokenize="porter unicode61");
@@ -158,7 +158,7 @@ def init_schema(con):
     DROP VIEW IF EXISTS v_messages;
     CREATE VIEW v_messages AS
       SELECT id, session_id, project, ts, role, cwd, git_branch, text,
-             is_human, prompt_source, harness, source_line FROM messages;
+             is_human, prompt_source, harness, source_line, synthetic FROM messages;
     """)
     con.execute("PRAGMA user_version=%d" % SCHEMA_VERSION)
     con.commit()
@@ -282,13 +282,14 @@ def _index_once(con, progress=False):
             cwd = core.safe_text(d.get("cwd") or "")
             gb = core.safe_text(d.get("gitBranch") or "")
             sid = core.safe_text(d.get("sessionId") or fallback_sid)
-            human = 1 if is_human_turn(d) else 0
+            synthetic = d.get("transcripto_synthetic") is True
+            human = 1 if is_human_turn(d) and not synthetic else 0
             psrc = d.get("promptSource")
             if text:
                 cur = con.execute(
-                    "INSERT INTO messages(session_id,session_file,project,ts,role,cwd,git_branch,text,is_human,prompt_source,harness,source_line)"
-                    " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (sid, f, proj, ts, role, cwd, gb, text, human, psrc, harness, d.get("_line")))
+                    "INSERT INTO messages(session_id,session_file,project,ts,role,cwd,git_branch,text,is_human,prompt_source,harness,source_line,synthetic)"
+                    " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (sid, f, proj, ts, role, cwd, gb, text, human, psrc, harness, d.get("_line"), int(synthetic)))
                 con.execute("INSERT INTO messages_fts(rowid,text) VALUES(?,?)", (cur.lastrowid, text))
                 msgs += 1
             for action, path in fl:
@@ -353,7 +354,8 @@ def _citation(path, line):
 
 def _public_example_rows():
     """An invented change-of-mind trace safe to install on an empty machine."""
-    base = {"sessionId": "public-change-example", "cwd": "/example/weather-service"}
+    base = {"sessionId": "public-change-example", "cwd": "/example/weather-service",
+            "transcripto_synthetic": True}
     rows = [
         dict(base, type="user", promptSource="typed", timestamp="2026-01-12T10:00:00Z",
              message={"role": "user", "content":
@@ -464,6 +466,16 @@ def cmd_ask(args):
     the arc: how many, how long, which repos, and your latest thought on it.
     """
     con = connect()
+    examples = con.execute(
+        "SELECT m.text,m.session_file,m.source_line FROM messages_fts "
+        "JOIN messages m ON m.id=messages_fts.rowid "
+        "WHERE messages_fts MATCH ? AND m.synthetic=1 AND m.prompt_source IN ('typed','queued') "
+        "ORDER BY m.ts DESC LIMIT ?", (_match(args.query), args.limit)).fetchall()
+    if examples:
+        print("SYNTHETIC EXAMPLE — invented requests, excluded from your message counts")
+        for text, source, line in examples:
+            print("  %s [%s]" % (" ".join(text.split()), _citation(source, line)))
+        print()
     try:
         rows = con.execute(
             "SELECT m.id,m.ts,m.project,m.cwd,m.session_id,m.text,m.session_file,m.source_line,"
@@ -475,6 +487,8 @@ def cmd_ask(args):
     except sqlite3.OperationalError as e:
         print("ask error:", e); return
     if not rows:
+        if examples:
+            return 0
         # Did the topic exist at all (just not in the operator's words)? Say so honestly.
         try:
             any_hit = con.execute(
@@ -1159,6 +1173,7 @@ def _change_records(roots, harness=None):
             prior = eps[number - 1] if number else None
             found.append({
                 "timestamp": ep["timestamp"],
+                "synthetic": any(row.get("transcripto_synthetic") is True for row in rows),
                 "harness": detected,
                 "correction": ep["prompt"],
                 "source": path,
@@ -1179,6 +1194,8 @@ def cmd_changes(args):
         print("No correction-shaped requests found. The classifier can have misses.")
         return 0
     for item in records[:args.limit]:
+        if item["synthetic"]:
+            print("SYNTHETIC EXAMPLE — invented request and recorded follow-up")
         print("CHANGE OF DIRECTION · %s · %s"
               % (item["harness"], _citation(item["source"], item["line"])))
         if item["previous_request"]:
@@ -1205,10 +1222,16 @@ def cmd_changes(args):
 def _write_private(path, text):
     parent = os.path.dirname(os.path.abspath(path))
     os.makedirs(parent, mode=0o700, exist_ok=True)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write(text)
-    os.chmod(path, 0o600)
+    # Replace atomically: never expose new private text through an existing 0644
+    # file, and never follow an output symlink into an unrelated source file.
+    fd, temporary = tempfile.mkstemp(prefix=".transcripto-", dir=parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 def cmd_handoff(args):
@@ -1230,6 +1253,7 @@ def cmd_handoff(args):
         missing.insert(0, "matching result for the source follow-up")
     packet = {
         "schema": "transcripto.handoff/1",
+        "synthetic": item["synthetic"],
         "receiver_harness": args.to_harness,
         "correction": item["correction"],
         "citation": {"source": item["source"], "line": item["line"],
@@ -1241,7 +1265,11 @@ def cmd_handoff(args):
         "missing": missing,
         "caveat": "A packet carries an instruction, not proof that the receiver completed it.",
     }
-    _write_private(os.path.expanduser(args.output), json.dumps(packet, indent=2) + "\n")
+    output = os.path.expanduser(args.output)
+    if os.path.realpath(output) == os.path.realpath(item["source"]):
+        print("Handoff output must not overwrite the source transcript.", file=sys.stderr)
+        return 2
+    _write_private(output, json.dumps(packet, indent=2) + "\n")
     print("Handoff written for %s: %s" % (args.to_harness, os.path.expanduser(args.output)))
     print("Missing: " + "; ".join(missing))
     return 0
@@ -1251,7 +1279,7 @@ def cmd_receive_handoff(args):
     """Write a prepared receiver brief from a packet. Does not invoke a receiver agent."""
     source = os.path.abspath(os.path.expanduser(args.packet))
     output = os.path.abspath(os.path.expanduser(args.output))
-    if source == output:
+    if os.path.realpath(source) == os.path.realpath(output):
         print("Receiver output must be a different path from the handoff packet.",
               file=sys.stderr)
         return 2
@@ -1280,11 +1308,15 @@ def cmd_receive_handoff(args):
     brief = (
         "# Prepared receiver brief\n\n"
         "Harness: %s\n\n"
+        "Provenance: %s\n\n"
         "Status: acknowledgement pending — no receiver agent was invoked by this command.\n\n"
         "Prepared instruction for receiver: %s\n\n"
         "Source: %s:L%s\n\n"
         "Still missing before completion can be claimed:\n%s\n"
-        % (args.as_harness, correction,
+        % (args.as_harness,
+           "SYNTHETIC EXAMPLE — invented instruction; not a real user request"
+           if packet.get("synthetic") is True else "source transcript (not independently verified)",
+           correction,
            core.safe_text((packet.get("citation") or {}).get("source")),
            (packet.get("citation") or {}).get("line") or "?",
            "".join("- %s\n" % core.safe_text(item) for item in remaining)
@@ -1574,6 +1606,7 @@ def coach(roots=None, harness=None, verified_human=False):
     human_texts, harnesses = [], set()
     for p in paths:
         rows, fh = _rows_for_file(p)
+        rows = [row for row in rows if row.get("transcripto_synthetic") is not True]
         if fh == "codex-history":
             continue
         harnesses.add(fh)

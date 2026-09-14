@@ -44,8 +44,9 @@ HOME=/tmp/t1-home PYTHONPATH=/tmp/t1-install python3 -m transcripto \
   --as-harness codex --output /tmp/t1-home/codex-work/receiver-brief.md
 ```
 
-The separate Codex receiver path adopted the correction in its brief. It explicitly
-named task-correctness verification as still missing; packet delivery and a recorded
+The command prepared a brief addressed to Codex. No receiver agent was invoked,
+and no adoption was observed. It explicitly named receiver acknowledgement and
+task-correctness verification as still missing; packet delivery and a recorded
 edit result do not prove semantic completion.
 
 ## Verification

@@ -12,7 +12,7 @@ con = sqlite3.connect(
 Use the stable views:
 
 - `v_sessions`: session ID, project, first/last timestamps, message and assistant counts, cwd, harness.
-- `v_messages`: ID, session ID, project, timestamp, role, cwd, branch, text, human flag, prompt source, harness, source line.
+- `v_messages`: ID, session ID, project, timestamp, role, cwd, branch, text, human flag, prompt source, harness, source line, synthetic flag. Synthetic rows have `is_human=0` and do not count as operator messages.
 - `v_file_touches`: name, path, action, session ID, timestamp, cwd, harness.
 - `v_index_health`: source file, indexed modification time, JSON warnings for partial reads.
 - `messages_fts`: full-text search joined to `v_messages.id`.

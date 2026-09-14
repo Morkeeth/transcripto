@@ -71,8 +71,9 @@ transcripto receive-handoff \
 cat "$HOME/codex-work/receiver-brief.md"
 ```
 
-The receiver brief adopts the cited correction and retains what is still
-missing before completion can be claimed. Handoff files are local and mode
+The command prepares a brief with the cited correction and retains what is still
+missing before completion can be claimed. It does not invoke a receiver agent or
+prove adoption. Synthetic provenance stays visible in search, changes, and handoffs. Handoff files are local and mode
 `0600`; they can contain transcript text and paths, so review them before
 sharing.
 

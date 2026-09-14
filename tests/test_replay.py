@@ -404,7 +404,8 @@ class CLITests(FixtureCase):
 
         asked = self.run_cli('ask', 'What changed about the forecast cache?')
         self.assertEqual(asked.returncode, 0, asked.stderr)
-        self.assertIn('1 message you typed', asked.stdout)
+        self.assertIn('SYNTHETIC EXAMPLE', asked.stdout)
+        self.assertNotIn('message you typed', asked.stdout)
         self.assertIn('public-change-example.jsonl:L', asked.stdout)
 
         changes = self.run_cli('changes')
@@ -420,6 +421,7 @@ class CLITests(FixtureCase):
         self.assertEqual(handoff.returncode, 0, handoff.stderr)
         packet = json.loads(inbox.read_text())
         self.assertEqual(packet['receiver_harness'], 'codex')
+        self.assertIs(packet['synthetic'], True)
         self.assertIn('30 seconds', packet['correction'])
         self.assertIn('task correctness verification', packet['missing'])
         self.assertEqual(inbox.stat().st_mode & 0o777, 0o600)
@@ -432,12 +434,63 @@ class CLITests(FixtureCase):
         self.assertNotIn('Receiver used the correction', received.stdout)
         text = brief.read_text()
         self.assertIn('Prepared receiver brief', text)
+        self.assertIn('SYNTHETIC EXAMPLE', text)
+        self.assertIn('SYNTHETIC EXAMPLE', changes.stdout)
         self.assertIn('acknowledgement pending', text)
         self.assertIn('Prepared instruction for receiver: No, use 30 seconds instead', text)
         self.assertNotIn('Instruction adopted:', text)
         self.assertIn('Still missing before completion can be claimed', text)
         self.assertIn('task correctness verification', text)
         self.assertIn('receiver acknowledgement', text)
+
+    def test_synthetic_provenance_survives_replay_and_index(self):
+        self.assertEqual(self.run_cli('import-example').returncode, 0)
+        replayed = self.run_cli('replay', '--json')
+        payload = json.loads(replayed.stdout)
+        self.assertIs(payload['synthetic'], True)
+        self.assertTrue(all(ep['synthetic'] for ep in payload['episodes']))
+        shown = self.run_cli('replay')
+        self.assertIn('Invented request:', shown.stdout)
+        self.assertNotIn('You asked:', shown.stdout)
+        self.assertEqual(self.run_cli('index').returncode, 0)
+        import sqlite3
+        with sqlite3.connect(str(self.root/'.trace/trace.db')) as con:
+            self.assertEqual(con.execute('SELECT sum(is_human), min(synthetic) FROM v_messages').fetchone(), (0, 1))
+
+    def test_real_and_synthetic_search_counts_stay_separate(self):
+        self.assertEqual(self.run_cli('import-example').returncode, 0)
+        real = self.root/'.claude/projects/weather/real.jsonl'
+        real.parent.mkdir(parents=True)
+        row = user('The forecast cache changes need a real regression check.')
+        row.update(sessionId='real-session', timestamp='2026-09-14T12:00:00Z')
+        real.write_text(json.dumps(row) + '\n')
+        asked = self.run_cli('ask', 'forecast cache')
+        self.assertIn('SYNTHETIC EXAMPLE', asked.stdout)
+        self.assertIn('1 message you typed', asked.stdout)
+        self.assertNotIn('3 messages you typed', asked.stdout)
+        self.assertIn('real.jsonl:L1', asked.stdout)
+
+    def test_handoff_refuses_source_and_symlink_alias(self):
+        self.assertEqual(self.run_cli('import-example').returncode, 0)
+        source = self.root/'.transcripto/imports/claude/public-change-example.jsonl'
+        original = source.read_bytes()
+        alias = self.root/'alias.json'
+        alias.symlink_to(source)
+        for output in (source, alias):
+            result = self.run_cli('handoff', '30 seconds', '--to-harness', 'codex', '--output', str(output))
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(source.read_bytes(), original)
+
+    def test_private_writer_replaces_without_following_symlink(self):
+        target = self.root/'source.txt'
+        target.write_text('original')
+        link = self.root/'output.txt'
+        link.symlink_to(target)
+        app._write_private(str(link), 'private correction')
+        self.assertEqual(target.read_text(), 'original')
+        self.assertFalse(link.is_symlink())
+        self.assertEqual(link.read_text(), 'private correction')
+        self.assertEqual(link.stat().st_mode & 0o777, 0o600)
 
     def test_receiver_rejects_wrong_harness_and_same_path(self):
         self.assertEqual(self.run_cli('import-example').returncode, 0)
