@@ -41,4 +41,4 @@ Wheel built with python -m build, installed with pip --no-index into a disposabl
 ## Not done
 
 - No push. No PR comment. Oscar integrates.
-- Not verified on Python 3.9 locally (3.12 here); CI covers it.
+- Python 3.9: syntax checked against the 3.9 grammar with ast.parse feature_version; the real 3.9 job runs in CI.
