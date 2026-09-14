@@ -86,6 +86,39 @@ class PublicFlowTests(unittest.TestCase):
         self.assertNotIn('amber', scoped.stdout)
         self.assertNotIn('cobalt', scoped.stdout)
 
+    def test_installed_example_stays_synthetic_through_open_and_handoff(self):
+        imported = self.run_cli('import-example')
+        self.assertEqual(imported.returncode, 0, imported.stderr)
+        query = self.run_cli('ask', 'forecast cache')
+        self.assertEqual(query.returncode, 0, query.stderr)
+        self.assertIn('SYNTHETIC EXAMPLE', query.stdout)
+        self.assertNotIn('messages you typed', query.stdout)
+        commands = [shlex.split(line.strip()[6:]) for line in query.stdout.splitlines()
+                    if line.strip().startswith('Open: ')]
+        self.assertEqual(len(commands), 3, query.stdout)
+        for command in commands:
+            replay = self.run_cli(*command[1:], '--json')
+            self.assertEqual(replay.returncode, 0, replay.stderr)
+            data = json.loads(replay.stdout)
+            self.assertTrue(data['synthetic'])
+            self.assertEqual(len(data['episodes']), 1)
+            share = self.run_cli(*command[1:], '--share')
+            self.assertIn('Synthetic', share.stdout)
+        packet, brief = self.home / 'packet.json', self.home / 'brief.md'
+        handed = self.run_cli('handoff', 'No, use 30 seconds', '--to-harness',
+                              'cursor', '--output', str(packet))
+        self.assertEqual(handed.returncode, 0, handed.stderr)
+        data = json.loads(packet.read_text())
+        self.assertTrue(data['synthetic'])
+        self.assertIn('receiver acknowledgement', data['missing'])
+        prepared = self.run_cli('receive-handoff', str(packet), '--as-harness',
+                                'cursor', '--output', str(brief))
+        self.assertEqual(prepared.returncode, 0, prepared.stderr)
+        self.assertIn('SYNTHETIC EXAMPLE', brief.read_text())
+        self.assertIn('acknowledgement pending', brief.read_text())
+        self.assertEqual(packet.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(brief.stat().st_mode & 0o777, 0o600)
+
     def test_exact_line_does_not_fall_back_to_another_request(self):
         path = self.write('session.jsonl', [
             {'type': 'user', 'promptSource': 'typed', 'message': {'content': 'First'}},

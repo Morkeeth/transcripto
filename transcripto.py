@@ -475,6 +475,8 @@ def cmd_ask(args):
         print("SYNTHETIC EXAMPLE — invented requests, excluded from your message counts")
         for text, source, line in examples:
             print("  %s [%s]" % (" ".join(text.split()), _citation(source, line)))
+            if line and core.safe_text(source) == source:
+                print("  Open: %s replay %s --line %d" % (PROG, shlex.quote(source), line))
         print()
     try:
         rows = con.execute(
