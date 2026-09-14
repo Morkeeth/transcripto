@@ -184,6 +184,39 @@ if [ "$MODE" = "fixture" ]; then
     FAIL=1
     OFFLINE_CORE_FAIL=1
   fi
+  # Embarrass the article method: plant a symlink into the same tree.
+  # A fresh symlink has mtime=now, so name-only find inflates TOTAL but not
+  # old30 — the "older than 30d" fraction looks better. Retention MUST use
+  # -type f (and must not follow -L unless that object is named).
+  echo "=== FIXTURE SYMLINK ON THE 504/2721 OBJECT ==="
+  # Use -quit, not find|head: under pipefail, head closing the pipe SIGPIPEs find
+  # and aborts the whole cold_verify (exit 141) — watched the hard way tonight.
+  FIRST_OLD=$(find "$ROOT" -type f -name '*.jsonl' ! -newermt "$THIRTY" -print -quit)
+  if [ -n "$FIRST_OLD" ]; then
+    ALIAS_DIR="$ROOT/symlink-alias-dir"
+    mkdir -p "$ALIAS_DIR"
+    ln -s "$FIRST_OLD" "$ALIAS_DIR/alias-old.jsonl"
+    NAME_TOTAL=$(find "$ROOT" -name '*.jsonl' | wc -l | tr -d ' ')
+    NAME_OLD=$(find "$ROOT" -name '*.jsonl' ! -newermt "$THIRTY" | wc -l | tr -d ' ')
+    TYPE_TOTAL=$(find "$ROOT" -type f -name '*.jsonl' | wc -l | tr -d ' ')
+    TYPE_OLD=$(find "$ROOT" -type f -name '*.jsonl' ! -newermt "$THIRTY" | wc -l | tr -d ' ')
+    echo "fixture_name_only_ratio: $NAME_OLD of $NAME_TOTAL"
+    echo "fixture_type_f_ratio: $TYPE_OLD of $TYPE_TOTAL"
+    if [ "$NAME_TOTAL" = "2722" ] && [ "$NAME_OLD" = "504" ] && [ "$TYPE_TOTAL" = "2721" ] && [ "$TYPE_OLD" = "504" ]; then
+      echo "fixture_symlink_inflation: DETECTED — name-only became 504 of 2722 (young symlink); -type f stayed 504 of 2721"
+      echo "fixture_symlink_ruling: omitting -type f dilutes the old fraction; do not follow that path"
+      echo "fixture_symlink_inflation_probe: PASS"
+    else
+      echo "fixture_symlink_inflation: FAIL — unexpected (name=$NAME_OLD/$NAME_TOTAL type=$TYPE_OLD/$TYPE_TOTAL)"
+      FAIL=1
+      OFFLINE_CORE_FAIL=1
+    fi
+    rm -rf "$ALIAS_DIR"
+  else
+    echo "fixture_symlink_inflation: FAIL — no old file to alias"
+    FAIL=1
+    OFFLINE_CORE_FAIL=1
+  fi
 else
   echo "ASSERT live: reported only — compare to frozen quotes by hand; no exact equality required."
 fi

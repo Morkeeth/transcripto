@@ -72,8 +72,9 @@ draft PR for Oscar review is the handoff, not a public post.
 ## PLAN (risk first)
 
 1. **Slice 1 — cold stranger at the file object + RED controls.** DONE.
-   Ran `TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-20260914 bash scripts/cold_verify.sh`
+   Ran `TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-ok bash scripts/cold_verify.sh`
    → `cold_verify: PASS`, `offline_core: PASS`, `ratio_30d: 504 of 2721`,
+   `fixture_symlink_inflation: DETECTED` (504/2722 name-only),
    `independent_oracle: PASS` (93/51, seed 20260914), `negative_planter: PASS`,
    `mtime_vs_newermt: DETECTED` (6/10), `hardlink_inflation: DETECTED`,
    `symlink_inflation: DETECTED`, `tz_divergence: OBSERVED`,
@@ -81,7 +82,9 @@ draft PR for Oscar review is the handoff, not a public post.
    `frozen_quote_reconcile: FAIL-TO-RECONCILE`, `stats_near_miss: DETECTED`,
    `death_rate_impossible: PASS`, `empty_grep_control: PASS`,
    `privacy_HEAD_vs_worktree: PASS`. Archive + wheel strangers PASS.
-   Artifact: `docs/COLD-VERIFY-2026-08-30.md`.
+   Artifact: `docs/COLD-VERIFY-2026-08-30.md`. Intermediate FAIL: `find|head`
+   under pipefail → exit 141; wrong expect old30=505 on young symlink —
+   both fixed at the object.
 2. **Slice 2 — STEP 3 ruling at the README object.** DONE.
    `nl -ba README.md | sed -n '64,90p'` → invented demo L66–88;
    `docs/STEP-3-README-BELOEVED-RULING.md` recommends KEEP; checklist unchecked.
@@ -134,8 +137,14 @@ Desktop mix), article/X/PyPI.
 - Slice 4: `pip_only_baseline.sh` → find wins; pip-only `retention` exit 2;
   `stats` prints 2721/2721 typed on retention fixture (near-miss DETECTED).
 - Beyond floor vs prior waves: `-mtime +30` disagreement hunt + hardlink
-  name≠inode inflation (ebe8 had symlink + calendar↔duration + HEAD privacy).
+  name≠inode inflation + fixture-symlink dilution on the 504/2721 object
+  (ebe8 had symlink micro-probe + calendar↔duration + HEAD privacy).
+- Intermediate FAIL (RUN): `find … | head -1` under `pipefail` → exit **141**
+  (SIGPIPE). Replaced with `find -print -quit`. First fixture-symlink assert
+  expected old30=505; object said 504 (young symlink mtime) — corrected.
 - Unit tests: **73 OK**. Empty-index gate in matrix via
   `test_privacy_empty_index.sh`.
 - TZ tonight: divergence OBSERVED (LA differs). Pair trap: UTC↔Tokyo hide
   Pacific divergence.
+- Final cold_verify tip: `TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-ok`
+  → **PASS** (artifact refreshed).

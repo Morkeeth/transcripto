@@ -83,6 +83,14 @@ the calendar cut.
 hardlink was planted. Symlink inflation is fixed by `-type f`; hardlink
 inflation is not. The article method counts names.
 
+### Embarrassing fixture symlink dilution (new tonight)
+
+Planting a young symlink into the 504/2721 tree made name-only find report
+**504 of 2722** while `-type f` stayed **504 of 2721**. Omitting `-type f`
+does not just inflate — it **dilutes** the old fraction. First draft of this
+probe wrongly expected old30 to become 505 (symlink mtime is now); that guess
+failed at the object and was corrected.
+
 ### Embarrassing frozen-quote non-reconciliation
 
 504/2721 → 579/2874 moves both numerator (+75) and denominator (+153).

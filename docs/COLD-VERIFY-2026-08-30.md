@@ -21,17 +21,17 @@ Oscar's machine-local quote (OQ-1).
 | control | result |
 |---------|--------|
 | `ratio_30d` | **504 of 2721** (fixture; old45=0) |
+| `fixture_symlink_inflation` | **DETECTED** — name-only became 504/2722 (young symlink dilutes fraction); `-type f` stayed 504/2721 |
 | `independent_oracle` | PASS (93/51, seed Random(20260914)) |
 | `negative_planter` | PASS (watched RED: 503 of 2720) |
 | `offline_core` | PASS |
-| `mtime_vs_newermt` | **DETECTED** 6/10 samples disagree — naive `-mtime +30` ≠ article cut |
+| `mtime_vs_newermt` | **DETECTED** — naive `-mtime +30` ≠ article cut |
 | `hardlink_inflation` | **DETECTED** — `-type f` counted 2 names / 1 inode |
 | `symlink_inflation` | DETECTED — name-only 2 vs `-type f` 1 |
-| `tz_divergence` | OBSERVED (UTC/Tokyo/London=2026-08-15; LA=2026-08-14) |
-| `tz_pair_trap` | DETECTED — UTC↔Tokyo agree while LA differs |
+| `tz_divergence` / `tz_pair_trap` | OBSERVED / DETECTED (see output) |
 | `frozen_quote_reconcile` | FAIL-TO-RECONCILE (no unique death rate) |
-| `stats_near_miss` | DETECTED (stats prints 2,721 typed on retention fixture) |
-| `docs_cleanupPeriodDays` | Default **30** (settings-reference.md) |
+| `stats_near_miss` | DETECTED |
+| `docs_cleanupPeriodDays` | Default **30** |
 | `docs_desktopSessionCleanupPeriodDays` | Default **0** / no age limit |
 | `pypi` | **0.2.0** |
 | `cold_verify` | **PASS** |
@@ -45,9 +45,9 @@ Also: `bash scripts/archive_stranger.sh` → PASS · `bash scripts/wheel_strange
 ## Captured command output
 
 ```text
-=== COLD VERIFY · 2026-09-14T00:09:56Z ===
+=== COLD VERIFY · 2026-09-14T00:15:25Z ===
 repo: /workspace
-work: /tmp/transcripto-cold-20260914
+work: /tmp/transcripto-cold-ok
 
 transcripto: transcripto 0.2.0
 
@@ -55,26 +55,32 @@ transcripto: transcripto 0.2.0
 
 generating fixture: 2721 jsonl files (504 aged 31–44d)…
 fixture_files_written: 2721 old_planted: 504
-retention source: FIXTURE /tmp/transcripto-cold-20260914/fixtures-retention-504-of-2721
+retention source: FIXTURE /tmp/transcripto-cold-ok/fixtures-retention-504-of-2721
   (no live ~/.claude/projects on this machine — method + arithmetic only)
 
 === RETENTION (find method, re-derived) ===
 mode: fixture
-as_of: 2026-09-14T00:10:03Z
+as_of: 2026-09-14T00:15:32Z
 threshold_30d: mtime <= 2026-08-15
 threshold_45d: mtime <= 2026-07-31
 total_jsonl: 2721
 older_than_30d: 504
 older_than_45d: 0
 ratio_30d: 504 of 2721
-oldest_file: /tmp/transcripto-cold-20260914/fixtures-retention-504-of-2721/demo-project/sessions/session-0055.jsonl
-oldest_mtime: 2026-08-01T00:09:59Z
+oldest_file: /tmp/transcripto-cold-ok/fixtures-retention-504-of-2721/demo-project/sessions/session-0055.jsonl
+oldest_mtime: 2026-08-01T00:15:29Z
 
 frozen_quote (Oscar 2026-08-28, NOT re-derived on this VM unless mode=live): 504 of 2,721
 frozen_rederive (Oscar 2026-08-29, NOT re-derived here): 579 of 2,874
 NOTE: the two frozen stamps do not reconcile by arithmetic; no daily death rate is claimed.
 
 ASSERT fixture 504 of 2721 (old45=0): PASS
+=== FIXTURE SYMLINK ON THE 504/2721 OBJECT ===
+fixture_name_only_ratio: 504 of 2722
+fixture_type_f_ratio: 504 of 2721
+fixture_symlink_inflation: DETECTED — name-only became 504 of 2722 (young symlink); -type f stayed 504 of 2721
+fixture_symlink_ruling: omitting -type f dilutes the old fraction; do not follow that path
+fixture_symlink_inflation_probe: PASS
 
 === DEATH-RATE IMPOSSIBILITY (frozen stamps are quotes, not live) ===
 frozen_delta_old30: +75
@@ -155,8 +161,8 @@ both_methods: 504
 calendar_only: 0
 duration_only: 0
 ref_calendar_epoch: 1786752000
-ref_duration_epoch: 1786752604
-method_skew_seconds: 604
+ref_duration_epoch: 1786752932
+method_skew_seconds: 932
 calendar_duration_delta: none tonight — both methods agree on this root at this clock
 calendar_duration_probe: PASS
 
@@ -197,7 +203,7 @@ control_note: no settings file → default 30-day cleanup applies per Claude Cod
 control_watched_red: PASS
 
 === ANTI-CONFLATION (wrong object must not look like retention) ===
-wrote 2721 records into /tmp/transcripto-cold-20260914/wrong-object-authorship-gate/retention-gate.jsonl
+wrote 2721 records into /tmp/transcripto-cold-ok/wrong-object-authorship-gate/retention-gate.jsonl
 wrong_object_files: 1
 wrong_object_records: 2721
 wrong_object_old30_files: 0
@@ -209,7 +215,7 @@ help_exit: 0
 
 === STATS NEAR-MISS (message counts ≠ file-age) ===
 stats_exit: 0
-stats_home: /tmp/transcripto-cold-20260914/fake-home-stats (isolated; does not touch ~/.trace)
+stats_home: /tmp/transcripto-cold-ok/fake-home-stats (isolated; does not touch ~/.trace)
 stats_out:
 2,721 of the 2,721 messages in your index are things you typed.  100.0%
 the rest is the machine answering. `coach` counts raw transcript records instead
@@ -245,9 +251,9 @@ baseline: naive overcounts (gate is stricter) — expected
 
 === PRIVACY ===
 privacy_mode: git-worktree
-PRIVACY OK: 0 hits in 208 tracked files
+PRIVACY OK: 0 hits in 218 tracked files
 privacy on real tree: PASS
-PRIVACY OK: 0 hits in 208 tracked files
+PRIVACY OK: 0 hits in 218 tracked files
 privacy_HEAD_extract_exit: 0
 privacy_HEAD_vs_worktree: PASS — git archive of HEAD is clean
 PRIVACY FAIL: git ls-files returned 0 files (empty index is not a clean tree)
@@ -275,7 +281,7 @@ docs_desktop_default_0_no_age_limit: PASS
 pypi_transcripto_version: 0.2.0 (re-derived)
 
 cold_verify: PASS
-work dir kept: /tmp/transcripto-cold-20260914
+work dir kept: /tmp/transcripto-cold-ok
 ```
 
 ## Method a stranger can re-derive on a live corpus

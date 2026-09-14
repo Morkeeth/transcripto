@@ -10,7 +10,7 @@ Agent does not post, publish, or bump PyPI.
 | gate | command | result |
 |------|---------|--------|
 | STEP 0 small-n | `./test_small_n.sh` | **7/7 green** (also `bash scripts/test_small_n.sh`) |
-| Cold stranger | `bash scripts/cold_verify.sh` | **PASS** — `ratio_30d: 504 of 2721`, `independent_oracle: PASS` (93/51), `negative_planter: PASS`, `mtime_vs_newermt: DETECTED` (6/10), `hardlink_inflation: DETECTED`, `tz_pair_trap: DETECTED`, `frozen_quote_reconcile: FAIL-TO-RECONCILE`, `stats_near_miss: DETECTED`, old45=0 |
+| Cold stranger | `bash scripts/cold_verify.sh` | **PASS** — `ratio_30d: 504 of 2721`, `fixture_symlink_inflation: DETECTED` (504/2722 name-only), `independent_oracle: PASS` (93/51), `negative_planter: PASS`, `mtime_vs_newermt: DETECTED` (6/10), `hardlink_inflation: DETECTED`, `tz_pair_trap: DETECTED`, `frozen_quote_reconcile: FAIL-TO-RECONCILE`, `stats_near_miss: DETECTED`, old45=0 |
 | Archive stranger | `bash scripts/archive_stranger.sh` | **PASS** (no `.git`; ephemeral privacy index) |
 | Wheel stranger | `bash scripts/wheel_stranger.sh` | **PASS** — `cwd_shadow_trap: DETECTED` then clean-cwd site-packages OK; fixture 504/2721 PASS |
 | Cold artifact | `docs/COLD-VERIFY-2026-08-30.md` | captured command output (2026-09-14 ~00:10Z re-run) |
@@ -54,9 +54,10 @@ $ ./test_small_n.sh
 $ bash scripts/test_small_n.sh
 … 7/7 green.
 
-$ TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-20260914 bash scripts/cold_verify.sh
+$ TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-ok bash scripts/cold_verify.sh
 … ratio_30d: 504 of 2721
 … ASSERT fixture 504 of 2721 (old45=0): PASS
+… fixture_symlink_inflation: DETECTED — name-only 504 of 2722; -type f 504 of 2721
 … negative_plant: 503 of 2720
 … negative_planter: PASS
 … independent_oracle: PASS (93/51, seed 20260914)
