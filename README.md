@@ -73,8 +73,8 @@ cat "$HOME/codex-work/receiver-brief.md"
 
 The brief includes the cited correction, recorded follow-up statuses
 (failed / succeeded / unknown), and an `Open:` command for the exact request.
-If the source moved or disappeared, the brief marks evidence uncertain and keeps
-packet statuses as provisional. It does not invoke a receiver agent or prove
+If the source moved, disappeared, or no longer holds the cited request, the brief
+marks evidence uncertain and shows only the packet's own statuses as provisional. It does not invoke a receiver agent or prove
 adoption. Synthetic provenance stays visible in search, changes, and handoffs.
 Handoff files are local and mode `0600`; they can contain transcript text and
 paths, so review them before sharing.

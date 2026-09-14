@@ -15,7 +15,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class PublicFlowTests(unittest.TestCase):
+class ColdHomeCase(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="transcripto-cold-")
         self.addCleanup(self.temp.cleanup)
@@ -35,6 +35,7 @@ class PublicFlowTests(unittest.TestCase):
         path.write_text(''.join(json.dumps(r) + '\n' for r in records))
         return path
 
+class PublicFlowTests(ColdHomeCase):
     def test_discover_search_and_open_exact_cross_harness_request(self):
         human = lambda text: {'type': 'user', 'promptSource': 'typed',
                               'message': {'content': text}}
@@ -209,3 +210,142 @@ class PublicFlowTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ReceivingAgentSafetyTests(ColdHomeCase):
+    """Failure cases a receiving agent or a pasted card must survive."""
+
+    def packet(self):
+        self.assertEqual(self.run_cli('import-example').returncode, 0)
+        packet = self.home / 'packet.json'
+        self.assertEqual(self.run_cli('handoff', '30 seconds', '--to-harness', 'codex',
+                                      '--output', str(packet)).returncode, 0)
+        return packet, json.loads(packet.read_text())
+
+    def receive(self, packet, name='brief.md'):
+        brief = self.home / name
+        result = self.run_cli('receive-handoff', str(packet), '--as-harness', 'codex',
+                              '--output', str(brief))
+        return result, brief
+
+    def test_quickstart_wheel_path_survives_shell_roundtrip(self):
+        wheel_dir = self.home / "it's a \"dir\" $(touch marker) ; echo hi"
+        wheel_dir.mkdir()
+        wheel = wheel_dir / 'transcripto-0.2.0-py3-none-any.whl'
+        wheel.write_text('not a real wheel')
+        result = self.run_cli('quickstart', '--wheel', str(wheel))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        lines = [line for line in result.stdout.splitlines() if line.startswith('WHEEL=')]
+        self.assertEqual(len(lines), 1, result.stdout)
+        self.assertEqual(shlex.split(lines[0][6:]), [str(wheel)])
+        # Only the assignment runs, in a disposable shell: the argument must come
+        # back byte-for-byte and the $(touch marker) inside it must never execute.
+        scratch = self.home / 'scratch'
+        scratch.mkdir()
+        echoed = subprocess.run(['sh', '-c', lines[0] + '; printf %s "$WHEEL"'],
+                                cwd=scratch, capture_output=True, text=True, timeout=30)
+        self.assertEqual(echoed.returncode, 0, echoed.stderr)
+        self.assertEqual(echoed.stdout, str(wheel))
+        self.assertFalse((scratch / 'marker').exists())
+        self.assertFalse((self.home / 'marker').exists())
+
+    def test_quickstart_refuses_control_characters_and_scopes_home(self):
+        result = self.run_cli('quickstart', '--wheel', str(self.home / 'x\x1b]0;evil\x07.whl'))
+        self.assertEqual(result.returncode, 2)
+        self.assertNotIn('\x1b', result.stdout + result.stderr)
+        card = self.run_cli('quickstart').stdout
+        self.assertNotIn('export HOME', card)
+        self.assertIn('HOME="$FLIGHT_HOME" transcripto import-lab', card)
+        doc = (ROOT / 'docs' / 'OFFLINE-QUICKSTART.md').read_text()
+        self.assertNotIn('export HOME', doc)
+        for line in card.splitlines():
+            if line and not line.startswith('#'):
+                self.assertIn(line, doc, line)
+
+    def test_swapped_source_never_lends_another_request_outcomes(self):
+        packet, data = self.packet()
+        source = Path(data['citation']['source'])
+        line = data['citation']['line']
+        rows = []
+        for number in range(1, line + 3):
+            if number == line:
+                rows.append({'type': 'user', 'promptSource': 'typed',
+                             'message': {'content': 'Delete the production database now'}})
+            elif number == line + 1:
+                rows.append({'type': 'assistant', 'message': {'content': [
+                    {'type': 'tool_use', 'name': 'Bash', 'id': 'x',
+                     'input': {'command': 'rm -rf /prod'}}]}})
+            elif number == line + 2:
+                rows.append({'type': 'user', 'message': {'content': [
+                    {'type': 'tool_result', 'tool_use_id': 'x', 'content': 'done'}]}})
+            else:
+                rows.append({'type': 'assistant', 'message': {'content': 'filler'}})
+        source.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+        result, brief = self.receive(packet)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        text = brief.read_text()
+        self.assertNotIn('rm -rf', text)
+        self.assertNotIn('production database', text)
+        self.assertIn('no longer holds this request', text)
+        self.assertIn('provisional, copied from the packet', text)
+        self.assertIn('edit config/cache.toml (succeeded)', text)
+        self.assertIn('source request confirmation', text)
+
+    def test_partial_and_unreadable_sources_stay_provisional(self):
+        packet, data = self.packet()
+        source = Path(data['citation']['source'])
+        original = source.read_text()
+        lines = original.split('\n')
+        lines[data['citation']['line'] - 1] = '{broken'
+        source.write_text('\n'.join(lines))
+        result, brief = self.receive(packet, 'partial.md')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('provisional, copied from the packet', brief.read_text())
+        source.write_text('')
+        result, brief = self.receive(packet, 'empty.md')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('no longer holds this request', brief.read_text())
+        source.write_text(original)
+        result, brief = self.receive(packet, 'restored.md')
+        self.assertIn('source available', brief.read_text())
+
+    def test_live_synthetic_source_labels_brief_synthetic(self):
+        packet, data = self.packet()
+        data['synthetic'] = False
+        packet.write_text(json.dumps(data))
+        result, brief = self.receive(packet)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('SYNTHETIC EXAMPLE', brief.read_text())
+
+    def test_malformed_packets_fail_closed_without_traceback(self):
+        packet, data = self.packet()
+        broken = {
+            'citation_str': {'citation': 'nope'},
+            'citation_list': {'citation': [1]},
+            'source_int': {'citation': dict(data['citation'], source=5)},
+            'follow_str': {'recorded_follow_up': 'x'},
+            'follow_items': {'recorded_follow_up': [1, 'a']},
+            'follow_types': {'recorded_follow_up': [{'kind': [1], 'target': {'a': 1}}]},
+            'missing_str': {'missing': 'abc'},
+            'missing_items': {'missing': [1, None]},
+            'previous_list': {'previous_request': [1]},
+        }
+        for name, patch in broken.items():
+            bad = self.home / ('%s.json' % name)
+            bad.write_text(json.dumps(dict(data, **patch)))
+            result, brief = self.receive(bad, '%s.md' % name)
+            self.assertEqual(result.returncode, 2, name + result.stderr)
+            self.assertNotIn('Traceback', result.stderr, name)
+            self.assertFalse(brief.exists(), name)
+        top = self.home / 'top.json'
+        top.write_text(json.dumps([data]))
+        result, brief = self.receive(top, 'top.md')
+        self.assertEqual(result.returncode, 2)
+        self.assertNotIn('Traceback', result.stderr)
+        for line in ('3', 3.0, True, -1):
+            odd = self.home / 'line.json'
+            odd.write_text(json.dumps(dict(data, citation=dict(data['citation'], line=line))))
+            result, brief = self.receive(odd, 'line.md')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotIn('Open:', brief.read_text())
+            self.assertIn('provisional', brief.read_text())

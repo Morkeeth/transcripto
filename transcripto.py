@@ -500,17 +500,18 @@ WHEEL=/absolute/path/to/transcripto-0.2.0-py3-none-any.whl
 python3 -m venv /tmp/transcripto-flight
 /tmp/transcripto-flight/bin/python -m pip install --no-index --no-deps "$WHEEL"
 export PATH="/tmp/transcripto-flight/bin:$PATH"
-export HOME="$(mktemp -d)"   # optional clean home; skip to use your own
+FLIGHT_HOME="$(mktemp -d)"   # clean home for the lab; your own HOME is never changed
 ```
 
 Replace WHEEL with the path printed by `python3 -m build` (dist/*.whl) or the
-file you copied onto the laptop.
+file you copied onto the laptop. Every lab command below sets HOME for that one
+command only. Drop the HOME= prefix to use your own history instead.
 
 ## 2. Seed labelled synthetic history
 
 ```sh
-transcripto import-lab
-transcripto ask "retry"
+HOME="$FLIGHT_HOME" transcripto import-lab
+HOME="$FLIGHT_HOME" transcripto ask "retry"
 ```
 
 ## 3. Reopen exact evidence
@@ -522,23 +523,28 @@ transcripto replay /path/from/open --line N
 transcripto replay /path/from/open --line N --json
 ```
 
+replay reads the cited file directly and needs no HOME prefix.
 Claude lab hit: failed edit. Codex: succeeded check. Cursor: unknown (no result).
 
 ## 4. Receiver brief with outcomes
 
 ```sh
-transcripto import-example
-transcripto handoff "30 seconds" --to-harness codex --output "$HOME/packet.json"
-transcripto receive-handoff "$HOME/packet.json" --as-harness codex --output "$HOME/brief.md"
-cat "$HOME/brief.md"
+HOME="$FLIGHT_HOME" transcripto import-example
+HOME="$FLIGHT_HOME" transcripto handoff "30 seconds" --to-harness codex --output "$FLIGHT_HOME/packet.json"
+HOME="$FLIGHT_HOME" transcripto receive-handoff "$FLIGHT_HOME/packet.json" --as-harness codex --output "$FLIGHT_HOME/brief.md"
+cat "$FLIGHT_HOME/brief.md"
 ```
 
 The brief includes recorded follow-up statuses and an Open command. If the source
-moved or vanished, the brief marks evidence uncertain and keeps packet statuses
-as provisional. Re-run ask after restoring the file, or pass the new path to replay.
+moved, vanished, or no longer holds the cited request, the brief marks evidence
+uncertain and shows only the packet's own statuses as provisional. Re-run ask
+after restoring the file, or pass the new path to replay.
 
 Status describes tool execution, not task correctness. Missing results stay unknown.
 """
+
+
+WHEEL_PLACEHOLDER = "/absolute/path/to/transcripto-0.2.0-py3-none-any.whl"
 
 
 def cmd_quickstart(args):
@@ -546,10 +552,14 @@ def cmd_quickstart(args):
     text = OFFLINE_QUICKSTART
     if args.wheel:
         wheel = os.path.abspath(os.path.expanduser(args.wheel))
-        text = text.replace("/absolute/path/to/transcripto-0.2.0-py3-none-any.whl", wheel)
+        if core.safe_text(wheel) != wheel:
+            print("Refusing a wheel path with control characters.", file=sys.stderr)
+            return 2
+        # The path lands in a shell assignment a stranger will paste. Quote it so
+        # spaces, apostrophes and $(...) travel as one literal argument.
+        text = text.replace("WHEEL=" + WHEEL_PLACEHOLDER, "WHEEL=" + shlex.quote(wheel))
         if not os.path.isfile(wheel):
-            print("warning: wheel path does not exist yet: " + core.safe_text(wheel),
-                  file=sys.stderr)
+            print("warning: wheel path does not exist yet: " + wheel, file=sys.stderr)
     print(text.rstrip())
     return 0
 
@@ -1416,36 +1426,69 @@ def cmd_handoff(args):
     return 0
 
 
+def _normal(text):
+    return " ".join(core.safe_text(text).split()).lower()
+
+
 def _source_evidence_state(citation, correction):
     """Check whether the cited source still opens the intended request.
 
-    Returns (state, open_command, live_follow_up).
-    state is 'available', 'missing', or 'uncertain'.
+    Returns a dict: state is 'available', 'missing', 'unreadable', or 'uncertain'.
+    events is a list only when state is 'available'; a source that no longer holds
+    the cited request must never lend another episode's outcomes to this brief.
     """
     citation = citation or {}
     path = citation.get("source")
     line = citation.get("line")
-    if not path or not isinstance(line, int) or line < 1:
-        return "uncertain", None, None
+    result = {"state": "uncertain", "open": None, "events": None, "synthetic": False}
+    if (not isinstance(path, str) or not path or core.safe_text(path) != path
+            or isinstance(line, bool) or not isinstance(line, int) or line < 1):
+        return result
     path = os.path.expanduser(path)
-    open_cmd = "%s replay %s --line %d" % (PROG, shlex.quote(path), line)
+    result["open"] = "%s replay %s --line %d" % (PROG, shlex.quote(path), line)
     if not os.path.isfile(path):
-        return "missing", open_cmd, None
+        result["state"] = "missing"
+        return result
     diagnostics = []
     rows, _harness = core.read_session(path, diagnostics)
     if diagnostics and not rows:
-        return "uncertain", open_cmd, None
-    eps = core.episodes(rows, path)
-    match = next((ep for ep in eps if ep["line"] == line), None)
-    if match is None:
-        return "uncertain", open_cmd, None
-    if correction and correction.lower() not in match["prompt"].lower():
-        return "uncertain", open_cmd, [
-            {"kind": event["kind"], "target": event["target"], "status": event["status"]}
-            for event in match["events"]]
-    return "available", open_cmd, [
+        result["state"] = "unreadable"
+        return result
+    match = next((ep for ep in core.episodes(rows, path) if ep["line"] == line), None)
+    if match is None or _normal(match["prompt"]) != _normal(correction):
+        return result
+    result["state"] = "available"
+    result["synthetic"] = match["synthetic"]
+    result["events"] = [
         {"kind": event["kind"], "target": event["target"], "status": event["status"]}
         for event in match["events"]]
+    return result
+
+
+def _packet_error(packet):
+    """Return a one-line reason a handoff packet cannot be used, or None."""
+    if not isinstance(packet, dict):
+        return "Handoff packet must be a JSON object."
+    if packet.get("schema") != "transcripto.handoff/1":
+        return "Unsupported handoff schema."
+    citation = packet.get("citation")
+    if citation is not None and not isinstance(citation, dict):
+        return "Handoff citation must be an object."
+    for item in (citation or {}).get("source"), packet.get("previous_request"):
+        if item is not None and not isinstance(item, str):
+            return "Handoff citation source and previous_request must be strings."
+    follow = packet.get("recorded_follow_up")
+    if follow is not None and (not isinstance(follow, list) or not all(
+            isinstance(item, dict) and all(
+                item.get(key) is None or isinstance(item.get(key), str)
+                for key in ("kind", "target", "status"))
+            for item in follow)):
+        return "Handoff recorded_follow_up must be a list of string-valued objects."
+    missing = packet.get("missing")
+    if missing is not None and (not isinstance(missing, list)
+                                or not all(isinstance(item, str) for item in missing)):
+        return "Handoff missing must be a list of strings."
+    return None
 
 
 def cmd_receive_handoff(args):
@@ -1462,15 +1505,16 @@ def cmd_receive_handoff(args):
     except (OSError, ValueError) as exc:
         print("Cannot read handoff: %s" % exc, file=sys.stderr)
         return 2
-    if packet.get("schema") != "transcripto.handoff/1":
-        print("Unsupported handoff schema.", file=sys.stderr)
+    problem = _packet_error(packet)
+    if problem:
+        print(problem, file=sys.stderr)
         return 2
     if packet.get("receiver_harness") != args.as_harness:
         print("Packet targets %s, not %s."
-              % (packet.get("receiver_harness") or "(unnamed)", args.as_harness),
+              % (core.safe_text(packet.get("receiver_harness") or "(unnamed)"), args.as_harness),
               file=sys.stderr)
         return 2
-    correction = core.safe_text(packet.get("correction"))
+    correction = core.safe_text(packet.get("correction") or "")
     if not correction:
         print("Handoff has no correction to use.", file=sys.stderr)
         return 2
@@ -1479,31 +1523,41 @@ def cmd_receive_handoff(args):
     if "receiver acknowledgement" not in remaining:
         remaining.append("receiver acknowledgement")
     citation = packet.get("citation") or {}
-    state, open_cmd, live = _source_evidence_state(citation, correction)
-    packet_follow = packet.get("recorded_follow_up") or []
-    follow = live if live is not None else packet_follow
+    evidence = _source_evidence_state(citation, correction)
+    state, open_cmd = evidence["state"], evidence["open"]
+    # Outcomes come from the live source only when it still holds this exact
+    # request. Otherwise the packet's own record is shown, labelled provisional.
+    follow = evidence["events"] if state == "available" else (packet.get("recorded_follow_up") or [])
     if state == "missing" and "matching source transcript" not in remaining:
         remaining.insert(0, "matching source transcript")
-    elif state == "uncertain" and "source request confirmation" not in remaining:
+    elif state != "available" and "source request confirmation" not in remaining:
         remaining.insert(0, "source request confirmation")
 
     if state == "available":
         evidence_status = "source available; Open command below reopens the exact request."
-    elif state == "missing":
-        evidence_status = (
-            "source missing or moved. Recorded follow-up below is provisional from the packet. "
-            "Restore the file and re-run ask, or pass the new path to replay --line.")
+        follow_title = "Recorded follow-up (tool execution, not task correctness):"
     else:
-        evidence_status = (
-            "source present but request match is uncertain. Treat outcomes as provisional. "
-            "Re-run ask to refresh citations, then Open again.")
+        follow_title = "Recorded follow-up (provisional, copied from the packet; not read from the source):"
+        if state == "missing":
+            evidence_status = (
+                "source missing or moved. Recorded follow-up below is provisional from the packet. "
+                "Restore the file and re-run ask, or pass the new path to replay --line.")
+        elif state == "unreadable":
+            evidence_status = (
+                "source present but could not be read. Treat outcomes as provisional. "
+                "Check the file, then re-run ask to refresh citations.")
+        else:
+            evidence_status = (
+                "source present but the cited line no longer holds this request. "
+                "Treat outcomes as provisional. Re-run ask to refresh citations, then Open again.")
 
     follow_lines = "".join(
-        "- %s %s (%s)\n" % (core.safe_text(item.get("kind")),
-                            core.safe_text(item.get("target")),
+        "- %s %s (%s)\n" % (core.safe_text(item.get("kind") or "tool"),
+                            core.safe_text(item.get("target") or "?"),
                             core.safe_text(item.get("status") or "unknown"))
         for item in follow) or "- (none recorded)\n"
     previous = core.safe_text(packet.get("previous_request") or "")
+    synthetic = packet.get("synthetic") is True or evidence["synthetic"]
     brief = (
         "# Prepared receiver brief\n\n"
         "Harness: %s\n\n"
@@ -1514,17 +1568,18 @@ def cmd_receive_handoff(args):
         "Previous request: %s\n\n"
         "Source: %s:L%s\n\n"
         "%s"
-        "Recorded follow-up (tool execution, not task correctness):\n%s\n"
+        "%s\n%s\n"
         "Still missing before completion can be claimed:\n%s\n"
         % (args.as_harness,
            "SYNTHETIC EXAMPLE. Invented instruction; not a real user request"
-           if packet.get("synthetic") is True else "source transcript (not independently verified)",
+           if synthetic else "source transcript (not independently verified)",
            evidence_status,
            correction,
            previous or "(not recorded)",
-           core.safe_text(citation.get("source")),
-           citation.get("line") or "?",
+           core.safe_text(citation.get("source") or "?"),
+           core.safe_text(citation.get("line") or "?"),
            ("Open: %s\n\n" % open_cmd) if open_cmd else "",
+           follow_title,
            follow_lines,
            "".join("- %s\n" % core.safe_text(item) for item in remaining)
            or "- task correctness verification\n")

@@ -10,6 +10,12 @@
   unknown evidence from an installed wheel.
 - `quickstart` prints an offline wheel install / search / reopen card
   (`docs/OFFLINE-QUICKSTART.md`). Codex normalization keeps `transcripto_synthetic`.
+- Review fixes: `quickstart --wheel` shell-quotes the `WHEEL=` assignment and
+  refuses control characters; the card scopes `HOME` per command instead of
+  exporting it. `receive-handoff` shows live outcomes only when the cited line
+  still holds the exact request, otherwise only the packet's provisional record;
+  malformed packets fail closed with one line instead of a traceback; a live
+  synthetic source labels the brief synthetic.
 
 ## 0.2.0 · instant replay
 
