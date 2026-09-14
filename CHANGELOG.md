@@ -1,6 +1,23 @@
 # Changes
 
-## 0.2.0 — instant replay
+## Unreleased
+
+- `receive-handoff` briefs include an `Open:` command, previous request, and
+  recorded follow-up statuses (failed / succeeded / unknown). Missing or
+  mismatched sources are marked uncertain with provisional packet outcomes.
+- `import-lab` installs labelled synthetic Claude / Codex / Cursor traces so a
+  receiving agent can `ask "retry"` and reopen exact failed / succeeded /
+  unknown evidence from an installed wheel.
+- `quickstart` prints an offline wheel install / search / reopen card
+  (`docs/OFFLINE-QUICKSTART.md`). Codex normalization keeps `transcripto_synthetic`.
+- Review fixes: `quickstart --wheel` shell-quotes the `WHEEL=` assignment and
+  refuses control characters; the card scopes `HOME` per command instead of
+  exporting it. `receive-handoff` shows live outcomes only when the cited line
+  still holds the exact request, otherwise only the packet's provisional record;
+  malformed packets fail closed with one line instead of a traceback; a live
+  synthetic source labels the brief synthetic.
+
+## 0.2.0 · instant replay
 
 - Running `transcripto` opens the latest session with a submitted human request.
 - Replay joins calls to results and shows succeeded, failed, and unknown execution,
