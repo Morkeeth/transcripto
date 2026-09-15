@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "transcripto"
-version = "0.2.0"
+version = "0.2.1"
 description = "Instant replay for coding agents. Inspect requests, tool calls, and recorded results across Claude Code, Codex, and Cursor. Local, stdlib-only."
 readme = "README.md"
 requires-python = ">=3.9"

@@ -11,7 +11,7 @@ Claude Code · Codex · Cursor. Local files. No account. No runtime dependencies
 ## Start with something you remember saying
 
 ```sh
-uvx --from transcripto==0.2.0 transcripto ask "retry"
+uvx --from transcripto==0.2.1 transcripto ask "retry"
 ```
 
 Replace `retry` with a word you remember using. `ask` searches messages identified
@@ -27,17 +27,17 @@ and its recorded work. This also works when search matches a word variant
 You can also search replay directly:
 
 ```sh
-uvx --from transcripto==0.2.0 transcripto replay "retry"
+uvx --from transcripto==0.2.1 transcripto replay "retry"
 
 # Or open your latest human session:
-uvx --from transcripto==0.2.0 transcripto
+uvx --from transcripto==0.2.1 transcripto
 ```
 
 Replay puts your request, tool calls and recorded results in order. Failed edits
 stay failed. Missing results stay unknown. Status describes tool execution,
 not whether the task was done correctly.
 
-Or install with `python3 -m pip install transcripto==0.2.0`, then run
+Or install with `python3 -m pip install transcripto==0.2.1`, then run
 `transcripto ask "retry"`. Requires Python 3.9 or newer.
 
 ## Try the stranger flow without your transcripts
@@ -96,7 +96,7 @@ succeeded check, Cursor an unknown missing result.
 ### Offline flight card
 
 ```sh
-transcripto quickstart --wheel /absolute/path/to/transcripto-0.2.0-py3-none-any.whl
+transcripto quickstart --wheel /absolute/path/to/transcripto-0.2.1-py3-none-any.whl
 ```
 
 Prints install, `import-lab`, search, and reopen commands for a built wheel
