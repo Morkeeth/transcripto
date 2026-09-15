@@ -5,13 +5,13 @@ Use a built wheel. Do not require PyPI. All lab records are invented.
 Print the same card from an installed CLI:
 
 ```sh
-transcripto quickstart --wheel /absolute/path/to/transcripto-0.2.0-py3-none-any.whl
+transcripto quickstart --wheel /absolute/path/to/transcripto-0.2.1-py3-none-any.whl
 ```
 
 ## 1. Install from a wheel path
 
 ```sh
-WHEEL=/absolute/path/to/transcripto-0.2.0-py3-none-any.whl
+WHEEL=/absolute/path/to/transcripto-0.2.1-py3-none-any.whl
 python3 -m venv /tmp/transcripto-flight
 /tmp/transcripto-flight/bin/python -m pip install --no-index --no-deps "$WHEEL"
 export PATH="/tmp/transcripto-flight/bin:$PATH"

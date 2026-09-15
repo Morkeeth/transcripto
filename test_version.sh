@@ -12,6 +12,13 @@ if [ "$PY" != "$TOML" ]; then
 else
   echo "  ok    version $PY matches in transcripto.py and pyproject.toml"
 fi
+# Installation pins must fail rather than merely warn: those commands are what
+# a new reader will run. Other version mentions may be historical notes.
+for pin in $(grep -oE 'transcripto==[0-9]+\.[0-9]+\.[0-9]+' README.md | sort -u); do
+  if [ "$pin" != "transcripto==$PY" ]; then
+    echo "  FAIL  README installs $pin, shipping $PY"; FAIL=1
+  fi
+done
 # The README sells commands. If it names a version, it has to be this one.
 # The old pattern was 'transcripto --version.*|[0-9]+\.[0-9]+\.[0-9]+'. The first alternative
 # swallowed the whole line, and the ^-anchored second grep then discarded it. The version
