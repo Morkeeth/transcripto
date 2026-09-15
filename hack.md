@@ -32,7 +32,7 @@ draft PR for Oscar review is the handoff, not a public post.
 - **OQ-4 (non-blocking, article honesty):** Do Desktop/Cowork transcripts under
   the same projects root inherit `desktopSessionCleanupPeriodDays` Default `0`
   (no age limit)? Live mix of CLI vs Desktop files on Oscar's machine is not
-  knowable here. Docs object must be opened tonight; live split is Oscar's.
+  knowable here. Docs object opened tonight; live split is Oscar's.
 
 ## CONSTITUTION
 
@@ -72,33 +72,52 @@ draft PR for Oscar review is the handoff, not a public post.
 ## PLAN (risk first)
 
 1. **Slice 1 — cold stranger at the file object + RED controls + stranger
-   product journey.** Riskiest: wrong-object retention, empty-green controls,
-   circular planter, and a launch checklist that claims a journey nobody ran.
-   Done-when: `bash scripts/cold_verify.sh` exits 0; output captured in
-   `docs/COLD-VERIFY-2026-08-30.md`; includes independent oracle, negative
-   planter, empty-grep RED watch, death-rate impossibility, product boundary,
-   and a cold run of the README stranger flow.
-2. **Slice 2 — STEP 3 ruling at the README object.** Done-when:
-   `docs/STEP-3-README-BELOEVED-RULING.md` cites tonight's `nl -ba README.md`
-   line refs; checklist STEP 3 boxes remain unchecked for Oscar.
-3. **Slice 3 — STEP 0 logged.** Done-when: `./test_small_n.sh` and
-   `bash scripts/test_small_n.sh` both 7/7; footer records the commands.
-4. **Slice 4 — baseline arm that can embarrass us.** Done-when:
-   `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` compare
-   naive `find` / pip-only install vs source; honest if naive wins retention.
+   product journey.** DONE.
+   Ran `TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-tonight bash scripts/cold_verify.sh`
+   → `cold_verify: PASS`, `offline_core: PASS`, `ratio_30d: 504 of 2721`,
+   `independent_oracle: PASS` (81/40, seed 20260915), `negative_planter: PASS`,
+   `stranger_product_journey: PASS`, `stats_near_miss: DETECTED`,
+   `tz_pair_trap: DETECTED`, `pypi_package_audit: PASS`.
+   Artifact: `docs/COLD-VERIFY-2026-08-30.md`.
+2. **Slice 2 — STEP 3 ruling at the README object.** DONE.
+   `nl -ba README.md | sed -n '130,154p'` → invented demo L132–154;
+   `docs/STEP-3-README-BELOEVED-RULING.md` recommends KEEP; checklist unchecked.
+3. **Slice 3 — STEP 0 logged.** DONE.
+   `./test_small_n.sh` and `bash scripts/test_small_n.sh` → 7/7 in checklist footer.
+4. **Slice 4 — baseline arm that can embarrass us.** DONE.
+   `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` — naive `find`
+   wins retention; pip-only `retention` exit 2; stats 2721/2721 near-miss
+   DETECTED; gate 8 vs naive 12; wheel cwd-shadow DETECTED.
 
 ## NOW
 
-**Slice 1** — write `scripts/cold_verify.sh`, run it at the object, capture
-`docs/COLD-VERIFY-2026-08-30.md`. Do not start slices 2–4 until slice 1's
-done-when has executed.
+Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
+`find` re-derive (with TZ), article/X/PyPI.
 
 ## LOG
 
 - 2026-09-15 start: main has no `hack.md`, no `scripts/`, no
   `docs/ARTICLE-01-SHIP-CHECKLIST.md`, no `docs/COLD-VERIFY-2026-08-30.md`.
   Existing `docs/` holds OFFLINE-QUICKSTART + CLOUD-RECEIPT only. Prior
-  night-wave branches exist on origin and are the floor; tonight re-runs.
-- hack.md written before any code (this file).
-- No live `~/.claude/projects` on this VM (OQ-1 expected).
+  night-wave branches on origin treated as floor; tonight re-ran.
+- hack.md written before any code.
+- No live `~/.claude/projects` on this VM (OQ-1).
 - Queue empty at start (`cursor-cloud-get-message-queue`).
+- Intermediate FAIL (RUN): `python3 -m venv` without `python3.12-venv` —
+  ensurepip missing. Installed package; cold_verify now refuses missing
+  `venv/bin/python`.
+- Intermediate FAIL (RUN): `test_privacy.sh` exited 0 on empty `git init`
+  ("PRIVACY OK … 1 production/doc files" via blank-line `wc`). Fail-closed
+  on empty index and on zero production files after exclusions.
+  Watched RED: `privacy_empty_index_exit: 1`.
+- `./test_small_n.sh` → **7/7 green**; `bash scripts/test_small_n.sh` → **7/7**.
+- Slice 1: cold_verify PASS; oracle 81/40 seed 20260915; stranger journey PASS;
+  stats near-miss DETECTED; docs Default 30 / desktop 0; PyPI 0.2.0;
+  wheel cold_verify entries 0.
+- Slice 2: STEP 3 KEEP at README L132–154 (tonight's object; prior waves'
+  L66–88 are stale).
+- Slice 3: 7/7 logged in checklist footer.
+- Slice 4: naive find WINS retention; authorship gate 8 < naive 12.
+- Archive stranger PASS; wheel stranger PASS (`cwd_shadow_trap: DETECTED`).
+- Unit tests: **94 OK** (re-derived; not carried from older 73).
+- Not done (by design): article post · X · PyPI bump.

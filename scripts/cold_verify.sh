@@ -67,6 +67,10 @@ echo
 
 # --- fresh venv from source (network may be needed once for pip/setuptools) ---
 python3 -m venv "$VENV"
+if [ ! -x "$VENV/bin/python" ]; then
+  echo "cold_verify: FAIL — venv missing $VENV/bin/python (install python3-venv)"
+  exit 1
+fi
 # shellcheck disable=SC1091
 source "$VENV/bin/activate"
 # Prefer offline editable install; fall back to one network attempt for pip bootstrap.
@@ -79,6 +83,8 @@ if [ "$pip_rc" -ne 0 ]; then
   python -m pip install -U pip -q
   python -m pip install -e "$REPO_ROOT" -q
 fi
+# Prove the venv can import pip after bootstrap (ensurepip outage must not look green).
+python -c 'import pip,sys; print("venv_pip_ok:", pip.__version__, "py", sys.version.split()[0])'
 echo "transcripto: $(transcripto --version 2>/dev/null || python -c 'import transcripto; print(getattr(transcripto,\"VERSION\", \"?\"))')"
 echo
 
@@ -961,11 +967,11 @@ print(wheels[0]['url'] if wheels else '')
     set -e
     if [ "$wheel_dl" -eq 0 ]; then
       COLD_IN_WHEEL=$(python - <<PY
-import zipfile
+import zipfile, sys
 z=zipfile.ZipFile("$WHEEL_TMP")
 names=z.namelist()
 print(sum(1 for n in names if "cold_verify" in n))
-print("wheel_file_count:", len(names), file=__import__("sys").stderr)
+print("wheel_file_count: %d" % len(names), file=sys.stderr)
 PY
 )
       echo "pypi_wheel_cold_verify_entries: $COLD_IN_WHEEL"
