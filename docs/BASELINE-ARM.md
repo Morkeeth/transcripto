@@ -72,6 +72,8 @@ stricter (and intended) authorship object. Do not conflate Arm B with Arm A.
 
 1. Quoting `stats` `2,721` as retention evidence — **DETECTED** on source,
    pip-only, and wheel arms tonight.
+   Repair shipped tonight: stats prints an explicit caveat that these are
+   indexed message counts, not transcript file ages (`stats_anti_conflation_caveat: PASS`).
 2. Inventing a daily death rate from frozen 504/2721 → 579/2874 —
    **FAIL-TO-RECONCILE** (control refuses).
 3. Claiming `pip install transcripto` reproduces cold verify — wheel has

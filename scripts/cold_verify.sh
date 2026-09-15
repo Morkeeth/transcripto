@@ -734,6 +734,13 @@ if [ "$MODE" = "fixture" ]; then
   if printf '%s\n' "$STATS_OUT" | grep -Eq '2,?721'; then
     echo "stats_near_miss: DETECTED — stats output contains 2721 (retention denominator lookalike)"
     echo "stats_near_miss_ruling: do NOT quote stats as retention evidence"
+    if printf '%s\n' "$STATS_OUT" | grep -Fq 'not transcript file ages'; then
+      echo "stats_anti_conflation_caveat: PASS — stats names the object (messages ≠ file ages)"
+    else
+      echo "stats_anti_conflation_caveat: FAIL — near-miss digit without object caveat"
+      FAIL=1
+      OFFLINE_CORE_FAIL=1
+    fi
   else
     echo "stats_near_miss: no 2721 literal in stats output tonight"
   fi

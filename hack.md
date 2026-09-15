@@ -121,3 +121,6 @@ Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
 - Archive stranger PASS; wheel stranger PASS (`cwd_shadow_trap: DETECTED`).
 - Unit tests: **94 OK** (re-derived; not carried from older 73).
 - Not done (by design): article post · X · PyPI bump.
+- Stats near-miss repair: `cmd_stats` now prints message≠file-age caveat;
+  cold_verify asserts `stats_anti_conflation_caveat: PASS` when 2721 is present.
+

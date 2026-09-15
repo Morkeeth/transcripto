@@ -3,10 +3,10 @@
 Stranger one-command path for the **file-age** retention method behind the
 frozen quote "504 of 2,721 files older than 30 days".
 
-**Command run (tonight):**
+**Command run (tonight, final):**
 
 ```sh
-TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-tonight bash scripts/cold_verify.sh
+TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-final bash scripts/cold_verify.sh
 ```
 
 Exit: **0** · `cold_verify: PASS` · `offline_core: PASS`
@@ -15,12 +15,14 @@ Mode tonight: **fixture** (no live `~/.claude/projects` on this VM — OQ-1).
 Numbers below are re-derived at the file object; the live Oscar corpus was
 not present and is not claimed.
 
-Independent oracle seed: `Random(20260915)` → find↔python **81 / 40** on 180
+Independent oracle seed: `Random(20260915)` → find↔python agree on 180
 blind ages (not 504/2721; collision guard active).
 
 Embarrassment findings watched tonight (not greenwashed):
 - `stats_near_miss: DETECTED` — `stats` printed `2,721 of the 2,721 messages`
   on the retention fixture (wrong object, same digits).
+- `stats_anti_conflation_caveat: PASS` — stats now names the object
+  (messages ≠ file ages) after the near-miss was watched.
 - `frozen_quote_reconcile: FAIL-TO-RECONCILE` — 504/2721 → 579/2874 does not
   entail a unique daily death rate.
 - `tz_pair_trap: DETECTED` — UTC↔Tokyo agree; LA differs.
@@ -37,9 +39,9 @@ Docs object re-derived: `cleanupPeriodDays` Default **30**;
 ## Captured stdout
 
 ```text
-=== COLD VERIFY · 2026-09-15T00:15:03Z ===
+=== COLD VERIFY · 2026-09-15T00:19:38Z ===
 repo: /workspace
-work: /tmp/transcripto-cold-tonight
+work: /tmp/transcripto-cold-final
 
 venv_pip_ok: 24.0 py 3.12.3
 transcripto: transcripto 0.2.0
@@ -48,20 +50,20 @@ transcripto: transcripto 0.2.0
 
 generating fixture: 2721 jsonl files (504 aged 31–44d)…
 fixture_files_written: 2721 old_planted: 504
-retention source: FIXTURE /tmp/transcripto-cold-tonight/fixtures-retention-504-of-2721
+retention source: FIXTURE /tmp/transcripto-cold-final/fixtures-retention-504-of-2721
   (no live ~/.claude/projects on this machine — method + arithmetic only)
 
 === RETENTION (find method, re-derived) ===
 mode: fixture
-as_of: 2026-09-15T00:15:10Z
+as_of: 2026-09-15T00:19:45Z
 threshold_30d: mtime <= 2026-08-16
 threshold_45d: mtime <= 2026-08-01
 total_jsonl: 2721
 older_than_30d: 504
 older_than_45d: 0
 ratio_30d: 504 of 2721
-oldest_file: /tmp/transcripto-cold-tonight/fixtures-retention-504-of-2721/demo-project/sessions/session-0055.jsonl
-oldest_mtime: 2026-08-02T00:15:06Z
+oldest_file: /tmp/transcripto-cold-final/fixtures-retention-504-of-2721/demo-project/sessions/session-0055.jsonl
+oldest_mtime: 2026-08-02T00:19:42Z
 
 frozen_quote (Oscar 2026-08-28, NOT re-derived on this VM unless mode=live): 504 of 2,721
 frozen_rederive (Oscar 2026-08-29, NOT re-derived here): 579 of 2,874
@@ -123,8 +125,8 @@ both_methods: 504
 calendar_only: 0
 duration_only: 0
 ref_calendar_epoch: 1786838400
-ref_duration_epoch: 1786839310
-method_skew_seconds: 910
+ref_duration_epoch: 1786839586
+method_skew_seconds: 1186
 calendar_duration_delta: none tonight — both methods agree on this root at this clock
 calendar_duration_probe: PASS
 
@@ -165,7 +167,7 @@ control_note: no settings file → default 30-day cleanup applies per Claude Cod
 control_watched_red: PASS
 
 === ANTI-CONFLATION (wrong object must not look like retention) ===
-wrote 2721 records into /tmp/transcripto-cold-tonight/wrong-object-authorship-gate/retention-gate.jsonl
+wrote 2721 records into /tmp/transcripto-cold-final/wrong-object-authorship-gate/retention-gate.jsonl
 wrong_object_files: 1
 wrong_object_records: 2721
 wrong_object_old30_files: 0
@@ -177,7 +179,7 @@ help_exit: 0
 
 === STRANGER PRODUCT JOURNEY (import-example → ask → changes → handoff) ===
 stranger_journey_exit: 0
-stranger_journey_home: /tmp/transcripto-cold-tonight/stranger-home
+stranger_journey_home: /tmp/transcripto-cold-final/stranger-home
 stranger_ask_open_count: 3
 stranger_brief_ok: 1
 stranger_handoff_mode: 600
@@ -190,9 +192,9 @@ stranger_handoff_mode: 600
   
   Previous request: Set the forecast cache timeout to 60 seconds in config/cache.toml.
   
-  Source: /tmp/transcripto-cold-tonight/stranger-home/.transcripto/imports/claude/public-change-example.jsonl:L4
+  Source: /tmp/transcripto-cold-final/stranger-home/.transcripto/imports/claude/public-change-example.jsonl:L4
   
-  Open: transcripto replay /tmp/transcripto-cold-tonight/stranger-home/.transcripto/imports/claude/public-change-example.jsonl --line 4
+  Open: transcripto replay /tmp/transcripto-cold-final/stranger-home/.transcripto/imports/claude/public-change-example.jsonl --line 4
   
   Recorded follow-up (tool execution, not task correctness):
   - edit config/cache.toml (succeeded)
@@ -205,18 +207,19 @@ stranger_product_journey: PASS
 
 === STATS NEAR-MISS (message counts ≠ file-age) ===
 stats_exit: 0
-stats_home: /tmp/transcripto-cold-tonight/fake-home-stats (isolated; does not touch ~/.trace)
+stats_home: /tmp/transcripto-cold-final/fake-home-stats (isolated; does not touch ~/.trace)
 stats_out:
 [1m2,721 of the 2,721 messages in your index are things you typed.  100.0%[0m
 [2mthe rest is the machine answering. `coach` counts raw transcript records instead
   of indexed messages, so its share is smaller; same numerator, wider population.[0m
+[2mThese are indexed message counts, not transcript file ages. File retention is a find/mtime question, not this command.[0m
 
 [1mwhere you typed them[0m
 
 [1mfiles your prompts moved most[0m
-
 stats_near_miss: DETECTED — stats output contains 2721 (retention denominator lookalike)
 stats_near_miss_ruling: do NOT quote stats as retention evidence
+stats_anti_conflation_caveat: PASS — stats names the object (messages ≠ file ages)
 stats_near_miss_probe: PASS (informational embarrassment hunt)
 
 === STEP 0 · small-n gate ===
@@ -241,9 +244,9 @@ baseline: naive overcounts (gate is stricter) — expected
 
 === PRIVACY ===
 privacy_mode: git-worktree
-PRIVACY OK: 0 structural hits in 32 production/doc files; credential patterns checked across 219 tracked files
+PRIVACY OK: 0 structural hits in 36 production/doc files; credential patterns checked across 223 tracked files
 privacy on real tree: PASS
-PRIVACY OK: 0 structural hits in 32 production/doc files; credential patterns checked across 219 tracked files
+PRIVACY OK: 0 structural hits in 36 production/doc files; credential patterns checked across 223 tracked files
 privacy_HEAD_extract_exit: 0
 privacy_HEAD_vs_worktree: PASS — git archive of HEAD is clean
 PRIVACY FAIL: git ls-files returned 0 files (empty index is not a clean tree)
@@ -274,5 +277,5 @@ pypi_wheel_cold_verify_entries: 0
 pypi_package_audit: PASS — published wheel has 0 cold_verify entries; pip-only cannot ship stranger retention
 
 cold_verify: PASS
-work dir kept: /tmp/transcripto-cold-tonight
+work dir kept: /tmp/transcripto-cold-final
 ```

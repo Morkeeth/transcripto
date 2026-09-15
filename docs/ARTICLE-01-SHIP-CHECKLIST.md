@@ -74,6 +74,7 @@ $ TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-tonight bash scripts/cold_verify.sh
 … product_boundary: PASS
 … stranger_product_journey: PASS (ask Open×3; brief mode 600)
 … stats_near_miss: DETECTED
+… stats_anti_conflation_caveat: PASS
 … offline_core: PASS
 … docs_cleanupPeriodDays_default_30: PASS
 … docs_desktop_default_0_no_age_limit: PASS
