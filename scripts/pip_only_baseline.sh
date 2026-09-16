@@ -39,9 +39,9 @@ python -m pip install -U pip -q
 python -m pip install --no-cache-dir 'transcripto==0.2.0' -q
 echo "pip_only_version: $(transcripto --version)"
 # Beyond-floor: does published 0.2.0 print the tip's stats caveat?
+mkdir -p "$WORK/probe-home"
 set +e
-CAVEAT_PROBE=$(cd "$WORK" && HOME="$WORK/probe-home" mkdir -p "$WORK/probe-home" && \
-  HOME="$WORK/probe-home" transcripto stats --root "$REPO_ROOT/fixtures-small-n" 2>&1)
+CAVEAT_PROBE=$(cd "$WORK" && HOME="$WORK/probe-home" transcripto stats --root "$REPO_ROOT/fixtures-small-n" 2>&1)
 set -e
 if printf '%s\n' "$CAVEAT_PROBE" | grep -Fq 'File retention is a find/mtime question'; then
   echo "pip_only_stats_caveat: PRESENT"

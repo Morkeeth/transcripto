@@ -75,25 +75,32 @@ draft PR for Oscar review is the handoff, not a public post.
 ## PLAN (risk first)
 
 1. **Slice 1 — cold stranger at the file object + RED controls + stranger
-   product journey + beyond-floor traps.** Riskiest. Main has no
-   `scripts/cold_verify.sh`. Bring the floor from prior waves, then tonight:
-   virtualenv fallback when `ensurepip` is missing; published-0.2.0 stats
-   caveat absence as an embarrassment probe; true cold clone outside
-   `/workspace`. Capture `docs/COLD-VERIFY-2026-08-30.md` from a RUN.
-2. **Slice 2 — STEP 3 ruling at the README object.** Open
-   `nl -ba README.md` tonight; write KEEP/TRIM ruling with line refs;
-   Oscar boxes unticked.
-3. **Slice 3 — STEP 0 logged.** Re-run `./test_small_n.sh` and
-   `bash scripts/test_small_n.sh`; log 7/7 at object in checklist footer.
-4. **Slice 4 — baseline arm that can embarrass us.** Document naive
-   `find` / pip-only vs transcripto; honest if naive wins. Include the
-   published-package caveat gap vs tip.
+   product journey + beyond-floor traps.** DONE.
+   Ran `TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-tonight bash scripts/cold_verify.sh`
+   → `cold_verify: PASS`, `offline_core: PASS`, `ratio_30d: 504 of 2721`,
+   `independent_oracle: PASS` (92/44, seed 20260916), `negative_planter: PASS`,
+   `stranger_product_journey: PASS`, `stats_near_miss: DETECTED`,
+   `tz_pair_trap: DETECTED`, `pypi_package_audit: PASS`,
+   `published_stats_caveat: ABSENT`, `tip_stats_caveat: PRESENT`,
+   `venv_backend: virtualenv-fallback`.
+   Artifact: `docs/COLD-VERIFY-2026-08-30.md`.
+   Also: archive PASS · wheel PASS · cold_clone PASS.
+2. **Slice 2 — STEP 3 ruling at the README object.** DONE.
+   `nl -ba README.md | sed -n '130,154p'` → invented demo L132–154;
+   `docs/STEP-3-README-BELOEVED-RULING.md` recommends KEEP; checklist unchecked.
+3. **Slice 3 — STEP 0 logged.** DONE.
+   `./test_small_n.sh` and `bash scripts/test_small_n.sh` → 7/7 in checklist footer.
+4. **Slice 4 — baseline arm that can embarrass us.** DONE.
+   `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` — naive `find`
+   wins retention; pip-only `retention` exit 2; stats 2721/2721 near-miss
+   DETECTED; gate 8 vs naive 12; published 0.2.0 caveat ABSENT; wheel
+   cwd-shadow DETECTED.
 
 ## NOW
 
-**Slice 1** — cold stranger path + RED controls + beyond-floor traps.
-hack.md exists; no scripts yet. Next: write `scripts/cold_verify.sh` and
-related floor scripts, then RUN them.
+Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
+`find` re-derive (with TZ), article/X/PyPI. Tip stats caveat is not on the
+live 0.2.0 wheel until Oscar cuts a release that includes it.
 
 ## LOG
 
@@ -113,5 +120,22 @@ related floor scripts, then RUN them.
   outage green — fall back or refuse with a clear FAIL.
 - Prior night-wave tips on origin (latest
   `origin/cursor/night-wave-p1-cold-verify-6e6c`) are the **floor**; tonight
-  re-runs and goes beyond (published caveat gap + venv outage + cold clone).
-- hack.md written before any code (this file).
+  re-ran and went beyond (published caveat gap + venv outage + cold clone).
+- hack.md written before any code.
+- Intermediate FAIL (RUN): published_stats probe saved wheel as
+  `pypi-wheel.whl` → pip rejected filename; fixed to URL basename.
+- Intermediate FAIL (RUN): probe used activated venv's `python3 -m virtualenv`
+  (no module); fixed to `~/.local/bin/virtualenv -p /usr/bin/python3`.
+- Intermediate FAIL (RUN): first cold_verify aborted on that probe under
+  `set -e` while outer `tee` still reported 0 (pipefail lesson).
+- `./test_small_n.sh` → **7/7 green**; `bash scripts/test_small_n.sh` → **7/7**.
+- Slice 1: cold_verify PASS; oracle 92/44 seed 20260916; stranger journey PASS;
+  stats near-miss DETECTED; docs Default 30 / desktop 0; PyPI 0.2.0;
+  wheel cold_verify entries 0; published caveat ABSENT; tip PRESENT.
+- Slice 2: STEP 3 KEEP at README L132–154 (tonight's object).
+- Slice 3: 7/7 logged in checklist footer.
+- Slice 4: naive find WINS retention; authorship gate 8 < naive 12.
+- Archive stranger PASS; wheel stranger PASS (`cwd_shadow_trap: DETECTED`);
+  cold clone PASS (`clone_ne_worktree`).
+- Unit tests: **94 OK** (re-derived; not carried).
+- Not done (by design): article post · X · PyPI bump.
