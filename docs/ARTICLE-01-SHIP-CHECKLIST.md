@@ -131,3 +131,5 @@ $ #   now falls back to virtualenv and refuses a pip-less bin/python.
 ```
 
 Not done (by design): article post · X post · PyPI bump · publish.
+
+Tip CI after README one-liner: run 35138430688 success (re-derived).

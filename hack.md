@@ -141,3 +141,4 @@ live 0.2.0 wheel until Oscar cuts a release that includes it.
 - Not done (by design): article post · X · PyPI bump.
 - Tip CI: docs commit `399a36b` → tests run 35138305197 **success** (re-derived `gh run view`). Intermediate cold-verify job failure on `8b85f4d` was the pypi-wheel.whl filename bug; fixed in `a2287fe`.
 - README Development one-liner added: `bash scripts/cold_verify.sh`.
+- Tip CI: `1f54775` → tests run 35138430688 **success** (3.9/3.13 + cold-verify; re-derived `gh run list`).
