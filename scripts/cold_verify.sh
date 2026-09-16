@@ -1008,7 +1008,12 @@ print(wheels[0]['url'] if wheels else '')
 ")
   set -e
   if [ -n "$WHEEL_URL" ]; then
-    WHEEL_TMP="$WORK/pypi-wheel.whl"
+    WHEEL_NAME=$(basename "$WHEEL_URL" | sed 's/[?#].*//')
+    case "$WHEEL_NAME" in
+      *.whl) ;;
+      *) WHEEL_NAME="transcripto-from-pypi.whl" ;;
+    esac
+    WHEEL_TMP="$WORK/$WHEEL_NAME"
     set +e
     curl -fsSL --max-time 40 -o "$WHEEL_TMP" "$WHEEL_URL"
     wheel_dl=$?
@@ -1023,6 +1028,7 @@ print("wheel_file_count: %d" % len(names), file=sys.stderr)
 PY
 )
       echo "pypi_wheel_cold_verify_entries: $COLD_IN_WHEEL"
+      echo "pypi_wheel_local_name: $WHEEL_NAME"
       if [ "$COLD_IN_WHEEL" = "0" ]; then
         echo "pypi_package_audit: PASS — published wheel has 0 cold_verify entries; pip-only cannot ship stranger retention"
       else
@@ -1035,46 +1041,56 @@ PY
       echo "=== PUBLISHED STATS CAVEAT GAP (PyPI wheel vs tip) ==="
       PUB_VENV="$WORK/pypi-stats-venv"
       rm -rf "$PUB_VENV"
+      # Must NOT use the activated cold_verify interpreter: it has no virtualenv
+      # module, and stdlib venv on ensurepip-less images yields bin/python without pip.
+      SYS_PY="${TRANSCRIPTO_SYSTEM_PYTHON:-/usr/bin/python3}"
       set +e
-      python3 -m virtualenv "$PUB_VENV" >/dev/null 2>&1 || python3 -m venv "$PUB_VENV" >/dev/null 2>&1
+      if [ -x "$HOME/.local/bin/virtualenv" ]; then
+        "$HOME/.local/bin/virtualenv" -p "$SYS_PY" "$PUB_VENV" >"$WORK/pypi-stats-venv.err" 2>&1
+        pub_ve_rc=$?
+      else
+        env -u VIRTUAL_ENV "$SYS_PY" -m virtualenv "$PUB_VENV" >"$WORK/pypi-stats-venv.err" 2>&1
+        pub_ve_rc=$?
+      fi
       set -e
-      if [ -x "$PUB_VENV/bin/python" ]; then
+      if [ -x "$PUB_VENV/bin/python" ] && "$PUB_VENV/bin/python" -c 'import pip' 2>/dev/null; then
+        set +e
         "$PUB_VENV/bin/python" -m pip install --no-index "$WHEEL_TMP" -q
-        PUB_HOME="$WORK/pypi-stats-home"
-        mkdir -p "$PUB_HOME"
-        # Reuse the retention fixture root if present; else plant a tiny lookalike.
-        PUB_ROOT="$ROOT"
-        if [ ! -d "$PUB_ROOT" ]; then
-          PUB_ROOT="$WORK/pypi-stats-fixture"
-          mkdir -p "$PUB_ROOT/demo/sessions"
-          echo '{"type":"user","message":{"role":"user","content":"x"}}' > "$PUB_ROOT/demo/sessions/a.jsonl"
-        fi
-        set +e
-        PUB_STATS=$(cd "$WORK" && HOME="$PUB_HOME" "$PUB_VENV/bin/transcripto" stats --root "$PUB_ROOT" 2>&1)
-        pub_stats_rc=$?
+        pub_install_rc=$?
         set -e
-        echo "published_stats_exit: $pub_stats_rc"
-        echo "published_stats_head:"
-        printf '%s\n' "$PUB_STATS" | head -4
-        if printf '%s\n' "$PUB_STATS" | grep -Fq 'File retention is a find/mtime question'; then
-          echo "published_stats_caveat: PRESENT — live wheel already names the object"
+        if [ "$pub_install_rc" -ne 0 ]; then
+          echo "published_stats_caveat: SKIP — wheel install into probe venv failed (rc=$pub_install_rc)"
         else
-          echo "published_stats_caveat: ABSENT — live $PYPI_VER wheel lacks tip anti-conflation caveat"
-          echo "published_stats_caveat_ruling: embarrassment — pip-only stats can still look like retention"
-          echo "published_stats_caveat_probe: PASS (gap watched; tip repair is this branch)"
-        fi
-        # Tip (this tree) must still carry the caveat — re-check current CLI.
-        set +e
-        TIP_STATS=$(HOME="$PUB_HOME" transcripto stats --root "$PUB_ROOT" 2>&1)
-        set -e
-        if printf '%s\n' "$TIP_STATS" | grep -Fq 'File retention is a find/mtime question'; then
-          echo "tip_stats_caveat: PRESENT"
-        else
-          echo "tip_stats_caveat: FAIL — tip lost the anti-conflation caveat"
-          FAIL=1
+          PUB_HOME="$WORK/pypi-stats-home"
+          mkdir -p "$PUB_HOME"
+          PUB_ROOT="$ROOT"
+          set +e
+          PUB_STATS=$(cd "$WORK" && HOME="$PUB_HOME" "$PUB_VENV/bin/transcripto" stats --root "$PUB_ROOT" 2>&1)
+          pub_stats_rc=$?
+          set -e
+          echo "published_stats_exit: $pub_stats_rc"
+          echo "published_stats_head:"
+          printf '%s\n' "$PUB_STATS" | head -4
+          if printf '%s\n' "$PUB_STATS" | grep -Fq 'File retention is a find/mtime question'; then
+            echo "published_stats_caveat: PRESENT — live wheel already names the object"
+          else
+            echo "published_stats_caveat: ABSENT — live $PYPI_VER wheel lacks tip anti-conflation caveat"
+            echo "published_stats_caveat_ruling: embarrassment — pip-only stats can still look like retention"
+            echo "published_stats_caveat_probe: PASS (gap watched; tip repair is this branch)"
+          fi
+          set +e
+          TIP_STATS=$(HOME="$PUB_HOME" transcripto stats --root "$PUB_ROOT" 2>&1)
+          set -e
+          if printf '%s\n' "$TIP_STATS" | grep -Fq 'File retention is a find/mtime question'; then
+            echo "tip_stats_caveat: PRESENT"
+          else
+            echo "tip_stats_caveat: FAIL — tip lost the anti-conflation caveat"
+            FAIL=1
+          fi
         fi
       else
-        echo "published_stats_caveat: SKIP — could not create probe venv"
+        echo "published_stats_caveat: SKIP — could not create probe venv with pip (rc=${pub_ve_rc:-?})"
+        head -8 "$WORK/pypi-stats-venv.err" 2>/dev/null || true
       fi
     else
       echo "pypi_wheel_download: SKIP (curl exit $wheel_dl)"
