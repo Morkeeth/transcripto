@@ -23,6 +23,7 @@ Agent does not post, publish, or bump PyPI.
 | Docs default | curl settings-reference.md | `cleanupPeriodDays` Default **30**; desktop Default **0** |
 | PyPI | `curl -sL https://pypi.org/pypi/transcripto/json` | **0.2.0** |
 | Published gap | wheel audit inside cold_verify | stats caveat **ABSENT**; stranger verbs **missing** on 0.2.0 |
+| CI | GitHub Actions tip `8ffb3c0` | test 3.9 + 3.13 + cold-verify all **success** (run 35199341649) |
 
 ## STEP 3 — README launch example
 

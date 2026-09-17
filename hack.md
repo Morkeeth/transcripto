@@ -150,3 +150,4 @@ stranger verbs + stats caveat, then article/X/PyPI.
   DETECTED on nonzero exit + tip-verb regex that does not false-fail help=
   forms + oracle seed 20260917 (90/46, not carried).
 - Final re-run after docs commit: tip `0b1cc06` cold_verify **PASS**; archive **PASS**; privacy 37/224.
+- Tip CI `8ffb3c0` (gh run 35199341649): test 3.9 + 3.13 + cold-verify all **success** (re-derived `gh run view`).
