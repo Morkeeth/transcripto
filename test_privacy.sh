@@ -10,14 +10,29 @@
 #   - arbitrary personal prose. There is no general detector.
 #   - anything deliberately encoded or encrypted.
 #   - anything in a release already published. This reads the WORKING TREE only.
+#
+# Empty-index trap: `git ls-files` on a fresh `git init` is empty. A prior form
+# of this guard printed "PRIVACY OK: 0 hits in 0 tracked files" and exited 0 —
+# the green-on-outage failure mode. Fail closed when nothing is tracked, and
+# when every tracked path is excluded from the production scan.
 set -u
 cd "$(dirname "$0")"
+n=$(git ls-files | wc -l | tr -d ' ')
+if [ "$n" -eq 0 ]; then
+  echo "PRIVACY FAIL: git ls-files returned 0 files (empty index is not a clean tree)"
+  exit 1
+fi
 home='/(Users|home)/[^/[:space:]"]+/'
 vault='(^|[^0-9])[0-9]{2} [A-Z][A-Za-z ]*/[^"]*\.md'
 secret='AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY'
-files=$(git ls-files | grep -v -E '^(fixtures[^/]*/|fixtures/|test_privacy\.sh$)')
+files=$(git ls-files | grep -v -E '^(fixtures[^/]*/|fixtures/|test_privacy\.sh$)' || true)
+n_prod=$(printf '%s\n' "$files" | sed '/^$/d' | wc -l | tr -d ' ')
+if [ "$n_prod" -eq 0 ]; then
+  echo "PRIVACY FAIL: 0 production/doc files after exclusions (not a clean tree)"
+  exit 1
+fi
 path_hits=$(printf '%s\n' "$files" | xargs grep -n -i -E "$home|$vault" 2>/dev/null)
 secret_hits=$(git ls-files -z | xargs -0 grep -n -i -E "$secret" 2>/dev/null)
 hits="$path_hits$secret_hits"
 if [ -n "$hits" ]; then echo "PRIVACY FAIL:"; echo "$hits" | head -20; exit 1; fi
-echo "PRIVACY OK: 0 structural hits in $(printf '%s\n' "$files" | wc -l | tr -d ' ') production/doc files; credential patterns checked across the tracked tree"
+echo "PRIVACY OK: 0 structural hits in $n_prod production/doc files; credential patterns checked across $n tracked files"
