@@ -98,7 +98,12 @@ create_venv() {
     echo "venv_stdlib_ensurepip: MISSING — bin/python exists but pip import fails"
     rm -rf "$dest"
   else
-    echo "venv_green_without_pip: no (stdlib venv did not claim success)"
+    if [ -x "$dest/bin/python" ] && ! "$dest/bin/python" -c 'import pip' 2>/dev/null; then
+      echo "venv_partial_without_pip: DETECTED — stdlib venv exit $stdlib_rc left python without pip"
+      echo "venv_green_without_pip: adjacent — nonzero exit but partial tree looks usable"
+    else
+      echo "venv_green_without_pip: no (stdlib venv did not claim success)"
+    fi
     echo "venv_stdlib: FAIL (exit $stdlib_rc) — see ensurepip / python3-venv"
     head -5 "$WORK/venv-stdlib.err" 2>/dev/null || true
     rm -rf "$dest"
@@ -1116,7 +1121,7 @@ if "site-packages" not in mod_file.replace("\\", "/"):
 else:
     print("published_module_cwd_shadow: no")
 src = inspect.getsource(transcripto)
-parsers = re.findall(r'add_parser\("([\w-]+)"\)', src)
+parsers = re.findall(r'add_parser\("([\w-]+)"', src)
 need = ["import-example", "changes", "handoff", "receive-handoff", "import-lab", "quickstart"]
 missing = [n for n in need if n not in parsers]
 print("published_parsers: " + ",".join(parsers))
@@ -1136,7 +1141,7 @@ PY
 import re
 from pathlib import Path
 src = Path("$REPO_ROOT/transcripto.py").read_text()
-parsers = re.findall(r'add_parser\("([\w-]+)"\)', src)
+parsers = re.findall(r'add_parser\("([\w-]+)"', src)
 need = ["import-example", "changes", "handoff", "receive-handoff", "import-lab", "quickstart"]
 missing = [n for n in need if n not in parsers]
 print("tip_parsers_stranger: " + ",".join([n for n in need if n in parsers]))

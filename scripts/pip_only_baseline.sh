@@ -54,7 +54,7 @@ VERB_GAP=$(cd "$WORK" && python - <<'PY'
 import inspect, re
 import transcripto
 src = inspect.getsource(transcripto)
-parsers = set(re.findall(r'add_parser\("([\w-]+)"\)', src))
+parsers = set(re.findall(r'add_parser\("([\w-]+)"', src))
 need = ["import-example", "changes", "handoff", "receive-handoff", "import-lab", "quickstart"]
 missing = [n for n in need if n not in parsers]
 print(",".join(missing) if missing else "")
