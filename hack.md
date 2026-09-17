@@ -140,7 +140,7 @@ stranger verbs + stats caveat, then article/X/PyPI.
 - Intermediate FAIL (RUN): first cold_verify after verb-gap probe failed
   `tip_stranger_verbs` because the regex required `add_parser("name")` with an
   immediate close-paren and missed `help=` forms. Journey itself had PASS.
-  Fixed regex; re-run → **PASS** (tip `2d3c7d6`).
+  Fixed regex; re-run → **PASS** (tip `0b1cc06`).
 - Archive / wheel / cold_clone / pip_only baseline → **PASS**.
 - Slice 2: KEEP ruling at L132–154; Oscar ticks open.
 - Slice 3: both small-n paths **7/7**.
@@ -149,3 +149,4 @@ stranger verbs + stats caveat, then article/X/PyPI.
 - Beyond floor vs e224: published stranger-verb gap probe + partial-venv
   DETECTED on nonzero exit + tip-verb regex that does not false-fail help=
   forms + oracle seed 20260917 (90/46, not carried).
+- Final re-run after docs commit: tip `0b1cc06` cold_verify **PASS**; archive **PASS**; privacy 37/224.
