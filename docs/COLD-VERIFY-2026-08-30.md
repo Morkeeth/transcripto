@@ -7,7 +7,7 @@ This VM has no `~/.claude/projects`. Tonight's PASS is **method + arithmetic
 fixture + independent oracle + RED controls + stranger product journey**, not
 a live re-derive of Oscar's corpus. Live numbers remain machine-local (OQ-1).
 
-Tip: `db2b68d` on `cursor/night-wave-p1-launch-d229`. Host tools in UTC
+Tip: `30ebfed` (cold_verify final RUN after docs landed) on `cursor/night-wave-p1-launch-d229`. Host tools in UTC
 (`TZ` empty). Oracle seed **20260919** re-derived from UTC date
 `datetime.now(tz=timezone.utc)` (not carried from a prior wave).
 
@@ -69,12 +69,12 @@ name-only=2, `-type f`=1).
 
 ## Command output (tonight, RUN)
 
-Host UTC tools. RUN at ~2026-09-19T12:21Z on tip `db2b68d`.
+Host UTC tools. RUN at ~2026-09-19T12:22Z on tip `30ebfed`.
 
 ```
-=== COLD VERIFY · 2026-09-19T12:19:58Z ===
+=== COLD VERIFY · 2026-09-19T12:22:36Z ===
 repo: /workspace
-work: /tmp/transcripto-cold-tonight
+work: /tmp/transcripto-cold-final
 
 venv_stdlib_exit: 1
 venv_partial_without_pip: DETECTED — stdlib venv exit 1 left python without pip
@@ -93,20 +93,20 @@ transcripto: transcripto 0.2.0
 
 generating fixture: 2721 jsonl files (504 aged 31–44d)…
 fixture_files_written: 2721 old_planted: 504
-retention source: FIXTURE /tmp/transcripto-cold-tonight/fixtures-retention-504-of-2721
+retention source: FIXTURE /tmp/transcripto-cold-final/fixtures-retention-504-of-2721
   (no live ~/.claude/projects on this machine — method + arithmetic only)
 
 === RETENTION (find method, re-derived) ===
 mode: fixture
-as_of: 2026-09-19T12:20:04Z
+as_of: 2026-09-19T12:22:42Z
 threshold_30d: mtime <= 2026-08-20
 threshold_45d: mtime <= 2026-08-05
 total_jsonl: 2721
 older_than_30d: 504
 older_than_45d: 0
 ratio_30d: 504 of 2721
-oldest_file: /tmp/transcripto-cold-tonight/fixtures-retention-504-of-2721/demo-project/sessions/session-0055.jsonl
-oldest_mtime: 2026-08-06T12:20:01Z
+oldest_file: /tmp/transcripto-cold-final/fixtures-retention-504-of-2721/demo-project/sessions/session-0055.jsonl
+oldest_mtime: 2026-08-06T12:22:38Z
 
 frozen_quote (Oscar 2026-08-28, NOT re-derived on this VM unless mode=live): 504 of 2,721
 frozen_rederive (Oscar 2026-08-29, NOT re-derived here): 579 of 2,874
@@ -172,8 +172,8 @@ both_methods: 504
 calendar_only: 0
 duration_only: 0
 ref_calendar_epoch: 1787184000
-ref_duration_epoch: 1787228405
-method_skew_seconds: 44405
+ref_duration_epoch: 1787228563
+method_skew_seconds: 44563
 calendar_duration_delta: none tonight — both methods agree on this root at this clock
 calendar_duration_probe: PASS
 
@@ -212,7 +212,7 @@ control_note: no settings file → default 30-day cleanup applies per Claude Cod
 control_watched_red: PASS
 
 === ANTI-CONFLATION (wrong object must not look like retention) ===
-wrote 2721 records into /tmp/transcripto-cold-tonight/wrong-object-authorship-gate/retention-gate.jsonl
+wrote 2721 records into /tmp/transcripto-cold-final/wrong-object-authorship-gate/retention-gate.jsonl
 wrong_object_files: 1
 wrong_object_records: 2721
 wrong_object_old30_files: 0
@@ -224,7 +224,7 @@ help_exit: 0
 
 === STRANGER PRODUCT JOURNEY (import-example → ask → changes → handoff) ===
 stranger_journey_exit: 0
-stranger_journey_home: /tmp/transcripto-cold-tonight/stranger-home
+stranger_journey_home: /tmp/transcripto-cold-final/stranger-home
 stranger_ask_open_count: 3
 stranger_brief_ok: 1
 stranger_handoff_mode: 600
@@ -237,9 +237,9 @@ stranger_handoff_mode: 600
   
   Previous request: Set the forecast cache timeout to 60 seconds in config/cache.toml.
   
-  Source: /tmp/transcripto-cold-tonight/stranger-home/.transcripto/imports/claude/public-change-example.jsonl:L4
+  Source: /tmp/transcripto-cold-final/stranger-home/.transcripto/imports/claude/public-change-example.jsonl:L4
   
-  Open: transcripto replay /tmp/transcripto-cold-tonight/stranger-home/.transcripto/imports/claude/public-change-example.jsonl --line 4
+  Open: transcripto replay /tmp/transcripto-cold-final/stranger-home/.transcripto/imports/claude/public-change-example.jsonl --line 4
   
   Recorded follow-up (tool execution, not task correctness):
   - edit config/cache.toml (succeeded)
@@ -252,7 +252,7 @@ stranger_product_journey: PASS
 
 === STATS NEAR-MISS (message counts ≠ file-age) ===
 stats_exit: 0
-stats_home: /tmp/transcripto-cold-tonight/fake-home-stats (isolated; does not touch ~/.trace)
+stats_home: /tmp/transcripto-cold-final/fake-home-stats (isolated; does not touch ~/.trace)
 stats_out:
 2,721 of the 2,721 messages in your index are things you typed.  100.0%
 the rest is the machine answering. `coach` counts raw transcript records instead
@@ -289,9 +289,9 @@ baseline: naive overcounts (gate is stricter) — expected
 
 === PRIVACY ===
 privacy_mode: git-worktree
-PRIVACY OK: 0 structural hits in 33 production/doc files; credential patterns checked across 220 tracked files
+PRIVACY OK: 0 structural hits in 37 production/doc files; credential patterns checked across 224 tracked files
 privacy on real tree: PASS
-PRIVACY OK: 0 structural hits in 33 production/doc files; credential patterns checked across 220 tracked files
+PRIVACY OK: 0 structural hits in 37 production/doc files; credential patterns checked across 224 tracked files
 privacy_HEAD_extract_exit: 0
 privacy_HEAD_vs_worktree: PASS — git archive of HEAD is clean
 PRIVACY FAIL: git ls-files returned 0 files (empty index is not a clean tree)
@@ -344,7 +344,7 @@ published_stats_caveat_probe: PASS (gap watched; tip repair is this branch)
 tip_stats_caveat: PRESENT
 
 === PUBLISHED VERB GAP (PyPI wheel vs tip stranger flow) ===
-published_module_file: /tmp/transcripto-cold-tonight/pypi-stats-venv/lib/python3.12/site-packages/transcripto.py
+published_module_file: /tmp/transcripto-cold-final/pypi-stats-venv/lib/python3.12/site-packages/transcripto.py
 published_module_cwd_shadow: no
 published_parsers: index,watch,ask,search,find,trace,sessions,stats,cost,coach,export-run,replay
 published_stranger_verbs_missing: import-example,changes,handoff,receive-handoff,import-lab,quickstart
@@ -355,7 +355,7 @@ tip_stranger_verbs_missing: (none)
 tip_stranger_verbs: PRESENT
 
 cold_verify: PASS
-work dir kept: /tmp/transcripto-cold-tonight
+work dir kept: /tmp/transcripto-cold-final
 ```
 
 ## Companion runs (tonight)
