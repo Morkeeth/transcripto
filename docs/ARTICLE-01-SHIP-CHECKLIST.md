@@ -2,7 +2,7 @@
 
 Cloud prepares. Oscar ticks. Agent does not post, publish, or bump PyPI.
 
-Tip tonight: `759bc07` on `cursor/night-wave-p1-cold-verify-47f3`.
+Tip tonight: `a50a724` on `cursor/night-wave-p1-cold-verify-47f3`.
 Artifact: `docs/COLD-VERIFY-2026-08-30.md`. Ruling:
 `docs/STEP-3-README-BELOEVED-RULING.md`. Baseline: `docs/BASELINE-ARM.md`.
 
@@ -16,7 +16,7 @@ the command. Oscar ticks stay unchecked.
 - [x] `hack.md` exists with seven parts — written before product/scripts code
       (`git show 64744a5:hack.md`).
 - [x] `bash scripts/cold_verify.sh` → `cold_verify: PASS`
-      (`TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-tonight`, ~00:14Z UTC).
+      (`TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-final`, ~00:14Z UTC).
       Fixture ratio **504 of 2721**; oracle seed **20260919** → old30=**91**,
       old45=**46**; `blank_line_wc_trap: DETECTED`; stranger journey PASS;
       published verb gap DETECTED; tip stats caveat PRESENT.
@@ -75,4 +75,4 @@ $ bash scripts/test_small_n.sh 2>&1 | tail -5
 7/7 green.
 ```
 
-Re-run at tip `759bc07`, 2026-09-19 ~00:16Z UTC. Both paths **7/7**.
+Re-run at tip `a50a724`, 2026-09-19 ~00:16Z UTC. Both paths **7/7**.

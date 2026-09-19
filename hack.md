@@ -149,3 +149,4 @@ stranger verbs + stats caveat, then article/X/PyPI.
 - Beyond floor vs `4eac`: oracle seed **20260919** (91/46, not carried 90/46);
   blank-line `wc -l` trap watched DETECTED; TZ pair trap DETECTED tonight;
   Desktop default `0` opened at the docs object.
+- Final refresh after docs on HEAD `a50a724`: cold_verify PASS (oracle 91/46); privacy 37/224; pip_only naive-wins; small_n 7/7.
