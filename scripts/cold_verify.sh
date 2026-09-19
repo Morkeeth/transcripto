@@ -374,7 +374,7 @@ mkdir -p "$ORACLE_ROOT"
 set +e
 ORACLE_REPORT=$(THIRTY="$THIRTY" FORTYFIVE="$FORTYFIVE" ORACLE_ROOT="$ORACLE_ROOT" python - <<'PY'
 import os, random, subprocess, time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 root = Path(os.environ["ORACLE_ROOT"])
@@ -388,7 +388,7 @@ t30 = day_start(thirty)
 t45 = day_start(fortyfive)
 # Seed from tonight's UTC calendar day — re-derived at the clock, not carried
 # from a prior wave's PASS line or from this prompt.
-seed = int(datetime.utcnow().strftime("%Y%m%d"))
+seed = int(datetime.now(tz=timezone.utc).strftime("%Y%m%d"))
 rng = random.Random(seed)
 n = 180
 ages = [rng.randint(0, 60) for _ in range(n)]
