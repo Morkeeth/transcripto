@@ -16,7 +16,7 @@ the command. Oscar ticks stay unchecked.
 - [x] `hack.md` exists with seven parts — written before product/scripts code
       (`git show 64744a5:hack.md`).
 - [x] `bash scripts/cold_verify.sh` → `cold_verify: PASS`
-      (`TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-final`, ~00:14Z UTC).
+      (`TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-final`, ~00:17Z UTC).
       Fixture ratio **504 of 2721**; oracle seed **20260919** → old30=**91**,
       old45=**46**; `blank_line_wc_trap: DETECTED`; stranger journey PASS;
       published verb gap DETECTED; tip stats caveat PRESENT.
@@ -75,4 +75,4 @@ $ bash scripts/test_small_n.sh 2>&1 | tail -5
 7/7 green.
 ```
 
-Re-run at tip `d703142`, 2026-09-19 ~00:16Z UTC. Both paths **7/7**.
+Re-run 2026-09-19 ~00:18Z UTC on this branch. Both paths **7/7**.
