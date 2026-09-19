@@ -78,3 +78,5 @@ $ bash scripts/test_small_n.sh 2>&1 | tail -5
 ```
 
 Re-run 2026-09-19 ~12:21Z UTC on this branch. Both paths **7/7**.
+
+Tip CI green on HEAD after check-runs confirm (matrix 3.9/3.13 + cold-verify job).
