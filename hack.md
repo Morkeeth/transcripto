@@ -31,8 +31,8 @@ draft PR for Oscar review is the handoff, not a public post.
 - **OQ-3 (Oscar only):** Article post · X post · PyPI publish. Agent does not.
 - **OQ-4 (non-blocking, article honesty):** Do Desktop/Cowork transcripts under
   the same projects root inherit `desktopSessionCleanupPeriodDays` Default `0`
-  (no age limit)? Live mix of CLI vs Desktop files on Oscar's machine is not
-  knowable here. Docs object opened if reachable; live split is Oscar's.
+  (no age limit)? Docs object opened tonight
+  (`settings-reference.md` → Default `0`); live CLI/Desktop mix is Oscar's.
 - **OQ-5 (non-blocking, launch honesty):** Published PyPI `0.2.0` (re-derived
   tonight) lacks `import-example` / `changes` / `handoff` / `receive-handoff` /
   `import-lab` / `quickstart` and the tip `stats` anti-conflation caveat.
@@ -62,8 +62,8 @@ draft PR for Oscar review is the handoff, not a public post.
 9. A stranger path that only works with `.git` present is not fully cold —
    archive extracts must be exercised.
 10. Prior night-wave branches are the floor, not the plan. Re-run tonight;
-    do not copy old PASS lines as evidence. Main still lacks tonight's
-    docs/scripts for this launch path — that gap is tonight's object, not a
+    do not copy old PASS lines as evidence. Main still lacked tonight's
+    docs/scripts for this launch path — that gap was tonight's object, not a
     reason to paste yesterday's artifact.
 11. Ambition beyond the floor must be able to embarrass us: naive `find`
     winning retention, `stats` near-miss looking like retention, empty-index
@@ -71,9 +71,8 @@ draft PR for Oscar review is the handoff, not a public post.
     blank line), frozen quotes that do not reconcile, wheel cwd-shadow binding
     the tree, TZ pair traps, calendar↔duration deltas, touch↔utime planter
     disagreement, **published 0.2.0 missing tip stranger verbs and the stats
-    caveat**, **`python3 -m venv` exiting 0 with no `pip` (ensurepip missing)**,
-    and a true cold clone outside the agent worktree — all must be watched,
-    not narrated.
+    caveat**, **`python3 -m venv` leaving python without pip**, and a true cold
+    clone outside the agent worktree — all must be watched, not narrated.
 12. Preserve the approved NORTH STAR and PROMISE LINE. Do not shrink the vision
     to whatever dataset is easiest. The stranger product journey on main
     (`import-example` → `ask` → `changes` → `handoff` → `receive-handoff`) is
@@ -82,54 +81,71 @@ draft PR for Oscar review is the handoff, not a public post.
 ## PLAN (risk first)
 
 1. **Slice 1 — cold stranger at the file object + RED controls + stranger
-   product journey + beyond-floor traps (venv green-without-pip,
-   published-package gap, tonight's oracle seed).** ← NOW
-2. **Slice 2 — STEP 3 ruling at the README object** (tonight's line refs;
-   Oscar ticks; do not guess).
-3. **Slice 3 — STEP 0 `test_small_n.sh` re-run** logged in checklist footer.
-4. **Slice 4 — baseline arm** (pip-only / naive `find` vs tip; honest if
-   naive wins; document published 0.2.0 verb gap).
+   product journey + beyond-floor traps.** DONE.
+   Ran `TRANSCRIPTO_COLD_DIR=/tmp/transcripto-cold-tonight bash scripts/cold_verify.sh`
+   → `cold_verify: PASS`, `offline_core: PASS`, `ratio_30d: 504 of 2721`,
+   `independent_oracle: PASS` (91/46, seed 20260919), `negative_planter: PASS`,
+   `blank_line_wc_trap: DETECTED`, `stranger_product_journey: PASS`,
+   `stats_near_miss: DETECTED`, `venv_partial_without_pip: DETECTED`,
+   `published_stats_caveat: ABSENT`, `published_verb_gap: DETECTED`,
+   `tip_stats_caveat: PRESENT`, `tip_stranger_verbs: PRESENT`,
+   `venv_backend: virtualenv-fallback`, `tz_pair_trap: DETECTED`.
+   Artifact: `docs/COLD-VERIFY-2026-08-30.md`.
+   Also: archive PASS · wheel PASS · cold_clone PASS.
+2. **Slice 2 — STEP 3 ruling at the README object.** DONE.
+   `nl -ba README.md | sed -n '128,156p'` → invented demo L132–154;
+   `docs/STEP-3-README-BELOEVED-RULING.md` recommends KEEP; checklist unchecked.
+3. **Slice 3 — STEP 0 logged.** DONE.
+   `./test_small_n.sh` and `bash scripts/test_small_n.sh` → 7/7 in checklist footer.
+4. **Slice 4 — baseline arm that can embarrass us.** DONE.
+   `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` — naive `find`
+   wins retention; pip-only `retention` exit 2; stats 2721/2721 near-miss
+   DETECTED; gate 8 vs naive 12; published 0.2.0 caveat ABSENT; verb gap
+   DETECTED; wheel cwd-shadow DETECTED.
 
 ## NOW
 
-Slice 1 only. Write/port `scripts/cold_verify.sh` and privacy fail-closed
-controls; run them tonight; capture `docs/COLD-VERIFY-2026-08-30.md`. Do not
-advance to Slice 2 until Slice 1's done-when has been RUN.
-
-**Slice 1 done-when:** `bash scripts/cold_verify.sh` exits 0 and prints
-`cold_verify: PASS` with offline core, fixture or live retention method,
-independent oracle, negative planter, empty-grep controls, and at least the
-beyond-floor traps named in constitution §11 that this host can exercise.
+Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
+`find` re-derive (with TZ; no invented death rate; name calendar vs duration;
+Desktop mix), decide whether article waits on a PyPI cut that includes tip
+stranger verbs + stats caveat, then article/X/PyPI.
 
 ## LOG
 
 - 2026-09-19T00:11Z start: `git pull origin main` → already up to date at
-  `c5f5bbf`. Main has **no** `hack.md`, **no** `scripts/`, **no**
+  `c5f5bbf`. Main had **no** `hack.md`, **no** `scripts/`, **no**
   `docs/ARTICLE-01-SHIP-CHECKLIST.md`, **no** `docs/COLD-VERIFY-2026-08-30.md`.
-  Existing `docs/` holds OFFLINE-QUICKSTART + CLOUD-RECEIPT only.
+  Existing `docs/` held OFFLINE-QUICKSTART + CLOUD-RECEIPT only.
 - Queue empty (`cursor-cloud-get-message-queue` → `queuedMessageCount: 0`).
 - Branch: `cursor/night-wave-p1-cold-verify-47f3`.
 - START at object: `./test_small_n.sh` → **7/7 green**.
   `bash scripts/test_small_n.sh` → missing (no `scripts/` yet).
-- `python3 -m pip install -e . -q` → installed (script under `~/.local/bin`).
 - `python3 -m unittest discover -s tests -q` → **94 OK** (re-derived).
 - `curl`/PyPI JSON → **0.2.0** live (re-derived).
 - No live `~/.claude/projects` on this VM (OQ-1).
-- Host `TZ=` (empty → UTC tools). `date -u` at start: `2026-09-19T00:11:17Z`.
-- README object opened: invented demo at **L132–154**
-  (`nl -ba README.md | sed -n '128,156p'`).
+- Host `TZ=` empty (UTC tools). README invented demo at **L132–154**.
 - `printf '' | grep -q .` → exit **1**. `printf '' | grep -qv x` → exit **1**.
 - Embarrassment at start (main, RUN):
-  - Empty `git init` + copy of `test_privacy.sh` → printed
-    `PRIVACY OK: 0 structural hits in 1 production/doc files` and exited **0**
-    (`wc -l` on a blank line invents the 1).
-  - `python3 -m venv` → exit **0**, `bin/python` works, **`bin/pip` absent**,
-    `ensurepip` missing. Green-on-broken.
-  - Published wheel `transcripto-0.2.0`: **no** parsers for
-    `import-example` / `handoff` / `receive-handoff` / `import-lab` /
-    `quickstart`; tip source has those stranger verbs. Tip `cmd_stats` has
-    **no** file-age anti-conflation caveat yet.
-- Prior tips on origin (`night-wave-p1-cold-verify-4eac` @ `4897958`, …) are
-  the **floor** — evidence of what was attempted, **not** tonight's PASS. This
-  wave re-runs at the object on tip `c5f5bbf` with oracle seed **20260919**.
-- hack.md written before any product/scripts code.
+  - Empty `git init` + copy of `test_privacy.sh` →
+    `PRIVACY OK: … in 1 production/doc files` exit **0** (`wc -l` blank line).
+  - `python3 -m venv` exit **0**, python without pip, ensurepip missing.
+  - Published wheel lacks tip stranger verbs; tip `cmd_stats` lacked file-age
+    caveat until Slice 1.
+- Prior tips (`4eac` @ `4897958`, …) are the **floor** — not tonight's PASS.
+- hack.md written before any product/scripts code; committed; pushed (`64744a5`).
+- Slice 1: privacy fail-closed; `scripts/cold_verify.sh` with offline core,
+  oracle (seed 20260919 → 91/46), negative planter, death-rate, empty-grep,
+  **blank-line wc trap**, symlink inflation, boundary, multi-TZ (pair trap
+  DETECTED), frozen-quote, calendar↔duration, touch↔utime, stats near-miss,
+  product boundary, stranger journey, HEAD-archive privacy, published stats
+  caveat gap, published verb gap, venv partial-without-pip.
+- Archive / wheel / cold_clone / pip_only baseline → **PASS**.
+- Slice 2: KEEP ruling at L132–154; Oscar ticks open.
+- Slice 3: both small-n paths **7/7**.
+- Slice 4: naive find wins; published verb gap DETECTED.
+- Unit tests: **94 OK**.
+- Docs object (OQ-4): `cleanupPeriodDays` Default `30`;
+  `desktopSessionCleanupPeriodDays` Default `0` (no age limit) — re-derived.
+- Beyond floor vs `4eac`: oracle seed **20260919** (91/46, not carried 90/46);
+  blank-line `wc -l` trap watched DETECTED; TZ pair trap DETECTED tonight;
+  Desktop default `0` opened at the docs object.
