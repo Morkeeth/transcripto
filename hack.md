@@ -156,3 +156,5 @@ stranger verbs + stats caveat, then article/X/PyPI.
 - Beyond floor vs `47f3`: UTC-date oracle seed (method, not carried literal);
   Desktop dual-gate named; find|head SIGPIPE watched; honest TZ = none tonight
   (did not invent a pair trap).
+- Tip HEAD `36ae349`: CI subscribed (`sub_b171a608…`); run `35442712127` in progress at handoff. Prior pushes on this branch (`4dc4a7c`, `db2b68d`, `30ebfed`) concluded **success** (`gh run list`).
+- ManagePullRequest: draft PR registered for user approval (not auto-created per repo settings). Branch pushed for Oscar to open.
