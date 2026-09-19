@@ -150,3 +150,4 @@ stranger verbs + stats caveat, then article/X/PyPI.
   blank-line `wc -l` trap watched DETECTED; TZ pair trap DETECTED tonight;
   Desktop default `0` opened at the docs object.
 - Final refresh after docs on HEAD `a50a724`: cold_verify PASS (oracle 91/46); privacy 37/224; pip_only naive-wins; small_n 7/7.
+- Tip CI green after check-runs confirm (matrix 3.9/3.13 + cold-verify job) on branch pushes through docs commits.

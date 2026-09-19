@@ -2,7 +2,7 @@
 
 Cloud prepares. Oscar ticks. Agent does not post, publish, or bump PyPI.
 
-Tip tonight: `d703142` on `cursor/night-wave-p1-cold-verify-47f3`.
+Branch: `cursor/night-wave-p1-cold-verify-47f3` (tip = `git rev-parse --short HEAD`).
 Artifact: `docs/COLD-VERIFY-2026-08-30.md`. Ruling:
 `docs/STEP-3-README-BELOEVED-RULING.md`. Baseline: `docs/BASELINE-ARM.md`.
 
