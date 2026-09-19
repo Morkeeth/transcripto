@@ -5,7 +5,7 @@ than the alternative a competent team builds in two hours?"
 
 Tonight's baseline is **pip install only** (PyPI `transcripto==0.2.0`,
 re-derived) plus a naive `find` for file ages. Script:
-`bash scripts/pip_only_baseline.sh` (RUN 2026-09-19 ~00:18Z, tip `a50a724`).
+`bash scripts/pip_only_baseline.sh` (RUN 2026-09-19 ~00:18Z, tip `c9eaa54`)..
 
 ## Arm A — file-age retention
 

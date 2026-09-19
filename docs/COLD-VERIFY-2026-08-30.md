@@ -7,7 +7,7 @@ This VM has no `~/.claude/projects`. Tonight's PASS is **method + arithmetic
 fixture + independent oracle + RED controls + stranger product journey**, not
 a live re-derive of Oscar's corpus. Live numbers remain machine-local (OQ-1).
 
-Tip: `a50a724` on `cursor/night-wave-p1-cold-verify-47f3`. Host tools in UTC
+Tip: `c9eaa54` (cold_verify RUN at `a50a724`) on `cursor/night-wave-p1-cold-verify-47f3`. Host tools in UTC
 (`TZ` empty). Oracle seed **20260919** (re-derived tonight; not carried).
 
 ## One command (cold stranger)

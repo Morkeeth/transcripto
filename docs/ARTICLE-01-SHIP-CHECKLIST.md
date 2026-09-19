@@ -2,7 +2,7 @@
 
 Cloud prepares. Oscar ticks. Agent does not post, publish, or bump PyPI.
 
-Tip tonight: `a50a724` on `cursor/night-wave-p1-cold-verify-47f3`.
+Tip tonight: `c9eaa54` on `cursor/night-wave-p1-cold-verify-47f3`.
 Artifact: `docs/COLD-VERIFY-2026-08-30.md`. Ruling:
 `docs/STEP-3-README-BELOEVED-RULING.md`. Baseline: `docs/BASELINE-ARM.md`.
 
@@ -75,4 +75,4 @@ $ bash scripts/test_small_n.sh 2>&1 | tail -5
 7/7 green.
 ```
 
-Re-run at tip `a50a724`, 2026-09-19 ~00:16Z UTC. Both paths **7/7**.
+Re-run at tip `c9eaa54`, 2026-09-19 ~00:16Z UTC. Both paths **7/7**.
