@@ -9,6 +9,9 @@ Helicon may check process. It must not score thematic truth.
 - [x] Themes must include a disconfirming episode.
 - [x] Human decisions are KEEP / REVISE / REJECT plus one sentence.
 - [x] Gateway is opt-in, fail-closed, and not on Transcripto's default path.
+- [x] Live generative requests put `zeroDataRetention` and `disallowPromptTraining` under `providerOptions.gateway`, not at the top level.
+- [x] Live generative receipts record wall-clock `latency_ms`.
+- [x] `/v1/chat/completions` is generative only. Jev stays on `/v1/evaluate` and is refused here.
 - [x] Raw live receipts are mode 0600 under `.trial/` and are gitignored.
 - [ ] Human baseline before live model exposure is still owed for Stage 1.
 - [ ] Stage 1 redacted export is not started.

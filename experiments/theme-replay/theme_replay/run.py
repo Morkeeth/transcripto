@@ -67,7 +67,8 @@ def run_gateway(frozen: Path, models: list[str], out: Path, *, zdr: bool, no_tra
     index = load_frozen(frozen)
     results = []
     for i, model in enumerate(models, 1):
-        raw = complete(model, prompt, zdr=zdr, no_training=no_training)
+        call = complete(model, prompt, zdr=zdr, no_training=no_training)
+        raw = call["payload"]
         text = (
             raw.get("choices", [{}])[0]
             .get("message", {})
@@ -79,22 +80,34 @@ def run_gateway(frozen: Path, models: list[str], out: Path, *, zdr: bool, no_tra
             output = {"raw_text": text}
         errors = validate_model_output(output, index) if "codes" in output else ["model did not return JSON schema"]
         usage = raw.get("usage") or {}
+        gateway_meta = (raw.get("providerMetadata") or {}).get("gateway") or {}
+        tokens = usage.get("total_tokens")
+        if tokens is None:
+            tokens = (usage.get("inputTokens") or 0) + (usage.get("outputTokens") or 0)
         receipt = {
             "arm": f"arm-{i}",
             "label": model.replace("/", "-"),
             "model": model,
             "offline": False,
             "at": _now(),
-            "latency_ms": None,
-            "tokens": usage.get("total_tokens", 0),
-            "cost": raw.get("cost"),
+            "latency_ms": call["latency_ms"],
+            "tokens": tokens,
+            "cost": gateway_meta.get("cost", raw.get("cost")),
             "zdr": zdr,
             "disallow_prompt_training": no_training,
+            "provider_options": call["provider_options"],
             "errors": errors,
             "output": output,
         }
         _write_private(out / f"{receipt['label']}.json", receipt)
-        _write_private(out / f"{receipt['label']}.raw.json", {"request_prompt_hash": hashlib.sha256(prompt.encode()).hexdigest(), "response": raw})
+        _write_private(
+            out / f"{receipt['label']}.raw.json",
+            {
+                "request_prompt_hash": hashlib.sha256(prompt.encode()).hexdigest(),
+                "provider_options": call["provider_options"],
+                "response": raw,
+            },
+        )
         results.append({"arm": receipt["arm"], "label": receipt["label"], "errors": errors})
     summary = {"stage": 0, "offline": False, "arms": results, "prompt_hash": hashlib.sha256(prompt.encode()).hexdigest()}
     (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf8")

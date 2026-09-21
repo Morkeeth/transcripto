@@ -22,7 +22,7 @@ PYTHONPATH=. python3 -m theme_replay review .trial/runs --frozen .trial/frozen \
   --decide finish-line-moves KEEP "The correction is on the page."
 ```
 
-Live Gateway is opt-in and fail-closed:
+Live generative Gateway is opt-in and fail-closed. It posts to `/v1/chat/completions` with `providerOptions.gateway.zeroDataRetention` and `disallowPromptTraining`. `--zdr` and `--no-training` are required. Wall-clock `latency_ms` is recorded on the receipt.
 
 ```sh
 PYTHONPATH=. python3 -m theme_replay run .trial/frozen \
@@ -30,6 +30,8 @@ PYTHONPATH=. python3 -m theme_replay run .trial/frozen \
   --zdr --no-training \
   --out .trial/runs-live
 ```
+
+That path cannot serve Jev. Jev (`typesafe-ai/jev`) is a separate evaluation trial on `POST /v1/evaluate`. This runner refuses Jev model ids so the two trials stay distinct.
 
 Human decisions are KEEP, REVISE, or REJECT plus one sentence. `CHANGES MY VIEW` is accepted as REVISE.
 

@@ -5,7 +5,14 @@ import unittest
 from pathlib import Path
 
 from theme_replay.freeze import freeze
-from theme_replay.gateway import require_key
+from theme_replay.gateway import (
+    CHAT_COMPLETIONS_URL,
+    EVALUATE_URL,
+    assert_chat_completions_url,
+    chat_completions_body,
+    complete,
+    require_key,
+)
 from theme_replay.review import record_decision, render
 from theme_replay.run import run_offline
 from theme_replay.schema import FORBIDDEN_PATH_MARKERS
@@ -85,6 +92,70 @@ class Stage0Tests(unittest.TestCase):
         os.environ.pop("VERCEL_AI_GATEWAY_API_KEY", None)
         with self.assertRaises(RuntimeError):
             require_key()
+
+    def test_generative_request_puts_privacy_flags_under_provider_options(self):
+        body = chat_completions_body(
+            "anthropic/claude-sonnet-5",
+            "prompt",
+            zdr=True,
+            no_training=True,
+        )
+        gateway = body["providerOptions"]["gateway"]
+        self.assertEqual(gateway["zeroDataRetention"], True)
+        self.assertEqual(gateway["disallowPromptTraining"], True)
+        self.assertNotIn("zeroDataRetention", body)
+        self.assertNotIn("disallowPromptTraining", body)
+
+    def test_generative_run_refuses_jev_and_evaluate_url(self):
+        with self.assertRaises(RuntimeError) as raised:
+            chat_completions_body("typesafe-ai/jev", "prompt", zdr=True, no_training=True)
+        self.assertIn("/v1/evaluate", str(raised.exception))
+        self.assertIn(EVALUATE_URL, str(raised.exception))
+        with self.assertRaises(RuntimeError):
+            assert_chat_completions_url(EVALUATE_URL)
+        assert_chat_completions_url(CHAT_COMPLETIONS_URL)
+
+    def test_live_generative_run_requires_zdr_flags(self):
+        with self.assertRaises(RuntimeError):
+            chat_completions_body("anthropic/claude-sonnet-5", "prompt", zdr=False, no_training=True)
+        with self.assertRaises(RuntimeError):
+            chat_completions_body("anthropic/claude-sonnet-5", "prompt", zdr=True, no_training=False)
+
+    def test_complete_records_wall_clock_latency(self):
+        import json as json_lib
+        from unittest import mock
+        from urllib.request import Request
+
+        class FakeResp:
+            def read(self):
+                return json_lib.dumps({"choices": [{"message": {"content": "{}"}}]}).encode()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        os.environ["AI_GATEWAY_API_KEY"] = "test-not-a-live-key"
+        try:
+            with mock.patch("urllib.request.urlopen", return_value=FakeResp()) as opener:
+                call = complete(
+                    "anthropic/claude-sonnet-5",
+                    "prompt",
+                    zdr=True,
+                    no_training=True,
+                )
+            request = opener.call_args[0][0]
+            self.assertIsInstance(request, Request)
+            self.assertEqual(request.full_url, CHAT_COMPLETIONS_URL)
+            sent = json_lib.loads(request.data.decode())
+            self.assertEqual(sent["providerOptions"]["gateway"]["zeroDataRetention"], True)
+            self.assertNotIn("zeroDataRetention", sent)
+            self.assertIsInstance(call["latency_ms"], float)
+            self.assertIsNotNone(call["latency_ms"])
+            self.assertIn("payload", call)
+        finally:
+            os.environ.pop("AI_GATEWAY_API_KEY", None)
 
     def test_freeze_rejects_private_paths(self):
         with tempfile.TemporaryDirectory() as tmp:
