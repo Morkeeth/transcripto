@@ -89,9 +89,10 @@ class Stage0Tests(unittest.TestCase):
     def test_freeze_rejects_private_paths(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "private.jsonl"
+            forbidden_target = FORBIDDEN_PATH_MARKERS[0] + "oscar/.claude/projects/x"
             source.write_text(
                 '{"episode_id":"E99","harness":"claude","kind":"succeeded","provenance":"synthetic",'
-                '"request":"x","events":[{"tool":"Read","kind":"read","target":"/Users/oscar/.claude/projects/x",'
+                f'"request":"x","events":[{{"tool":"Read","kind":"read","target":"{forbidden_target}",'
                 '"status":"succeeded","evidence":"ok"}]}\n',
                 encoding="utf8",
             )
