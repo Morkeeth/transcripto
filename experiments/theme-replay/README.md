@@ -23,7 +23,7 @@ PYTHONPATH=. python3 -m theme_replay review .trial/runs --frozen .trial/frozen \
   --decide finish-line-moves KEEP "The correction is on the page."
 ```
 
-Receipts are blind. `run` shuffles arms with a recorded `--seed` and names them `arm-N.json`. The arm-to-model key is `blind.json` (mode 0600). `review` and `compare` never read model ids from receipts.
+Receipts are blind. `run` shuffles arms with a recorded `--seed` and names them `arm-N.json`. The arm-to-model key is `blind.json` (mode 0600). Receipts carry no model id. `review` never opens `blind.json`. `compare` reads it only to group repeats, and emits `G1`, `G2` labels.
 
 `compare` is the arm M view. It lists shared readings, unique readings, contested episodes (support in one arm, counterexample in another), uncited episodes and repeat drift. Two themes count as one reading when their supporting episodes overlap by at least half. It gives no single number. Overlap is not validity.
 

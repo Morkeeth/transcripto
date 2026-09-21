@@ -493,8 +493,11 @@ class CompareTests(unittest.TestCase):
             self.assertIn("E03", report["uncited_episodes"] + [
                 e for row in report["arms"].values() for e in row["cited_episodes"]])
             self.assertTrue((runs / "compare.json").exists())
-            for receipt in load_receipts(runs):
-                self.assertNotIn(receipt["output"]["model"], json.dumps(report))
+            hidden = json.loads((runs / "blind.json").read_text())["arms"]
+            receipts_text = " ".join(p.read_text() for p in runs.glob("arm-*.json"))
+            for row in hidden.values():
+                self.assertNotIn(row["model"], json.dumps(report))
+                self.assertNotIn(row["model"], receipts_text)
 
     def test_repeat_drift_is_reported_per_hidden_model(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -57,7 +57,7 @@ def _write_blind(out: Path, seed: int, mapping: dict[str, dict[str, Any]]) -> No
         out / "blind.json",
         {
             "seed": seed,
-            "note": "Unblinding key. Do not open before human decisions are recorded.",
+            "note": "Unblinding key. Humans do not open it before decisions are recorded. compare reads it only to group repeats and emits G labels.",
             "arms": mapping,
         },
     )
@@ -84,7 +84,7 @@ def run_offline(frozen: Path, arms_dir: Path, out: Path, *, seed: int | None = N
             "tokens": 0,
             "cost": 0,
             "errors": errors,
-            "output": output,
+            "output": {k: v for k, v in output.items() if k != "model"},
         }
         _write_private(out / f"{arm}.json", receipt)
         mapping[arm] = {"model": job["model"], "source": job["source"].name, "run": 1}
