@@ -9,12 +9,10 @@ from .schema import normalize_decision
 
 
 def load_receipts(runs: Path) -> list[dict]:
-    rows = []
-    for file in sorted(runs.glob("*.json")):
-        if file.name in {"summary.json", "verify.json", "decisions.json"}:
-            continue
-        rows.append(json.loads(file.read_text(encoding="utf8")))
-    return rows
+    """Arm receipts only. blind.json, raw bodies and reports are never read here."""
+    files = [p for p in runs.glob("arm-*.json") if not p.name.endswith(".raw.json")]
+    files.sort(key=lambda p: int(p.stem.split("-")[1]) if p.stem.split("-")[1].isdigit() else 0)
+    return [json.loads(p.read_text(encoding="utf8")) for p in files]
 
 
 def render(frozen: Path, runs: Path) -> str:
@@ -43,6 +41,24 @@ def render(frozen: Path, runs: Path) -> str:
                 lines.append(
                     f"         Open: {ev.get('episode_id')} line {ev.get('line')}  {ev.get('quote')!r}"
                 )
+        lines.append("")
+    compare_path = runs / "compare.json"
+    if compare_path.exists():
+        report = json.loads(compare_path.read_text(encoding="utf8"))
+        lines.append("DIVERGENCE  descriptive only, overlap is not validity")
+        for row in report.get("shared_readings") or []:
+            lines.append(f"  SHARED     {' + '.join(row['arms'])}  " + " / ".join(t["name"] for t in row["themes"]))
+        for row in report.get("unique_readings") or []:
+            lines.append(f"  UNIQUE     {row['arms'][0]}  " + " / ".join(t["name"] for t in row["themes"]))
+        for row in report.get("contested_episodes") or []:
+            lines.append(
+                f"  CONTESTED  {row['episode_id']}  supports in {', '.join(row['supports_in'])}; "
+                f"counterexample in {', '.join(row['counterexample_in'])}"
+            )
+        if report.get("uncited_episodes"):
+            lines.append(f"  UNCITED    {', '.join(report['uncited_episodes'])}")
+        for row in report.get("repeat_drift") or []:
+            lines.append(f"  DRIFT      {row['model_group']} {', '.join(row['arms'])}  concepts changed={row['central_concepts_changed']}")
         lines.append("")
     return "\n".join(lines)
 

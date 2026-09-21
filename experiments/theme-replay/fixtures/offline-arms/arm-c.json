@@ -1,0 +1,54 @@
+{
+  "model": "offline-c",
+  "analytic_position": "Read the recorded results first, then the later human turns. Silence in the record is its own class.",
+  "codes": [
+    {
+      "label": "the human names a different object",
+      "episode_ids": ["E04", "E08", "E12"],
+      "evidence": [
+        {
+          "episode_id": "E04",
+          "quote": "No, I meant the header parser in lab/src/http/headers.py.",
+          "line": 2
+        }
+      ],
+      "interpretation": "The correction replaces the target, not the method.",
+      "counterevidence": [{"episode_id": "E05", "reason": "E05 keeps its first target and needs no correction."}],
+      "confidence": "tentative"
+    },
+    {
+      "label": "no result is recorded for the check",
+      "episode_ids": ["E03", "E07", "E11"],
+      "evidence": [
+        {
+          "episode_id": "E03",
+          "quote": "No matching tool result recorded.",
+          "line": 2,
+          "claimed_status": "unknown"
+        }
+      ],
+      "interpretation": "Nobody corrects these episodes because nothing in the record says the work went wrong. That is not the same as success.",
+      "counterevidence": [{"episode_id": "E01", "reason": "E01 records its test result, so the question has an answer."}],
+      "confidence": "tentative"
+    }
+  ],
+  "themes": [
+    {
+      "name": "The object changes under the agent",
+      "central_concept": "A later human turn names a different target than the one the agent acted on.",
+      "codes": ["the human names a different object"],
+      "supporting_episodes": ["E04", "E08", "E12"],
+      "disconfirming_episodes": ["E05"],
+      "limits": "Synthetic corpus only."
+    },
+    {
+      "name": "Silence is not success",
+      "central_concept": "An unknown result escapes correction because nothing in the record invites one.",
+      "codes": ["no result is recorded for the check"],
+      "supporting_episodes": ["E03", "E07", "E11"],
+      "disconfirming_episodes": ["E01"],
+      "limits": "Synthetic corpus only. Absence of a correction is not evidence that the work was right."
+    }
+  ],
+  "questions_for_human": ["Should an episode with no recorded result count as needing correction?"]
+}
