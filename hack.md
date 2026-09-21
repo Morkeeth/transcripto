@@ -148,3 +148,4 @@ Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
 - ensurepip absent on host → `venv_partial_without_pip: DETECTED`;
   virtualenv fallback used.
 - Remote stranger clone of this branch → `bash scripts/cold_verify.sh` → **PASS**.
+- GitHub Actions tip `aea99dd`: test 3.9 + 3.13 + cold-verify all **success**.
