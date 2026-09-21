@@ -804,6 +804,12 @@ def cmd_stats(args):
     print("\033[2mthe rest is the machine answering. `coach` counts raw transcript records"
           " instead\n  of indexed messages, so its share is smaller; same numerator, wider"
           " population.\033[0m")
+    # Anti-conflation: on a retention fixture of N single-message files, the
+    # message total can equal the file count (e.g. 2,721). That digit is still
+    # a message count — not "files older than 30 days". Name the object.
+    print("\033[2mThese are indexed message counts, not transcript file ages."
+          " File retention is a find/mtime question, not this command.\033[0m")
+
 
     print("\n\033[1mwhere you typed them\033[0m")
     rows = con.execute("SELECT cwd,COUNT(*) n FROM messages WHERE " + HUMAN +
