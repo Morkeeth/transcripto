@@ -36,9 +36,10 @@ draft PR for Oscar review is the handoff, not a public post.
   Default `0` **and** dual-gate with `cleanupPeriodDays` Default `30`); live
   CLI/Desktop mix is Oscar's.
 - **OQ-5 (non-blocking, launch honesty):** Published PyPI `0.2.0` (re-derived
-  tonight) may lack tip stranger verbs and/or the tip `stats` anti-conflation
-  caveat. README stranger flow works from **source** (`.`); `pip install
-  transcripto==0.2.0` is a different object — measure it, do not assume.
+  tonight) lacks tip stranger verbs (`import-example` / `changes` / `handoff` /
+  `receive-handoff` / `import-lab` / `quickstart`) and the tip `stats`
+  anti-conflation caveat. README stranger flow works from **source**;
+  `pip install transcripto==0.2.0` is a different object.
 
 ## CONSTITUTION
 
@@ -63,9 +64,8 @@ draft PR for Oscar review is the handoff, not a public post.
 9. A stranger path that only works with `.git` present is not fully cold —
    archive extracts must be exercised.
 10. Prior night-wave branches are the floor, not the plan. Re-run tonight;
-    do not copy old PASS lines as evidence. Main still lacks docs/scripts for
-    cold verify — that gap is tonight's object, not a reason to paste
-    yesterday's artifact.
+    do not copy old PASS lines as evidence. Main still lacked cold-verify
+    docs/scripts at start — that gap was tonight's object.
 11. Two frozen stamps (504/2721 and 579/2874) must not be allowed to print a
     daily death rate. An executable control rejects that arithmetic.
 12. `test_privacy.sh` must fail closed on an empty `git ls-files`. A green
@@ -74,33 +74,41 @@ draft PR for Oscar review is the handoff, not a public post.
 ## PLAN (risk first)
 
 1. **Slice 1 — cold stranger at the file object + RED controls + death-rate
-   impossibility + docs desktop caveat.** NOW.
-   Deliverable: `scripts/cold_verify.sh` + `docs/COLD-VERIFY-2026-08-30.md`
-   with tonight's command output. Floor: prior `night-wave-p1-launch-d229`.
-2. **Slice 2 — STEP 3 ruling at the README object.**
-   `nl -ba README.md` on tonight's tip; ruling doc; checklist unchecked.
-3. **Slice 3 — STEP 0 logged.**
+   impossibility + docs desktop caveat.** DONE.
+   Ran `bash scripts/cold_verify.sh` → `cold_verify: PASS`,
+   `death_rate_impossible: PASS`, `empty_grep_control: PASS`,
+   `independent_oracle: PASS` (87/40, seed 20260921), `negative_planter: PASS`,
+   `offline_core: PASS`, docs dual-gate + desktop immortal,
+   `pypi_package_audit: PASS`, `published_verb_gap: DETECTED`,
+   `published_stats_caveat: ABSENT`. Artifact:
+   `docs/COLD-VERIFY-2026-08-30.md`.
+2. **Slice 2 — STEP 3 ruling at the README object.** DONE.
+   `nl -ba README.md | sed -n '128,156p'` → invented demo L132–154;
+   `docs/STEP-3-README-BELOEVED-RULING.md` recommends KEEP; checklist unchecked.
+3. **Slice 3 — STEP 0 logged.** DONE.
    `./test_small_n.sh` and `bash scripts/test_small_n.sh` → 7/7 in checklist
-   footer (START already showed 7/7 on `./test_small_n.sh` tonight).
-4. **Slice 4 — baseline arm that can embarrass us.**
-   `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` — honest if
-   naive `find` wins retention / pip-only cannot reproduce cold_verify.
+   footer.
+4. **Slice 4 — baseline arm that can embarrass us.** DONE.
+   `docs/BASELINE-ARM.md` + `bash scripts/pip_only_baseline.sh` — naive `find`
+   wins retention; pip-only `retention` exit 2; stats 2721/2721 near-miss
+   DETECTED; gate 8 vs naive 12; archive + wheel + cold-clone strangers PASS;
+   cwd-shadow DETECTED; PyPI wheel has no cold_verify; verb gap DETECTED.
 
 ## NOW
 
-**Slice 1** — land cold_verify + privacy fail-closed + capture COLD-VERIFY
-artifact by running the script. Do not tick PASS from a prior wave.
+Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
+`find` re-derive (with TZ + Desktop mix check), article/X/PyPI.
 
 ## LOG
 
 - 2026-09-21T00:07Z start: `git pull origin main` ok; branch
-  `cursor/night-wave-p1-launch-0583`. Main tip `c5f5bbf` has
+  `cursor/night-wave-p1-launch-0583`. Main tip `c5f5bbf` had
   `docs/OFFLINE-QUICKSTART.md` + `docs/CLOUD-RECEIPT-…` but **no** `hack.md`,
   **no** `scripts/`, **no** ARTICLE/COLD-VERIFY/BASELINE/STEP-3 docs.
 - START: `./test_small_n.sh` → **7/7 green** (command ran).
 - `python3 -m pip install -e . -q` ok (script lands in `~/.local/bin`).
-- Unit tests at start: **94 OK** (`python3 -m unittest discover -s tests -q`).
-- PyPI JSON at start: **0.2.0** (`curl …/pypi/transcripto/json`).
+- Unit tests at start: **94 OK**.
+- PyPI JSON at start: **0.2.0**.
 - No live `~/.claude/projects` (OQ-1).
 - Docs object opened at start (`curl` settings-reference.md):
   `cleanupPeriodDays` **Default: `30`**;
@@ -109,8 +117,34 @@ artifact by running the script. Do not tick PASS from a prior wave.
   with `cleanupPeriodDays`.
 - Embarrassment at start (main `test_privacy.sh`): empty `git init` + copy
   script → `printf` blank-line `wc -l` invents **1** production file and exits
-  **0** ("PRIVACY OK"). Fail-closed is missing on main; prior waves fixed it
-  off-main and it never landed.
+  **0** ("PRIVACY OK"). Fail-closed was missing on main.
 - Prior remotes (esp. `cursor/night-wave-p1-launch-d229`) are the **floor** —
   evidence of what was attempted, **not** tonight's PASS.
-- hack.md written before product/scripts code.
+- hack.md written before product/scripts code; committed; pushed.
+- Slice 1: privacy fail-closed; `scripts/cold_verify.sh` with offline core,
+  oracle (seed 20260921), negative planter, death-rate impossibility,
+  empty-grep + blank-line wc, symlink inflation, boundary, TZ pair trap,
+  stats near-miss, docs dual-gate, PyPI package audit + verb/caveat gaps,
+  stranger product journey. `bash scripts/cold_verify.sh` → **PASS**
+  (captured in `docs/COLD-VERIFY-2026-08-30.md`).
+- Oracle tonight: old30=**87**, old45=**40** (not carried from prior waves).
+- Death-rate: frozen delta old +75 / total +153 → laundered "75 deaths"
+  FORBIDDEN.
+- Stats near-miss: `2,721 of the 2,721 messages … 100.0%` DETECTED; tip caveat
+  PRESENT; published ABSENT.
+- duration_vs_calendar counted_by_bang_newermt=**0** tonight.
+- TZ: **divergence OBSERVED** — LA `2026-08-21` vs UTC/Tokyo/London
+  `2026-08-22`; pair trap DETECTED.
+- Archive stranger → **PASS**. Wheel stranger → **PASS** (cwd shadow
+  DETECTED). Cold clone → **PASS**. pip-only baseline → **PASS** (naive find
+  wins).
+- Slice 2: README L132–154 invented demo; KEEP ruling; Oscar ticks open.
+- Slice 3: both small-n paths **7/7**; logged in checklist footer.
+- Slice 4: baseline doc + pip_only; PyPI wheel audit 0 cold_verify hits;
+  published verb gap DETECTED.
+- Unit tests after: **94 OK**.
+- README Development points at `bash scripts/cold_verify.sh`.
+- `test_privacy_empty_index.sh` added to the matrix via `test_*.sh` glob.
+- ensurepip absent on host → `venv_partial_without_pip: DETECTED`;
+  virtualenv fallback used.
+- Remote stranger clone of this branch → `bash scripts/cold_verify.sh` → **PASS**.
