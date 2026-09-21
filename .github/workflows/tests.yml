@@ -16,6 +16,9 @@ jobs:
       - name: Install distribution test tooling
         run: python -m pip install build
       - run: python -m unittest discover -s tests -v
+      - name: Stage 0 theme-replay experiment
+        working-directory: experiments/theme-replay
+        run: PYTHONPATH=. python -m unittest tests.test_theme_replay -v
       - run: for test in test_*.sh; do bash "$test" || exit 1; done
       - run: python -m pip wheel --no-deps . --wheel-dir /tmp/wheels
       - run: python -m pip install --no-deps /tmp/wheels/transcripto-*.whl

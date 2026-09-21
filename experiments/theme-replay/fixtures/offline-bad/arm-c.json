@@ -1,0 +1,31 @@
+{
+  "model": "offline-c",
+  "analytic_position": "Fabricated evidence to prove the verifier.",
+  "codes": [
+    {
+      "label": "invented quote",
+      "episode_ids": ["E02"],
+      "evidence": [
+        {
+          "episode_id": "E02",
+          "quote": "Oscar told me to ship the wallet keys tonight.",
+          "line": 1
+        }
+      ],
+      "interpretation": "This quote is not in the frozen corpus.",
+      "counterevidence": [],
+      "confidence": "tentative"
+    }
+  ],
+  "themes": [
+    {
+      "name": "A smooth story",
+      "central_concept": "The model invents a private motive.",
+      "codes": ["invented quote"],
+      "supporting_episodes": ["E02"],
+      "disconfirming_episodes": [],
+      "limits": "none"
+    }
+  ],
+  "questions_for_human": []
+}
