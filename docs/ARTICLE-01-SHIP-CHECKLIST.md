@@ -111,4 +111,9 @@ $ python3 -m unittest discover -s tests -q
 … Ran 94 tests … OK
 ```
 
+$ git clone --depth 1 --branch cursor/night-wave-p1-launch-8b78 \
+    https://github.com/Morkeeth/transcripto.git /tmp/transcripto-remote-stranger
+$ cd /tmp/transcripto-remote-stranger && bash scripts/cold_verify.sh
+… cold_verify: PASS
+
 Not done (by design): article post · X post · PyPI bump · publish.

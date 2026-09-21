@@ -141,3 +141,5 @@ Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
 - Unit tests after: **94 OK**.
 - Docs object: cleanup Default 30; desktop Default 0; dual-gate; sweep after
   session start; managed cleanupPeriodDays ignores Desktop key.
+- Remote stranger: `git clone --depth 1 --branch cursor/night-wave-p1-launch-8b78
+  … && bash scripts/cold_verify.sh` → **PASS**.
