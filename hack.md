@@ -143,3 +143,4 @@ Done. Slices 1–4 shipped. Oscar morning clicks: STEP 3 KEEP/TRIM, live
   session start; managed cleanupPeriodDays ignores Desktop key.
 - Remote stranger: `git clone --depth 1 --branch cursor/night-wave-p1-launch-8b78
   … && bash scripts/cold_verify.sh` → **PASS**.
+- GitHub Actions tip `dfe42b2`: test 3.9 + 3.13 + cold-verify all **success**.
