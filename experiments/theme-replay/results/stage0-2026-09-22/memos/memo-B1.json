@@ -1,0 +1,276 @@
+{
+  "memo": "B1",
+  "condition": "B",
+  "arms": [],
+  "prompt_sha256": "dc4e9478559366565bacbcfa94d929a041b3bb5a12c792e40d3aa12dc03bc778",
+  "prompt_chars": 4715,
+  "at": "2026-09-22T21:26:10.336574+00:00",
+  "latency_ms": 141936.1,
+  "usage": {
+    "prompt_tokens": 1310,
+    "completion_tokens": 8767,
+    "reasoning_tokens": 7547,
+    "total_tokens": 10077,
+    "cost_usd": 0.0677175
+  },
+  "finish_reason": "stop",
+  "upstream_provider": "InferenceNet",
+  "parse_step": "as_returned",
+  "output": {
+    "memo": [
+      {
+        "claim": "Every correction in the corpus rewrites the user's own initial specification rather than addressing agent behavior: E04 swaps the named file ('No, I meant...'), E08 changes the filename and scope, and E12 reverses the instruction to ship the helper as the public API.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 1,
+            "quote": "Refactor the auth parser in lab/src/auth/parser.py"
+          },
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py"
+          },
+          {
+            "episode_id": "E08",
+            "line": 1,
+            "quote": "Document the caching layer in lab/docs/caching.md."
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E12",
+            "line": 1,
+            "quote": "Ship the retry helper as the public API."
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "In all three correction episodes the correction sits on the line immediately after the request and before any tool event, so corrections intercept the plan rather than react to tool output.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py"
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Failed tool matches \u2014 'text not found', 'context mismatch', 'old_string not found' \u2014 occur in E02, E06 and E10 with no correction recorded, so tool failure by itself does not make an episode require correction.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "line": 2,
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: text not found",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "line": 2,
+            "quote": "apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "line": 2,
+            "quote": "StrReplace lab/src/worker.py failed: StrReplace failed: old_string not found",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": [
+          "E04"
+        ]
+      },
+      {
+        "claim": "Corrections also appear in episodes where every recorded tool event succeeded (E08, E12), so green tool results do not make an episode correction-proof \u2014 correction tracks the match to user intent, not tool status.",
+        "type": "exception",
+        "evidence": [
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E08",
+            "line": 3,
+            "quote": "Write lab/docs/caching.md succeeded: Wrote lab/docs/caching.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E08",
+            "line": 4,
+            "quote": "Edit lab/docs/cache.md succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E12",
+            "line": 3,
+            "quote": "Edit lab/src/queue.py succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E12",
+            "line": 4,
+            "quote": "Edit lab/src/api.py succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": [
+          "E04"
+        ]
+      },
+      {
+        "claim": "Episodes whose request names one clear target and whose tools all succeed \u2014 E01, E05, E09 \u2014 close with no correction at all.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E01",
+            "line": 1,
+            "quote": "Add a retry helper to lab/src/queue.py and keep the tests green."
+          },
+          {
+            "episode_id": "E01",
+            "line": 3,
+            "quote": "Bash pytest lab/tests/test_queue.py -q succeeded: Process exited with code 0",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E05",
+            "line": 2,
+            "quote": "Write lab/docs/cache.md succeeded: Wrote lab/docs/cache.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E09",
+            "line": 3,
+            "quote": "Bash pytest lab/tests/test_expiry.py -q succeeded: Process exited with code 0",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": [
+          "E08",
+          "E12"
+        ]
+      },
+      {
+        "claim": "In E04 the mis-targeted edit is still attempted and fails with 'wrong file' after the correction line, so a correction does not itself prevent the wrong action from being executed.",
+        "type": "exception",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py"
+          },
+          {
+            "episode_id": "E04",
+            "line": 3,
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: wrong file",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E04",
+            "line": 4,
+            "quote": "Edit lab/src/http/headers.py succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": [
+          "E08",
+          "E12"
+        ]
+      },
+      {
+        "claim": "No episode with an unknown tool outcome (E03, E07, E11) contains a correction; whether users decline to correct unverified runs or those episodes simply end early cannot be determined from the lines.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "line": 2,
+            "quote": "Bash pytest -q unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "line": 2,
+            "quote": "Bash git commit -am green-suite unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "line": 2,
+            "quote": "Read lab/src/queue.py unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Whether near-identical path names (lab/docs/caching.md vs lab/docs/cache.md) contribute to corrections like E08's cannot be settled from the corpus.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E08",
+            "line": 1,
+            "quote": "Document the caching layer in lab/docs/caching.md."
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          }
+        ],
+        "counter_episodes": [
+          "E04",
+          "E12"
+        ]
+      }
+    ],
+    "reading_decisions": [],
+    "what_changed_my_view": "no readings"
+  },
+  "score": {
+    "hard_failures": [],
+    "claims": 8,
+    "citations": 29,
+    "types": {
+      "pattern": 4,
+      "exception": 2,
+      "open_question": 2,
+      "other": 0
+    },
+    "distinct_episodes_cited": 12,
+    "distinct_counter_episodes": 3,
+    "proxies": {
+      "F1": true,
+      "F2": true,
+      "F3": true,
+      "F4": true,
+      "F5": false
+    },
+    "proxy_count": 4,
+    "reading_decisions": {}
+  }
+}

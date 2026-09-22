@@ -1,0 +1,232 @@
+{
+  "memo": "R1",
+  "condition": "R",
+  "arms": [
+    "arm-6",
+    "arm-2",
+    "arm-5"
+  ],
+  "prompt_sha256": "0121cecd7b23db231dcc9e1f8a0b77f86d26cf26ccd2a0a8fef53eef67c29813",
+  "prompt_chars": 32572,
+  "at": "2026-09-22T21:37:32.109355+00:00",
+  "latency_ms": 88891.7,
+  "usage": {
+    "prompt_tokens": 8250,
+    "completion_tokens": 6811,
+    "reasoning_tokens": 5400,
+    "total_tokens": 15061,
+    "cost_usd": 0.1244337
+  },
+  "finish_reason": "stop",
+  "upstream_provider": "Together",
+  "parse_step": "fence_stripped",
+  "output": {
+    "memo": [
+      {
+        "claim": "Every recorded correction in the corpus is an explicit human redirection of target, scope, or design, and only E04, E08, and E12 contain one.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Correction tracks fit to the user's intent rather than tool-event status, since E08 and E12 were corrected even though every recorded event in them succeeded.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E08",
+            "line": 3,
+            "quote": "Wrote lab/docs/caching.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E12",
+            "line": 3,
+            "quote": "File updated successfully",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "In E04 the correction line (L2) precedes the failed edit (L3) in the frozen record, so the corpus does not show the failure prompting the correction.",
+        "type": "exception",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E04",
+            "line": 3,
+            "quote": "Edit failed: wrong file",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "A failed tool event by itself is not recorded as requiring correction: E02, E06, and E10 end in failures with no correction line.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "line": 2,
+            "quote": "Edit failed: text not found",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "line": 2,
+            "quote": "apply_patch rejected: context mismatch",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "line": 2,
+            "quote": "StrReplace failed: old_string not found",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": [
+          "E04"
+        ]
+      },
+      {
+        "claim": "Whether the failed, uncorrected episodes (E02, E06, E10) actually required correction cannot be settled from the frozen corpus, which records no resolution after the failure.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "line": 1,
+            "quote": "Refactor the auth parser in lab/src/auth/parser.py and keep the existing tests green."
+          },
+          {
+            "episode_id": "E02",
+            "line": 2,
+            "quote": "Edit failed: text not found",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Unknown-status episodes (E03, E07, E11) record no tool outcome, so their need for correction is unverifiable rather than demonstrated.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "line": 2,
+            "quote": "No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "line": 2,
+            "quote": "No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "line": 2,
+            "quote": "No matching tool result recorded.",
+            "claimed_status": "unknown"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Episodes whose recorded events all succeeded and matched the request as given (E01, E05, E09) carry no correction, but clean execution is no guarantee a correction will not be issued.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E01",
+            "line": 3,
+            "quote": "Process exited with code 0",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E05",
+            "line": 2,
+            "quote": "Wrote lab/docs/cache.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E09",
+            "line": 3,
+            "quote": "Process exited with code 0",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": [
+          "E08",
+          "E12"
+        ]
+      }
+    ],
+    "reading_decisions": [
+      {
+        "reading": "A",
+        "decision": "REVISE",
+        "why": "Its overall structure is sound, but the 'failed-edit-attempt-precedes-correction' code reverses E04's frozen line order (the correction at L2 precedes the failed edit at L3) and asserts a causal prompt the lines do not show."
+      },
+      {
+        "reading": "B",
+        "decision": "KEEP",
+        "why": "It cleanly separates the correction field from failure and unknown status, adds the all-succeeded baseline, and honestly flags E12 as counterevidence to that baseline."
+      },
+      {
+        "reading": "C",
+        "decision": "KEEP",
+        "why": "Its intent-fit framing and its separation of E08 from E04/E12 are well grounded, though its 'wrong-target' label sits loosely on E12's visibility correction."
+      }
+    ],
+    "what_changed_my_view": "The readings largely converged with my own first pass, but checking Reading A against the frozen line order surfaced an error the empty mechanical check missed: in E04 the correction (L2) precedes the failed edit (L3), so failure cannot be said to prompt correction there. Comparing the readings also sharpened the point that E08 and E12 were corrected after fully successful events, decoupling correction from tool status."
+  },
+  "score": {
+    "hard_failures": [],
+    "claims": 7,
+    "citations": 19,
+    "types": {
+      "pattern": 4,
+      "exception": 1,
+      "open_question": 2,
+      "other": 0
+    },
+    "distinct_episodes_cited": 12,
+    "distinct_counter_episodes": 3,
+    "proxies": {
+      "F1": true,
+      "F2": true,
+      "F3": true,
+      "F4": true,
+      "F5": false
+    },
+    "proxy_count": 4,
+    "reading_decisions": {
+      "REVISE": 1,
+      "KEEP": 2
+    }
+  }
+}

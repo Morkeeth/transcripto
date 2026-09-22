@@ -1,0 +1,200 @@
+{
+  "memo": "B2",
+  "condition": "B",
+  "arms": [],
+  "prompt_sha256": "dc4e9478559366565bacbcfa94d929a041b3bb5a12c792e40d3aa12dc03bc778",
+  "prompt_chars": 4715,
+  "at": "2026-09-22T21:28:32.275255+00:00",
+  "latency_ms": 59305.0,
+  "usage": {
+    "prompt_tokens": 1310,
+    "completion_tokens": 5799,
+    "reasoning_tokens": 4634,
+    "total_tokens": 7109,
+    "cost_usd": 0.0907449
+  },
+  "finish_reason": "stop",
+  "upstream_provider": "Together",
+  "parse_step": "fence_stripped",
+  "output": {
+    "memo": [
+      {
+        "claim": "Corrections appear only where the user redirects the target artifact or constrains how the work is done, not where a tool call merely fails.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Failed tool events occur in three episodes that record no correction at all, so a tool failure by itself does not make an episode require correction.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "line": 2,
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: text not found",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "line": 2,
+            "quote": "apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "line": 2,
+            "quote": "StrReplace lab/src/worker.py failed: StrReplace failed: old_string not found",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": [
+          "E04"
+        ]
+      },
+      {
+        "claim": "Unrecorded (unknown) tool results likewise appear only in episodes without any correction.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "line": 2,
+            "quote": "Bash pytest -q unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "line": 2,
+            "quote": "Bash git commit -am green-suite unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "line": 2,
+            "quote": "Read lab/src/queue.py unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Every episode that contains a correction ends with at least one succeeded event, so correction is associated with recovery rather than abandonment.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 4,
+            "quote": "Edit lab/src/http/headers.py succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E08",
+            "line": 4,
+            "quote": "Edit lab/docs/cache.md succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E12",
+            "line": 4,
+            "quote": "Edit lab/src/api.py succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "E04 is the one episode with both a correction and a failed event, but the correction (L2) precedes the failure (L3), so the failure did not prompt the correction.",
+        "type": "exception",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E04",
+            "line": 3,
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: wrong file",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "In E08 the correction changed the target file, yet the agent still wrote the originally requested caching.md alongside the corrected cache.md, so the correction did not fully supplant the original target.",
+        "type": "exception",
+        "evidence": [
+          {
+            "episode_id": "E08",
+            "line": 3,
+            "quote": "Write lab/docs/caching.md succeeded: Wrote lab/docs/caching.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E08",
+            "line": 4,
+            "quote": "Edit lab/docs/cache.md succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Whether corrections stem from ambiguous requests or from the user changing their mind cannot be settled from the lines: E12's request said to ship the helper as the public API, yet the correction reverses that.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E12",
+            "line": 1,
+            "quote": "Ship the retry helper as the public API."
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": []
+      }
+    ],
+    "reading_decisions": [],
+    "what_changed_my_view": "no readings"
+  },
+  "score": {
+    "hard_failures": [],
+    "claims": 7,
+    "citations": 18,
+    "types": {
+      "pattern": 4,
+      "exception": 2,
+      "open_question": 1,
+      "other": 0
+    },
+    "distinct_episodes_cited": 9,
+    "distinct_counter_episodes": 1,
+    "proxies": {
+      "F1": true,
+      "F2": false,
+      "F3": true,
+      "F4": true,
+      "F5": false
+    },
+    "proxy_count": 3,
+    "reading_decisions": {}
+  }
+}

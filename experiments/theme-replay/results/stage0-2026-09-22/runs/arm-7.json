@@ -1,0 +1,214 @@
+{
+  "arm": "arm-7",
+  "offline": false,
+  "transport": "openrouter",
+  "at": "2026-09-22T21:25:06.591538+00:00",
+  "http_status": 200,
+  "latency_ms": 33070.0,
+  "tokens": 6010,
+  "usage": {
+    "prompt_tokens": 3223,
+    "completion_tokens": 2787,
+    "reasoning_tokens": 1034,
+    "total_tokens": 6010,
+    "cost_usd": 0.085235
+  },
+  "cost": 0.085235,
+  "finish_reason": "stop",
+  "parse_step": "as_returned",
+  "request_meta": {
+    "max_tokens": 12000,
+    "provider": {
+      "zdr": true,
+      "data_collection": "deny",
+      "allow_fallbacks": true
+    },
+    "usage": {
+      "include": true
+    }
+  },
+  "zdr_confirmation": "unverified",
+  "errors": [],
+  "output": {
+    "analytic_position": "I treated correction as broader than an explicit user correction: an episode may require corrective work when execution fails, when the result is unknown and therefore cannot support the requested conclusion or conditional action, or when the user revises the target, scope, or interface decision. Explicit changed-decision episodes are not automatically agent errors, because the frozen corpus does not establish whether the revised intent was knowable in advance. Successful tool results establish execution status only, not semantic correctness.",
+    "codes": [
+      {
+        "label": "failed operation leaves work incomplete",
+        "episode_ids": [
+          "E02",
+          "E06",
+          "E10"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: text not found",
+            "line": 2,
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "quote": "apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch",
+            "line": 2,
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "quote": "StrReplace lab/src/worker.py failed: StrReplace failed: old_string not found",
+            "line": 2,
+            "claimed_status": "failed"
+          }
+        ],
+        "interpretation": "A failed edit or patch does not complete the requested change and therefore calls for corrective action such as re-reading the file, adjusting context, or selecting another edit method.",
+        "counterevidence": [
+          {
+            "episode_id": "E01",
+            "reason": "The comparable change completed without an observed correction: E01 L2 records \"Edit lab/src/queue.py succeeded: File updated successfully\"."
+          }
+        ],
+        "confidence": "tentative"
+      },
+      {
+        "label": "unknown result prevents verification",
+        "episode_ids": [
+          "E03",
+          "E07",
+          "E11"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "quote": "Bash pytest -q unknown: No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "quote": "Bash git commit -am green-suite unknown: No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "quote": "Read lab/src/queue.py unknown: No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          }
+        ],
+        "interpretation": "An unknown result requires correction or follow-up because the agent cannot substantiate a test report, conditional commit, or file-content answer from the recorded action. Unknown is preserved as uncertainty rather than treated as failure or success.",
+        "counterevidence": [
+          {
+            "episode_id": "E09",
+            "reason": "Verification is recorded rather than missing: E09 L3 states \"Bash pytest lab/tests/test_expiry.py -q succeeded: Process exited with code 0\"."
+          }
+        ],
+        "confidence": "tentative"
+      },
+      {
+        "label": "target or scope is revised",
+        "episode_ids": [
+          "E04",
+          "E08"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "quote": "No, I meant the header parser in lab/src/http/headers.py.",
+            "line": 2
+          },
+          {
+            "episode_id": "E08",
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section.",
+            "line": 2
+          }
+        ],
+        "interpretation": "Correction is required when the operative specification changes its file target or requested scope. These cases should not be reduced to tool failure: E08 records a successful write to the originally requested path before the user supplies a different path and shorter scope.",
+        "counterevidence": [
+          {
+            "episode_id": "E05",
+            "reason": "The requested target remains stable and no correction is recorded: E05 L1 says \"Write a TTL note into lab/docs/cache.md and leave the rest of the docs alone.\""
+          }
+        ],
+        "confidence": "tentative"
+      },
+      {
+        "label": "interface decision is reversed",
+        "episode_ids": [
+          "E12"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E12",
+            "quote": "Keep the helper private. The public API stays the existing enqueue function.",
+            "line": 2
+          }
+        ],
+        "interpretation": "A revised product or design decision can require correction even when subsequent edits succeed. Here the desired visibility changes from public to private, so successful execution alone does not remove the need to realign the implementation.",
+        "counterevidence": [
+          {
+            "episode_id": "E01",
+            "reason": "The request contains no recorded reversal of API visibility: E01 L1 says \"Add a retry helper to lab/src/queue.py and keep the tests green.\""
+          }
+        ],
+        "confidence": "tentative"
+      }
+    ],
+    "themes": [
+      {
+        "name": "Operational breakdown creates a remediation need",
+        "central_concept": "Correction is required when the attempted operation cannot deliver the requested artifact; for example, E06 L2 records \"apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch\".",
+        "codes": [
+          "failed operation leaves work incomplete"
+        ],
+        "supporting_episodes": [
+          "E02",
+          "E06",
+          "E10"
+        ],
+        "disconfirming_episodes": [
+          "E01"
+        ],
+        "limits": "The corpus records failure but not an ensuing correction in these episodes, so this theme identifies a need for corrective work rather than an observed human correction. E01 L2 provides a contrasting completed operation: \"Edit lab/src/queue.py succeeded: File updated successfully\"."
+      },
+      {
+        "name": "Unverifiable outcomes require resolution before proceeding",
+        "central_concept": "Missing tool results make requested conclusions or conditional actions unsupported; E03 L2 states \"Bash pytest -q unknown: No matching tool result recorded.\"",
+        "codes": [
+          "unknown result prevents verification"
+        ],
+        "supporting_episodes": [
+          "E03",
+          "E07",
+          "E11"
+        ],
+        "disconfirming_episodes": [
+          "E09"
+        ],
+        "limits": "Unknown does not prove that an operation failed; it only shows that the frozen record cannot verify the outcome. By contrast, E09 L3 records \"Bash pytest lab/tests/test_expiry.py -q succeeded: Process exited with code 0\"."
+      },
+      {
+        "name": "Changed intent can require correction despite successful execution",
+        "central_concept": "An episode requires realignment when the user changes the target, scope, or design decision, as in E08 L2: \"lab/docs/cache.md, shorter please. Drop the architecture section.\" and E12 L2: \"Keep the helper private. The public API stays the existing enqueue function.\"",
+        "codes": [
+          "target or scope is revised",
+          "interface decision is reversed"
+        ],
+        "supporting_episodes": [
+          "E04",
+          "E08",
+          "E12"
+        ],
+        "disconfirming_episodes": [
+          "E05"
+        ],
+        "limits": "The evidence does not establish that these revisions reflect agent misunderstanding rather than a human change of mind. A stable contrasting request appears at E05 L1: \"Write a TTL note into lab/docs/cache.md and leave the rest of the docs alone.\" Successful tool status also does not by itself establish semantic alignment."
+      }
+    ],
+    "questions_for_human": [
+      "Should \"require correction\" include episodes with failed or unknown results but no explicit correction field, or only changed-decision episodes?",
+      "Should E04, E08, and E12 be classified as agent errors, user specification changes, or left indeterminate?",
+      "Does an unknown result require rerunning the action, recovering missing telemetry, or merely withholding a conclusion?",
+      "What evidence beyond tool success is required to judge that the resulting implementation semantically satisfies the request?"
+    ]
+  }
+}

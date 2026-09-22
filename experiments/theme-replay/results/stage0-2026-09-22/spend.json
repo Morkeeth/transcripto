@@ -1,0 +1,111 @@
+{
+  "ceiling_usd": 3.0,
+  "spent_usd": 1.709009,
+  "calls": [
+    {
+      "label": "arm-1",
+      "model": "blind",
+      "cost_usd": 0.10327
+    },
+    {
+      "label": "arm-2",
+      "model": "blind",
+      "cost_usd": 0.048682
+    },
+    {
+      "label": "arm-3",
+      "model": "blind",
+      "cost_usd": 0.01352625
+    },
+    {
+      "label": "arm-4",
+      "model": "blind",
+      "cost_usd": 0.01354875
+    },
+    {
+      "label": "arm-5",
+      "model": "blind",
+      "cost_usd": 0.075722
+    },
+    {
+      "label": "arm-6",
+      "model": "blind",
+      "cost_usd": 0.058232
+    },
+    {
+      "label": "arm-7",
+      "model": "blind",
+      "cost_usd": 0.085235
+    },
+    {
+      "label": "arm-8",
+      "model": "blind",
+      "cost_usd": 0.125615
+    },
+    {
+      "label": "arm-9",
+      "model": "blind",
+      "cost_usd": 0.0116175
+    },
+    {
+      "label": "memo-B1",
+      "model": "moonshotai/kimi-k3",
+      "cost_usd": 0.0677175
+    },
+    {
+      "label": "memo-B2",
+      "model": "moonshotai/kimi-k3",
+      "cost_usd": 0.0907449
+    },
+    {
+      "label": "memo-B3",
+      "model": "moonshotai/kimi-k3",
+      "cost_usd": 0.0579825
+    },
+    {
+      "label": "memo-S1",
+      "model": "moonshotai/kimi-k3",
+      "cost_usd": 0.04867075
+    },
+    {
+      "label": "memo-S2",
+      "model": "moonshotai/kimi-k3",
+      "cost_usd": 0.1697952
+    },
+    {
+      "label": "memo-S3",
+      "model": "moonshotai/kimi-k3",
+      "cost_usd": 0.0737925
+    },
+    {
+      "label": "memo-R1",
+      "model": "moonshotai/kimi-k3",
+      "cost_usd": 0.1244337
+    },
+    {
+      "label": "memo-R2",
+      "model": "moonshotai/kimi-k3",
+      "cost_usd": 0.1423107
+    },
+    {
+      "label": "memo-R3",
+      "model": "moonshotai/kimi-k3",
+      "cost_usd": 0.1017783
+    },
+    {
+      "label": "memo-M1",
+      "model": "moonshotai/kimi-k3",
+      "cost_usd": 0.0784005
+    },
+    {
+      "label": "memo-M2",
+      "model": "moonshotai/kimi-k3",
+      "cost_usd": 0.1010514
+    },
+    {
+      "label": "memo-M3",
+      "model": "moonshotai/kimi-k3",
+      "cost_usd": 0.1168824
+    }
+  ]
+}

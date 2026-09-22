@@ -1,0 +1,226 @@
+{
+  "arm": "arm-5",
+  "offline": false,
+  "transport": "openrouter",
+  "at": "2026-09-22T21:23:48.330917+00:00",
+  "http_status": 200,
+  "latency_ms": 62107.5,
+  "tokens": 11509,
+  "usage": {
+    "prompt_tokens": 4921,
+    "completion_tokens": 6588,
+    "reasoning_tokens": 3888,
+    "total_tokens": 11509,
+    "cost_usd": 0.075722
+  },
+  "cost": 0.075722,
+  "finish_reason": "stop",
+  "parse_step": "fence_stripped",
+  "request_meta": {
+    "max_tokens": 12000,
+    "provider": {
+      "zdr": true,
+      "data_collection": "deny",
+      "allow_fallbacks": true
+    },
+    "usage": {
+      "include": true
+    }
+  },
+  "zdr_confirmation": "unverified",
+  "errors": [],
+  "output": {
+    "analytic_position": "This reading treats 'correction' as an operational category defined by the corpus's own 'correction' field, not as an inference from tool-result status. Failed and unknown tool-result lines are preserved as recorded (never upgraded to succeeded), and 'unknown' is treated as an evidentiary gap distinct from both success and failure. Agreement across harnesses (claude/codex/cursor) is not treated as validity; each code is grounded only in the frozen corpus lines cited. The analysis assumes that explicit human correction (the correction field) and tool execution failure are two independent axes: an episode can fail without being corrected, and an episode can be corrected despite a technically successful tool result.",
+    "codes": [
+      {
+        "label": "explicit-correction-after-wrong-target",
+        "episode_ids": [
+          "E04",
+          "E12"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "quote": "No, I meant the header parser in lab/src/http/headers.py.",
+            "line": 2
+          },
+          {
+            "episode_id": "E04",
+            "quote": "Edit failed: wrong file",
+            "line": 3,
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E12",
+            "quote": "Keep the helper private. The public API stays the existing enqueue function.",
+            "line": 2
+          }
+        ],
+        "interpretation": "Correction appears when the agent's initial action targets the wrong file or the wrong scope of change, and the human redirects it explicitly. In E04 this follows a recorded tool failure; in E12 it follows two recorded successes, showing target-mismatch correction is not tied to tool status.",
+        "counterevidence": [
+          {
+            "episode_id": "E08",
+            "reason": "Correction also occurs after a fully successful write (Wrote lab/docs/caching.md), not just after a wrong-target failure, so 'wrong target' is not the only trigger captured by this code."
+          }
+        ],
+        "confidence": "tentative"
+      },
+      {
+        "label": "explicit-correction-after-successful-action",
+        "episode_ids": [
+          "E08"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E08",
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section.",
+            "line": 2
+          },
+          {
+            "episode_id": "E08",
+            "quote": "Wrote lab/docs/caching.md",
+            "line": 3,
+            "claimed_status": "succeeded"
+          }
+        ],
+        "interpretation": "A correction can follow a technically successful tool result when the output does not match the user's intended file, length, or scope. This shows correction tracks intent-fit rather than execution success.",
+        "counterevidence": [
+          {
+            "episode_id": "E01",
+            "reason": "E01 is also fully succeeded (edit and test both succeeded) and carries no correction, showing success alone does not produce a correction event."
+          }
+        ],
+        "confidence": "tentative"
+      },
+      {
+        "label": "tool-failure-without-explicit-correction",
+        "episode_ids": [
+          "E02",
+          "E06",
+          "E10"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "quote": "Edit failed: text not found",
+            "line": 2,
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "quote": "apply_patch rejected: context mismatch",
+            "line": 2,
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "quote": "StrReplace failed: old_string not found",
+            "line": 2,
+            "claimed_status": "failed"
+          }
+        ],
+        "interpretation": "These episodes record a failed tool result but carry no correction field, meaning the corpus does not represent them as having been corrected, even though a failed edit plausibly needs rework. Failure and recorded correction are therefore not the same thing in this corpus.",
+        "counterevidence": [
+          {
+            "episode_id": "E04",
+            "reason": "E04 also has a failed Edit (wrong file) but this one is paired with an explicit correction and a subsequent successful edit, showing failure can co-occur with correction elsewhere in the corpus."
+          }
+        ],
+        "confidence": "tentative"
+      },
+      {
+        "label": "unresolved-status-ambiguity",
+        "episode_ids": [
+          "E03",
+          "E07",
+          "E11"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "quote": "No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "quote": "No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "quote": "No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          }
+        ],
+        "interpretation": "An 'unknown' status leaves the actual outcome unverified. None of these episodes carry a correction field, so unresolved status is recorded separately from, and should not be conflated with, a need for correction.",
+        "counterevidence": [
+          {
+            "episode_id": "E01",
+            "reason": "E01's tool results are fully resolved as succeeded, contrasting the ambiguous, unresolved status class and showing resolved status is the norm against which 'unknown' departs."
+          }
+        ],
+        "confidence": "tentative"
+      }
+    ],
+    "themes": [
+      {
+        "name": "Correction is an explicit human signal, not a status inference",
+        "central_concept": "The corpus marks correction via an explicit 'correction' field attached to changed-decision episodes; this field, not tool-result status, is the operative signal for 'requiring correction.'",
+        "codes": [
+          "explicit-correction-after-wrong-target",
+          "explicit-correction-after-successful-action"
+        ],
+        "supporting_episodes": [
+          "E04",
+          "E08",
+          "E12"
+        ],
+        "disconfirming_episodes": [
+          "E01",
+          "E02"
+        ],
+        "limits": "The absence of a correction field in E01 or E02 shows the corpus does not record a correction there, but this cannot establish that no correction was ever warranted in the underlying (unobserved) work \u2014 only that none is captured in this frozen snapshot."
+      },
+      {
+        "name": "Tool failure alone does not generate a recorded correction",
+        "central_concept": "Failed tool-result lines stand on their own in several episodes with no accompanying correction, separating execution failure from intent-misalignment correction.",
+        "codes": [
+          "tool-failure-without-explicit-correction"
+        ],
+        "supporting_episodes": [
+          "E02",
+          "E06",
+          "E10"
+        ],
+        "disconfirming_episodes": [
+          "E04"
+        ],
+        "limits": "Sample is small (3 supporting, 1 disconfirming); the corpus provides no downstream events after the failures in E02, E06, E10, so it is unknown whether correction occurred outside the recorded window."
+      },
+      {
+        "name": "Unknown status is an evidentiary gap distinct from correction-worthiness",
+        "central_concept": "Episodes with unknown tool-result status lack verification, but this is a different category from either success, failure, or correction, and must not be upgraded to any of those.",
+        "codes": [
+          "unresolved-status-ambiguity"
+        ],
+        "supporting_episodes": [
+          "E03",
+          "E07",
+          "E11"
+        ],
+        "disconfirming_episodes": [
+          "E01"
+        ],
+        "limits": "Because 'unknown' cannot be resolved from the frozen corpus, no claim can be made about whether these episodes eventually needed correction; treating unknown as a proxy for failure or for correction-need would exceed the evidence."
+      }
+    ],
+    "questions_for_human": [
+      "Should episodes with a failed tool-result line but no recorded correction field (E02, E06, E10) be treated as requiring correction, or does the corpus intend for absence of the correction field to mean none was needed?",
+      "How should 'unknown' tool-result episodes (E03, E07, E11) be classified for correction analysis given that neither success nor failure can be confirmed?",
+      "Is the correction in E08, which follows a successful write, evidence that scope/format mismatch should be treated as a distinct correction trigger from wrong-target correction (E04, E12)?"
+    ]
+  }
+}

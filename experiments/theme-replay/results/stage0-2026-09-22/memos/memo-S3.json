@@ -1,0 +1,214 @@
+{
+  "memo": "S3",
+  "condition": "S",
+  "arms": [
+    "arm-3"
+  ],
+  "prompt_sha256": "05e3b0c9d8cbbdc4c3eec8e2657efd4c2445c2704cd20c38d81c11566aa27150",
+  "prompt_chars": 8173,
+  "at": "2026-09-22T21:36:41.931005+00:00",
+  "latency_ms": 50139.6,
+  "usage": {
+    "prompt_tokens": 2132,
+    "completion_tokens": 4683,
+    "reasoning_tokens": 3308,
+    "total_tokens": 6815,
+    "cost_usd": 0.0737925
+  },
+  "finish_reason": "stop",
+  "upstream_provider": "Together",
+  "parse_step": "fence_stripped",
+  "output": {
+    "memo": [
+      {
+        "claim": "Every correction in the corpus is a user message that changes the task specification mid-stream\u2014the target file, the scope, or an API design constraint\u2014rather than a response to a tool error.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Tool-execution failures on their own never receive a correction: all three failed edit/patch episodes end without any user or agent follow-up.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "line": 2,
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: text not found",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "line": 2,
+            "quote": "apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "line": 2,
+            "quote": "StrReplace lab/src/worker.py failed: StrReplace failed: old_string not found",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": [
+          "E04"
+        ]
+      },
+      {
+        "claim": "Episodes whose tool results are unrecorded (unknown status) also receive no correction, so missing evidence of success does not trigger one either.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "line": 2,
+            "quote": "Bash pytest -q unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "line": 2,
+            "quote": "Bash git commit -am green-suite unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "line": 2,
+            "quote": "Read lab/src/queue.py unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "E04 is the only episode where a correction co-occurs with a recorded failure, and because the correction line precedes the 'wrong file' failure, the corpus does not show the failure causing the correction.",
+        "type": "exception",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E04",
+            "line": 3,
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: wrong file",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "A correction does not guarantee the original target is abandoned: in E08 the agent still wrote lab/docs/caching.md after being told to use cache.md, and only then edited cache.md.",
+        "type": "exception",
+        "evidence": [
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E08",
+            "line": 3,
+            "quote": "Write lab/docs/caching.md succeeded: Wrote lab/docs/caching.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E08",
+            "line": 4,
+            "quote": "Edit lab/docs/cache.md succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": [
+          "E04",
+          "E12"
+        ]
+      },
+      {
+        "claim": "Episodes whose single specification is executed successfully to a verified endpoint (tests green or file written) never require correction.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E01",
+            "line": 3,
+            "quote": "Bash pytest lab/tests/test_queue.py -q succeeded: Process exited with code 0",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E05",
+            "line": 2,
+            "quote": "Write lab/docs/cache.md succeeded: Wrote lab/docs/cache.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E09",
+            "line": 3,
+            "quote": "Bash pytest lab/tests/test_expiry.py -q succeeded: Process exited with code 0",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "The corpus does not show why failed episodes like E02, E06, and E10 were left uncorrected\u2014whether corrections are reserved for intent changes or simply absent here is undeterminable from the lines.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "line": 2,
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: text not found",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": []
+      }
+    ],
+    "reading_decisions": [
+      {
+        "reading": "A",
+        "decision": "KEEP",
+        "why": "Its core split\u2014corrections track requester specification changes (E04, E08, E12) while bare tool failures (E02, E06, E10) go uncorrected\u2014matches the corpus, though my memo adds that E04's correction precedes its failure and that E08's correction was only partially heeded."
+      }
+    ],
+    "what_changed_my_view": "Reading A matched my independent read of the corpus, so it confirmed rather than changed the spec-change-vs-tool-failure split; my own additions were the E04 line-ordering nuance and the observation that E08's correction did not stop the write to the original file."
+  },
+  "score": {
+    "hard_failures": [],
+    "claims": 7,
+    "citations": 18,
+    "types": {
+      "pattern": 4,
+      "exception": 2,
+      "open_question": 1,
+      "other": 0
+    },
+    "distinct_episodes_cited": 12,
+    "distinct_counter_episodes": 2,
+    "proxies": {
+      "F1": true,
+      "F2": true,
+      "F3": true,
+      "F4": true,
+      "F5": false
+    },
+    "proxy_count": 4,
+    "reading_decisions": {
+      "KEEP": 1
+    }
+  }
+}

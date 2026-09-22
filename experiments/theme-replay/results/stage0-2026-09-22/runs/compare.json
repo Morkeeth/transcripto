@@ -1,0 +1,806 @@
+{
+  "rule": "same reading when supporting-episode overlap >= 0.5",
+  "arms": {
+    "arm-1": {
+      "themes": [
+        "Completion requires a demonstrated usable outcome",
+        "Alignment can override successful execution"
+      ],
+      "codes": 3,
+      "cited_episodes": [
+        "E01",
+        "E02",
+        "E03",
+        "E04",
+        "E05",
+        "E06",
+        "E07",
+        "E08",
+        "E09",
+        "E10",
+        "E11",
+        "E12"
+      ],
+      "disconfirming": [
+        "E01",
+        "E05",
+        "E09"
+      ],
+      "named_failures": 0,
+      "questions_for_human": [
+        "Should \"require correction\" include failed and unknown episodes that need remediation even though their correction field is null, or only episodes with an explicit human correction?",
+        "Should changed-decision episodes be treated as agent errors, human preference changes, or a separate category of interactional realignment?",
+        "What evidence would be sufficient to resolve an unknown result: a rerun, recovered tool output, or an explicit statement that verification was impossible?"
+      ]
+    },
+    "arm-2": {
+      "themes": [
+        "Correction tracks human redirection, not tool outcome",
+        "Failure and unresolved status are preserved as distinct from correction"
+      ],
+      "codes": 4,
+      "cited_episodes": [
+        "E01",
+        "E02",
+        "E03",
+        "E04",
+        "E05",
+        "E06",
+        "E07",
+        "E08",
+        "E09",
+        "E10",
+        "E11",
+        "E12"
+      ],
+      "disconfirming": [
+        "E02",
+        "E03",
+        "E04",
+        "E12"
+      ],
+      "named_failures": 0,
+      "questions_for_human": [
+        "Should a correction be inferred when a failed or unknown tool-result line is never followed by any later succeeded event, even without an explicit [correction] line in this schema?",
+        "Is E04's co-occurrence of a failed edit and a correction evidence that failure caused the correction, or are these independent signals that happened to land in the same episode?",
+        "Should episodes with only unknown tool results (E03, E07, E11) be flagged as requiring correction due to unverifiable outcome, even though no correction line exists for them in this corpus?"
+      ]
+    },
+    "arm-3": {
+      "themes": [
+        "requester_specification_shift_triggers_correction"
+      ],
+      "codes": 2,
+      "cited_episodes": [
+        "E01",
+        "E02",
+        "E04",
+        "E06",
+        "E08",
+        "E10",
+        "E12"
+      ],
+      "disconfirming": [
+        "E01",
+        "E02",
+        "E06",
+        "E10"
+      ],
+      "named_failures": 0,
+      "questions_for_human": [
+        "Should agent tool failures (such as in E02, E06, and E10) trigger an automated retry/correction protocol, or remain terminal failed states?",
+        "Do changed-decision episodes represent flaws in the agent's preliminary actions or purely exogenous human specification updates?"
+      ]
+    },
+    "arm-4": {
+      "themes": [
+        "User-Initiated Specification and Intent Shift"
+      ],
+      "codes": 3,
+      "cited_episodes": [
+        "E01",
+        "E02",
+        "E04",
+        "E05",
+        "E06",
+        "E08",
+        "E10",
+        "E12"
+      ],
+      "disconfirming": [
+        "E01",
+        "E02",
+        "E04",
+        "E05",
+        "E06",
+        "E10"
+      ],
+      "named_failures": 0,
+      "questions_for_human": [
+        "Should mechanical tool failures (such as text not found or context mismatch) trigger an interactive correction loop in future corpus versions?",
+        "Were the changed decisions in E04, E08, and E12 intended to simulate human error in prompt specification or evolving product requirements?"
+      ]
+    },
+    "arm-5": {
+      "themes": [
+        "Correction is an explicit human signal, not a status inference",
+        "Tool failure alone does not generate a recorded correction",
+        "Unknown status is an evidentiary gap distinct from correction-worthiness"
+      ],
+      "codes": 4,
+      "cited_episodes": [
+        "E01",
+        "E02",
+        "E03",
+        "E04",
+        "E06",
+        "E07",
+        "E08",
+        "E10",
+        "E11",
+        "E12"
+      ],
+      "disconfirming": [
+        "E01",
+        "E02",
+        "E04",
+        "E08"
+      ],
+      "named_failures": 0,
+      "questions_for_human": [
+        "Should episodes with a failed tool-result line but no recorded correction field (E02, E06, E10) be treated as requiring correction, or does the corpus intend for absence of the correction field to mean none was needed?",
+        "How should 'unknown' tool-result episodes (E03, E07, E11) be classified for correction analysis given that neither success nor failure can be confirmed?",
+        "Is the correction in E08, which follows a successful write, evidence that scope/format mismatch should be treated as a distinct correction trigger from wrong-target correction (E04, E12)?"
+      ]
+    },
+    "arm-6": {
+      "themes": [
+        "Correction as explicit human redirection",
+        "Tool failure is not sufficient evidence of a correction need",
+        "Unknown status is a distinct, non-error category requiring preservation"
+      ],
+      "codes": 4,
+      "cited_episodes": [
+        "E01",
+        "E02",
+        "E03",
+        "E04",
+        "E05",
+        "E06",
+        "E07",
+        "E08",
+        "E09",
+        "E10",
+        "E11",
+        "E12"
+      ],
+      "disconfirming": [
+        "E01",
+        "E02",
+        "E04",
+        "E05",
+        "E09"
+      ],
+      "named_failures": 0,
+      "questions_for_human": [
+        "Should a failed tool event with no subsequent correction field (E02, E06, E10) be treated as an unresolved episode requiring correction, or as a closed failed episode outside the scope of 'correction'?",
+        "Is 'correction' meant to capture only user-issued redirections (correction field present), or should it also include agent self-correction visible only through retried tool calls (e.g., E04's failed-then-succeeded edit sequence)?",
+        "For unknown-status episodes (E03, E07, E11), is there an out-of-band signal (outside this corpus) that resolves whether the underlying request succeeded, or should these remain permanently indeterminate for this analysis?"
+      ]
+    },
+    "arm-7": {
+      "themes": [
+        "Operational breakdown creates a remediation need",
+        "Unverifiable outcomes require resolution before proceeding",
+        "Changed intent can require correction despite successful execution"
+      ],
+      "codes": 4,
+      "cited_episodes": [
+        "E01",
+        "E02",
+        "E03",
+        "E04",
+        "E05",
+        "E06",
+        "E07",
+        "E08",
+        "E09",
+        "E10",
+        "E11",
+        "E12"
+      ],
+      "disconfirming": [
+        "E01",
+        "E05",
+        "E09"
+      ],
+      "named_failures": 0,
+      "questions_for_human": [
+        "Should \"require correction\" include episodes with failed or unknown results but no explicit correction field, or only changed-decision episodes?",
+        "Should E04, E08, and E12 be classified as agent errors, user specification changes, or left indeterminate?",
+        "Does an unknown result require rerunning the action, recovering missing telemetry, or merely withholding a conclusion?",
+        "What evidence beyond tool success is required to judge that the resulting implementation semantically satisfies the request?"
+      ]
+    },
+    "arm-8": {
+      "themes": [
+        "Correction follows a change in the operative specification",
+        "Tool outcome and correction need are distinct",
+        "Missing evidence requires epistemic repair"
+      ],
+      "codes": 4,
+      "cited_episodes": [
+        "E01",
+        "E02",
+        "E03",
+        "E04",
+        "E06",
+        "E07",
+        "E08",
+        "E09",
+        "E10",
+        "E11",
+        "E12"
+      ],
+      "disconfirming": [
+        "E01",
+        "E02",
+        "E04",
+        "E09"
+      ],
+      "named_failures": 0,
+      "questions_for_human": [
+        "Should \"require correction\" include technical retries and renewed observation, or only episodes with an explicit user correction?",
+        "In E04, E08, and E12, did the user clarify an earlier intention or change the decision after the initial request?",
+        "When a successful action is superseded, should correction include reverting its side effects, such as the successful write to lab/docs/caching.md in E08?"
+      ]
+    },
+    "arm-9": {
+      "themes": [
+        "Correction Requires User-Driven Intent Revision Rather Than Mechanical Tool Failure"
+      ],
+      "codes": 2,
+      "cited_episodes": [
+        "E01",
+        "E02",
+        "E04",
+        "E05",
+        "E06",
+        "E08",
+        "E09",
+        "E10",
+        "E12"
+      ],
+      "disconfirming": [
+        "E01",
+        "E02",
+        "E04",
+        "E05",
+        "E06",
+        "E09",
+        "E10"
+      ],
+      "named_failures": 0,
+      "questions_for_human": [
+        "Should future iterations model human corrections responding directly to mechanical tool failures rather than exclusively to user specification revisions?"
+      ]
+    }
+  },
+  "shared_readings": [
+    {
+      "arms": [
+        "arm-1",
+        "arm-2",
+        "arm-5",
+        "arm-6",
+        "arm-7",
+        "arm-8"
+      ],
+      "themes": [
+        {
+          "arm": "arm-1",
+          "name": "Completion requires a demonstrated usable outcome",
+          "central_concept": "An episode cannot be accepted as complete when execution is explicitly rejected or its result is absent. The contrast is visible between E06 L2, \"apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch\" (claimed_status: failed), and E03 L2, \"Bash pytest -q unknown: No matching tool result recorded.\" (claimed_status: unknown): one establishes failure, while the other leaves the outcome unresolved.",
+          "supporting": [
+            "E02",
+            "E03",
+            "E06",
+            "E07",
+            "E10",
+            "E11"
+          ],
+          "disconfirming": [
+            "E01",
+            "E09"
+          ]
+        },
+        {
+          "arm": "arm-2",
+          "name": "Failure and unresolved status are preserved as distinct from correction",
+          "central_concept": "Failed and unknown tool-result lines describe execution-level problems (rejected patches, missing text, missing results) that are never, by themselves, accompanied by a correction line in this frozen corpus, so they must not be upgraded into 'required correction' claims.",
+          "supporting": [
+            "E02",
+            "E03",
+            "E06",
+            "E07",
+            "E10",
+            "E11"
+          ],
+          "disconfirming": [
+            "E04"
+          ]
+        },
+        {
+          "arm": "arm-5",
+          "name": "Tool failure alone does not generate a recorded correction",
+          "central_concept": "Failed tool-result lines stand on their own in several episodes with no accompanying correction, separating execution failure from intent-misalignment correction.",
+          "supporting": [
+            "E02",
+            "E06",
+            "E10"
+          ],
+          "disconfirming": [
+            "E04"
+          ]
+        },
+        {
+          "arm": "arm-5",
+          "name": "Unknown status is an evidentiary gap distinct from correction-worthiness",
+          "central_concept": "Episodes with unknown tool-result status lack verification, but this is a different category from either success, failure, or correction, and must not be upgraded to any of those.",
+          "supporting": [
+            "E03",
+            "E07",
+            "E11"
+          ],
+          "disconfirming": [
+            "E01"
+          ]
+        },
+        {
+          "arm": "arm-6",
+          "name": "Tool failure is not sufficient evidence of a correction need",
+          "central_concept": "Failed events (status: failed) mark broken attempts, but corpus evidence shows failure and correction are logically separate categories: some failures are followed by correction (E04), others are not (E02, E06, E10).",
+          "supporting": [
+            "E02",
+            "E04",
+            "E06",
+            "E10"
+          ],
+          "disconfirming": [
+            "E01",
+            "E09"
+          ]
+        },
+        {
+          "arm": "arm-6",
+          "name": "Unknown status is a distinct, non-error category requiring preservation",
+          "central_concept": "Episodes with 'unknown' events lack recorded tool outcomes and must not be treated as failures needing correction; they instead flag a gap in observability that is analytically different from a demonstrated failure or an explicit correction.",
+          "supporting": [
+            "E03",
+            "E07",
+            "E11"
+          ],
+          "disconfirming": [
+            "E05"
+          ]
+        },
+        {
+          "arm": "arm-7",
+          "name": "Operational breakdown creates a remediation need",
+          "central_concept": "Correction is required when the attempted operation cannot deliver the requested artifact; for example, E06 L2 records \"apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch\".",
+          "supporting": [
+            "E02",
+            "E06",
+            "E10"
+          ],
+          "disconfirming": [
+            "E01"
+          ]
+        },
+        {
+          "arm": "arm-7",
+          "name": "Unverifiable outcomes require resolution before proceeding",
+          "central_concept": "Missing tool results make requested conclusions or conditional actions unsupported; E03 L2 states \"Bash pytest -q unknown: No matching tool result recorded.\"",
+          "supporting": [
+            "E03",
+            "E07",
+            "E11"
+          ],
+          "disconfirming": [
+            "E09"
+          ]
+        },
+        {
+          "arm": "arm-8",
+          "name": "Tool outcome and correction need are distinct",
+          "central_concept": "Both failure and success can coexist with a need for further work. E06 L2 records \"apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch\", while E08 L3 records \"Write lab/docs/caching.md succeeded: Wrote lab/docs/caching.md\" even though E08 contains a revised target and scope.",
+          "supporting": [
+            "E02",
+            "E06",
+            "E08",
+            "E10",
+            "E12"
+          ],
+          "disconfirming": [
+            "E04"
+          ]
+        },
+        {
+          "arm": "arm-8",
+          "name": "Missing evidence requires epistemic repair",
+          "central_concept": "An unknown tool result prevents a warranted completion claim rather than proving failure. E03 L2 states \"Bash pytest -q unknown: No matching tool result recorded.\", and E11 L2 states \"Read lab/src/queue.py unknown: No matching tool result recorded.\"",
+          "supporting": [
+            "E03",
+            "E07",
+            "E11"
+          ],
+          "disconfirming": [
+            "E09"
+          ]
+        }
+      ]
+    },
+    {
+      "arms": [
+        "arm-1",
+        "arm-2",
+        "arm-3",
+        "arm-4",
+        "arm-5",
+        "arm-6",
+        "arm-7",
+        "arm-8",
+        "arm-9"
+      ],
+      "themes": [
+        {
+          "arm": "arm-1",
+          "name": "Alignment can override successful execution",
+          "central_concept": "Correction can be driven by a revised human decision rather than tool failure. E08 L2 changes file, length, and content scope through \"lab/docs/cache.md, shorter please. Drop the architecture section.\", even though E08 contains successful tool results.",
+          "supporting": [
+            "E04",
+            "E08",
+            "E12"
+          ],
+          "disconfirming": [
+            "E05"
+          ]
+        },
+        {
+          "arm": "arm-2",
+          "name": "Correction tracks human redirection, not tool outcome",
+          "central_concept": "In this corpus, the correction line appears only in changed-decision episodes, driven by the human restating target, scope, or visibility -- independent of whether the preceding tool events succeeded or failed.",
+          "supporting": [
+            "E04",
+            "E08",
+            "E12"
+          ],
+          "disconfirming": [
+            "E02",
+            "E03"
+          ]
+        },
+        {
+          "arm": "arm-3",
+          "name": "requester_specification_shift_triggers_correction",
+          "central_concept": "Corrections in agent work episodes are driven by upstream changes in requester intent\u2014such as target file redirection, scope reduction, or API design reversals\u2014rather than autonomous recovery from tool-level mechanical errors.",
+          "supporting": [
+            "E04",
+            "E08",
+            "E12"
+          ],
+          "disconfirming": [
+            "E02",
+            "E06",
+            "E10"
+          ]
+        },
+        {
+          "arm": "arm-4",
+          "name": "User-Initiated Specification and Intent Shift",
+          "central_concept": "Episodes require correction when human operators modify target files, restrict content scope, or reverse design requirements mid-workflow, rather than as an automatic response to runtime tool errors.",
+          "supporting": [
+            "E04",
+            "E08",
+            "E12"
+          ],
+          "disconfirming": [
+            "E02",
+            "E06",
+            "E10"
+          ]
+        },
+        {
+          "arm": "arm-5",
+          "name": "Correction is an explicit human signal, not a status inference",
+          "central_concept": "The corpus marks correction via an explicit 'correction' field attached to changed-decision episodes; this field, not tool-result status, is the operative signal for 'requiring correction.'",
+          "supporting": [
+            "E04",
+            "E08",
+            "E12"
+          ],
+          "disconfirming": [
+            "E01",
+            "E02"
+          ]
+        },
+        {
+          "arm": "arm-6",
+          "name": "Correction as explicit human redirection",
+          "central_concept": "An episode requires correction when a correction field/text exists, marking a mismatch between the agent's initial action and the user's actual intent (wrong file, wrong scope, wrong design decision).",
+          "supporting": [
+            "E04",
+            "E08",
+            "E12"
+          ],
+          "disconfirming": [
+            "E01"
+          ]
+        },
+        {
+          "arm": "arm-7",
+          "name": "Changed intent can require correction despite successful execution",
+          "central_concept": "An episode requires realignment when the user changes the target, scope, or design decision, as in E08 L2: \"lab/docs/cache.md, shorter please. Drop the architecture section.\" and E12 L2: \"Keep the helper private. The public API stays the existing enqueue function.\"",
+          "supporting": [
+            "E04",
+            "E08",
+            "E12"
+          ],
+          "disconfirming": [
+            "E05"
+          ]
+        },
+        {
+          "arm": "arm-8",
+          "name": "Correction follows a change in the operative specification",
+          "central_concept": "The clearest correction requirement is semantic realignment of target, scope, or interface, as in E04 L2, \"No, I meant the header parser in lab/src/http/headers.py.\", E08 L2, \"lab/docs/cache.md, shorter please. Drop the architecture section.\", and E12 L2, \"Keep the helper private. The public API stays the existing enqueue function.\"",
+          "supporting": [
+            "E04",
+            "E08",
+            "E12"
+          ],
+          "disconfirming": [
+            "E02"
+          ]
+        },
+        {
+          "arm": "arm-9",
+          "name": "Correction Requires User-Driven Intent Revision Rather Than Mechanical Tool Failure",
+          "central_concept": "Episodes require correction when human users revise specifications, file targets, or design decisions mid-stream, whereas autonomous tool execution errors terminate without eliciting correction.",
+          "supporting": [
+            "E04",
+            "E08",
+            "E12"
+          ],
+          "disconfirming": [
+            "E01",
+            "E02",
+            "E05",
+            "E06",
+            "E09",
+            "E10"
+          ]
+        }
+      ]
+    }
+  ],
+  "unique_readings": [],
+  "contested_episodes": [
+    {
+      "episode_id": "E01",
+      "supports_in": [
+        "arm-2"
+      ],
+      "counterexample_in": [
+        "arm-1",
+        "arm-3",
+        "arm-4",
+        "arm-5",
+        "arm-6",
+        "arm-7",
+        "arm-8",
+        "arm-9"
+      ]
+    },
+    {
+      "episode_id": "E02",
+      "supports_in": [
+        "arm-1",
+        "arm-2",
+        "arm-4",
+        "arm-5",
+        "arm-6",
+        "arm-7",
+        "arm-8",
+        "arm-9"
+      ],
+      "counterexample_in": [
+        "arm-2",
+        "arm-3",
+        "arm-4",
+        "arm-5",
+        "arm-6",
+        "arm-8",
+        "arm-9"
+      ]
+    },
+    {
+      "episode_id": "E03",
+      "supports_in": [
+        "arm-1",
+        "arm-2",
+        "arm-5",
+        "arm-6",
+        "arm-7",
+        "arm-8"
+      ],
+      "counterexample_in": [
+        "arm-2"
+      ]
+    },
+    {
+      "episode_id": "E04",
+      "supports_in": [
+        "arm-1",
+        "arm-2",
+        "arm-3",
+        "arm-4",
+        "arm-5",
+        "arm-6",
+        "arm-7",
+        "arm-8",
+        "arm-9"
+      ],
+      "counterexample_in": [
+        "arm-2",
+        "arm-4",
+        "arm-5",
+        "arm-6",
+        "arm-8",
+        "arm-9"
+      ]
+    },
+    {
+      "episode_id": "E05",
+      "supports_in": [
+        "arm-2"
+      ],
+      "counterexample_in": [
+        "arm-1",
+        "arm-4",
+        "arm-6",
+        "arm-7",
+        "arm-9"
+      ]
+    },
+    {
+      "episode_id": "E06",
+      "supports_in": [
+        "arm-1",
+        "arm-2",
+        "arm-4",
+        "arm-5",
+        "arm-6",
+        "arm-7",
+        "arm-8",
+        "arm-9"
+      ],
+      "counterexample_in": [
+        "arm-3",
+        "arm-4",
+        "arm-9"
+      ]
+    },
+    {
+      "episode_id": "E08",
+      "supports_in": [
+        "arm-1",
+        "arm-2",
+        "arm-3",
+        "arm-4",
+        "arm-5",
+        "arm-6",
+        "arm-7",
+        "arm-8",
+        "arm-9"
+      ],
+      "counterexample_in": [
+        "arm-5"
+      ]
+    },
+    {
+      "episode_id": "E09",
+      "supports_in": [
+        "arm-2"
+      ],
+      "counterexample_in": [
+        "arm-1",
+        "arm-6",
+        "arm-7",
+        "arm-8",
+        "arm-9"
+      ]
+    },
+    {
+      "episode_id": "E10",
+      "supports_in": [
+        "arm-1",
+        "arm-2",
+        "arm-4",
+        "arm-5",
+        "arm-6",
+        "arm-7",
+        "arm-8",
+        "arm-9"
+      ],
+      "counterexample_in": [
+        "arm-3",
+        "arm-4",
+        "arm-9"
+      ]
+    },
+    {
+      "episode_id": "E12",
+      "supports_in": [
+        "arm-1",
+        "arm-2",
+        "arm-3",
+        "arm-4",
+        "arm-5",
+        "arm-6",
+        "arm-7",
+        "arm-8",
+        "arm-9"
+      ],
+      "counterexample_in": [
+        "arm-2"
+      ]
+    }
+  ],
+  "disconfirming_surfaced": [
+    "E01",
+    "E02",
+    "E03",
+    "E04",
+    "E05",
+    "E06",
+    "E08",
+    "E09",
+    "E10",
+    "E12"
+  ],
+  "uncited_episodes": [],
+  "repeat_drift": [
+    {
+      "model_group": "G1",
+      "arms": [
+        "arm-1",
+        "arm-7",
+        "arm-8"
+      ],
+      "central_concepts_changed": true,
+      "supporting_overlap_min": 1.0
+    },
+    {
+      "model_group": "G2",
+      "arms": [
+        "arm-2",
+        "arm-5",
+        "arm-6"
+      ],
+      "central_concepts_changed": true,
+      "supporting_overlap_min": 1.0
+    },
+    {
+      "model_group": "G3",
+      "arms": [
+        "arm-3",
+        "arm-4",
+        "arm-9"
+      ],
+      "central_concepts_changed": true,
+      "supporting_overlap_min": 1.0
+    }
+  ],
+  "note": "Descriptive only. Overlap is not validity. A unique reading is a question for the human, not an error."
+}

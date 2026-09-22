@@ -1,0 +1,233 @@
+{
+  "memo": "R3",
+  "condition": "R",
+  "arms": [
+    "arm-9",
+    "arm-3",
+    "arm-4"
+  ],
+  "prompt_sha256": "fb4e51ec51ededcb7180adb070a7a8ac8face5e22793042ac71f0ef38fd49eb3",
+  "prompt_chars": 18061,
+  "at": "2026-09-22T21:40:40.800543+00:00",
+  "latency_ms": 86491.0,
+  "usage": {
+    "prompt_tokens": 4637,
+    "completion_tokens": 6029,
+    "reasoning_tokens": 4439,
+    "total_tokens": 10666,
+    "cost_usd": 0.1017783
+  },
+  "finish_reason": "stop",
+  "upstream_provider": "Together",
+  "parse_step": "fence_stripped",
+  "output": {
+    "memo": [
+      {
+        "claim": "Every correction turn in the corpus is a user revision of the original request: a changed target file (E04), a changed target plus reduced scope (E08), or a reversed API-visibility decision (E12).",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Mechanical tool failures by themselves do not trigger corrections: E02, E06, and E10 each end at a failed edit or patch event with no correction turn recorded.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "line": 2,
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: text not found",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "line": 2,
+            "quote": "apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "line": 2,
+            "quote": "StrReplace lab/src/worker.py failed: StrReplace failed: old_string not found",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": [
+          "E04"
+        ]
+      },
+      {
+        "claim": "In E04 the correction is recorded at line 2, before the failed 'wrong file' edit at line 3, so in this log the correction is not a reaction to that tool failure; the failure text is instead consistent with the redirect the user had already issued.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E04",
+            "line": 3,
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: wrong file",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "A correction does not guarantee the original action is suppressed: in E08 the write to the original target caching.md still succeeded after the user redirected to cache.md, so both files were written.",
+        "type": "exception",
+        "evidence": [
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E08",
+            "line": 3,
+            "quote": "Write lab/docs/caching.md succeeded: Wrote lab/docs/caching.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E08",
+            "line": 4,
+            "quote": "Edit lab/docs/cache.md succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": [
+          "E04"
+        ]
+      },
+      {
+        "claim": "Episodes whose only tool result is unrecorded (unknown) also receive no correction: E03, E07, and E11 all end without any follow-up turn.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "line": 2,
+            "quote": "Bash pytest -q unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "line": 2,
+            "quote": "Bash git commit -am green-suite unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "line": 2,
+            "quote": "Read lab/src/queue.py unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Whether an unknown tool result on a conditional action should require correction is unresolved: E07's request made the commit conditional on a green suite, yet the commit outcome is unrecorded and no verification or correction follows.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E07",
+            "line": 1,
+            "quote": "Commit if the suite is green."
+          },
+          {
+            "episode_id": "E07",
+            "line": 2,
+            "quote": "Bash git commit -am green-suite unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Correction is not a default step in this corpus: cleanly specified requests run to success without any correction turn (E01, E05, E09), but a precise original request does not immunize an episode, since E08 named an explicit file and was still corrected.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E01",
+            "line": 3,
+            "quote": "Bash pytest lab/tests/test_queue.py -q succeeded: Process exited with code 0",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E05",
+            "line": 2,
+            "quote": "Write lab/docs/cache.md succeeded: Wrote lab/docs/cache.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E09",
+            "line": 3,
+            "quote": "Bash pytest lab/tests/test_expiry.py -q succeeded: Process exited with code 0",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": [
+          "E08"
+        ]
+      }
+    ],
+    "reading_decisions": [
+      {
+        "reading": "A",
+        "decision": "KEEP",
+        "why": "Its two codes match the corpus exactly: corrections coincide with user revisions (E04, E08, E12) and tool failures terminate uncorrected (E02, E06, E10), and its stated limit about absent self-correction loops is accurate."
+      },
+      {
+        "reading": "B",
+        "decision": "REVISE",
+        "why": "The split of target redirection from design reversal is a useful refinement, but 'misidentifies the target' overstates E08 and E12, which read as changed preferences rather than corrected mistakes, and like the others it ignores the unknown-status episodes."
+      },
+      {
+        "reading": "C",
+        "decision": "KEEP",
+        "why": "Its three-code split is the most granular and every quote and status checks out; its shared blind spot on E03/E07/E11 is an extension opportunity, not an error."
+      }
+    ],
+    "what_changed_my_view": "The three readings converged on the same correction episodes (E04, E08, E12), which matched my own read, so they mostly confirmed rather than changed my view. The divergence view's uncited-episode list (E03, E07, E11) pushed me to add the unknown-status pattern and the E07 conditional-commit open question, which no reading covered."
+  },
+  "score": {
+    "hard_failures": [],
+    "claims": 7,
+    "citations": 19,
+    "types": {
+      "pattern": 5,
+      "exception": 1,
+      "open_question": 1,
+      "other": 0
+    },
+    "distinct_episodes_cited": 12,
+    "distinct_counter_episodes": 2,
+    "proxies": {
+      "F1": true,
+      "F2": true,
+      "F3": true,
+      "F4": true,
+      "F5": false
+    },
+    "proxy_count": 4,
+    "reading_decisions": {
+      "KEEP": 2,
+      "REVISE": 1
+    }
+  }
+}

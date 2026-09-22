@@ -1,0 +1,49 @@
+{
+  "stage": 0,
+  "offline": false,
+  "transport": "openrouter",
+  "repeat": 3,
+  "seed": 20260922,
+  "arms": [
+    {
+      "arm": "arm-1",
+      "errors": []
+    },
+    {
+      "arm": "arm-2",
+      "errors": []
+    },
+    {
+      "arm": "arm-3",
+      "errors": []
+    },
+    {
+      "arm": "arm-4",
+      "errors": []
+    },
+    {
+      "arm": "arm-5",
+      "errors": []
+    },
+    {
+      "arm": "arm-6",
+      "errors": []
+    },
+    {
+      "arm": "arm-7",
+      "errors": []
+    },
+    {
+      "arm": "arm-8",
+      "errors": []
+    },
+    {
+      "arm": "arm-9",
+      "errors": []
+    }
+  ],
+  "call_failures": [],
+  "prompt_hash": "3645ca4817ba552aec1809c27176e883cd9f31ffd84d1cfafe2f145d605cffe0",
+  "spent_usd_ledger_total": 0.535448,
+  "ceiling_usd": 3.0
+}

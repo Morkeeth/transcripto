@@ -37,6 +37,14 @@ def publish(trial: Path, results: Path) -> list[str]:
             shutil.copyfile(src, dest)
             dest.chmod(0o644)
             copied.append(str(dest))
+    # The ledger names the model per arm. That is the blind key, so arm rows lose the model id.
+    spend = results / "spend.json"
+    if spend.exists():
+        data = json.loads(spend.read_text(encoding="utf8"))
+        for row in data.get("calls", []):
+            if str(row.get("label", "")).startswith("arm-"):
+                row["model"] = "blind"
+        spend.write_text(json.dumps(data, indent=2) + "\n", encoding="utf8")
     (results / "corpus-lines.txt").write_text(corpus_lines(load_frozen(trial / "frozen")) + "\n", encoding="utf8")
     for dest in copied:
         text = Path(dest).read_text(encoding="utf8")

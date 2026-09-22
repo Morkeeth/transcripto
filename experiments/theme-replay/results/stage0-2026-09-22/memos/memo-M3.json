@@ -1,0 +1,251 @@
+{
+  "memo": "M3",
+  "condition": "M",
+  "arms": [
+    "arm-5",
+    "arm-1",
+    "arm-4"
+  ],
+  "prompt_sha256": "ddecab75281dc74e337b9c9e7d13f79d56201cb6679ee4a2eb5362bb8a24dc46",
+  "prompt_chars": 27572,
+  "at": "2026-09-22T21:44:14.399187+00:00",
+  "latency_ms": 95983.9,
+  "usage": {
+    "prompt_tokens": 6971,
+    "completion_tokens": 6565,
+    "reasoning_tokens": 4833,
+    "total_tokens": 13536,
+    "cost_usd": 0.1168824
+  },
+  "finish_reason": "stop",
+  "upstream_provider": "Together",
+  "parse_step": "fence_stripped",
+  "output": {
+    "memo": [
+      {
+        "claim": "Every recorded correction in the corpus is an explicit human redirect of the file target, the content scope, or the API/design contract.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "In the recorded order, each correction is logged at line 2, before any tool event in its episode, so the corpus presents corrections as intent realignments rather than as reactions to observed tool outcomes.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E08",
+            "line": 3,
+            "quote": "Write lab/docs/caching.md succeeded: Wrote lab/docs/caching.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E04",
+            "line": 3,
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: wrong file",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Failed tool events in E02, E06, and E10 leave the requested change unmade yet carry no correction field, so execution failure and recorded correction are disjoint in this corpus.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "line": 2,
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: text not found",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "line": 2,
+            "quote": "apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "line": 2,
+            "quote": "StrReplace lab/src/worker.py failed: StrReplace failed: old_string not found",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": [
+          "E04"
+        ]
+      },
+      {
+        "claim": "Episodes where the stated intent stays stable and every tool event succeeds (E01, E05, E09) carry no correction, so successful execution under stable intent does not require correction.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E01",
+            "line": 2,
+            "quote": "Edit lab/src/queue.py succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E01",
+            "line": 3,
+            "quote": "Bash pytest lab/tests/test_queue.py -q succeeded: Process exited with code 0",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E05",
+            "line": 2,
+            "quote": "Write lab/docs/cache.md succeeded: Wrote lab/docs/cache.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E09",
+            "line": 3,
+            "quote": "Bash pytest lab/tests/test_expiry.py -q succeeded: Process exited with code 0",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": [
+          "E08",
+          "E12"
+        ]
+      },
+      {
+        "claim": "E04 is the sole episode mixing a correction with a failed event: after the redirect to the header parser, an edit to the originally requested auth parser failed as 'wrong file' before the redirected edit succeeded.",
+        "type": "exception",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E04",
+            "line": 3,
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: wrong file",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E04",
+            "line": 4,
+            "quote": "Edit lab/src/http/headers.py succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Unknown-status episodes (E03, E07, E11) leave the requested test, commit, or inspection unverifiable, and the frozen corpus records neither an outcome nor a correction, so their correction-need cannot be determined and unknown must not be upgraded.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "line": 2,
+            "quote": "Bash pytest -q unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "line": 2,
+            "quote": "Bash git commit -am green-suite unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "line": 2,
+            "quote": "Read lab/src/queue.py unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Whether failed episodes 'require correction' is a definitional gap the corpus cannot settle: E06's requested change is never shown completed, yet no retry or correction is recorded, so 'needs remediation' and 'recorded correction' cannot be reconciled from the lines.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E06",
+            "line": 1,
+            "quote": "Patch lab/src/queue.py to raise after three retries."
+          },
+          {
+            "episode_id": "E06",
+            "line": 2,
+            "quote": "apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": [
+          "E04"
+        ]
+      }
+    ],
+    "reading_decisions": [
+      {
+        "reading": "A",
+        "decision": "REVISE",
+        "why": "I adopt its core separation of the explicit correction field from tool-status inference, but its labels and interpretations claim corrections follow tool outcomes (after failure in E04, after a successful write in E08), which the line order contradicts since every correction sits at L2 before any event."
+      },
+      {
+        "reading": "B",
+        "decision": "REVISE",
+        "why": "Its three-way taxonomy and status discipline are useful, but treating failed and unknown episodes as 'requiring correction' is an analyst-imposed definition the corpus never records, and its E08 framing implies correction responding to successful execution even though the correction precedes all events."
+      },
+      {
+        "reading": "C",
+        "decision": "KEEP",
+        "why": "It correctly identifies user-initiated redirection of target, scope, or design as the only recorded correction trigger and alone gets E04's correction-before-failure ordering right, though I discount its 'high' confidence and note it never addresses the unknown-status episodes."
+      }
+    ],
+    "what_changed_my_view": "Checking line order changed my read: every correction is logged at L2, before any tool event, which undercut A's and B's framings of correction as a reaction to success or failure and reframed it as intent realignment. B's broad definition also forced me to separate 'recorded correction' from 'plausibly needs remediation,' a gap the frozen corpus cannot close for failed or unknown episodes."
+  },
+  "score": {
+    "hard_failures": [],
+    "claims": 7,
+    "citations": 22,
+    "types": {
+      "pattern": 4,
+      "exception": 1,
+      "open_question": 2,
+      "other": 0
+    },
+    "distinct_episodes_cited": 12,
+    "distinct_counter_episodes": 3,
+    "proxies": {
+      "F1": true,
+      "F2": true,
+      "F3": true,
+      "F4": true,
+      "F5": false
+    },
+    "proxy_count": 4,
+    "reading_decisions": {
+      "REVISE": 2,
+      "KEEP": 1
+    }
+  }
+}

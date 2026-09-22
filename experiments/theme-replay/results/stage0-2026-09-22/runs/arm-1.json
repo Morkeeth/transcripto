@@ -1,0 +1,186 @@
+{
+  "arm": "arm-1",
+  "offline": false,
+  "transport": "openrouter",
+  "at": "2026-09-22T21:21:34.994289+00:00",
+  "http_status": 200,
+  "latency_ms": 30998.7,
+  "tokens": 5994,
+  "usage": {
+    "prompt_tokens": 3223,
+    "completion_tokens": 2771,
+    "reasoning_tokens": 1217,
+    "total_tokens": 5994,
+    "cost_usd": 0.10327
+  },
+  "cost": 0.10327,
+  "finish_reason": "stop",
+  "parse_step": "as_returned",
+  "request_meta": {
+    "max_tokens": 12000,
+    "provider": {
+      "zdr": true,
+      "data_collection": "deny",
+      "allow_fallbacks": true
+    },
+    "usage": {
+      "include": true
+    }
+  },
+  "zdr_confirmation": "unverified",
+  "errors": [],
+  "output": {
+    "analytic_position": "I treat correction broadly as any remediation needed before an episode can be accepted as complete: repairing a failed action, resolving an unobserved outcome, or adapting to an explicit human revision. I distinguish these inferred repair needs from the corpus's recorded correction field. Failed and unknown episodes contain no recorded human correction, while changed-decision episodes do. Because the corpus is small, synthetic, and outcome-labelled, it supports a descriptive taxonomy rather than causal claims about agent competence.",
+    "codes": [
+      {
+        "label": "mechanical action failure",
+        "episode_ids": [
+          "E02",
+          "E06",
+          "E10"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: text not found",
+            "line": 2,
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "quote": "apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch",
+            "line": 2,
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "quote": "StrReplace lab/src/worker.py failed: StrReplace failed: old_string not found",
+            "line": 2,
+            "claimed_status": "failed"
+          }
+        ],
+        "interpretation": "An episode requires operational correction when its attempted edit or patch is explicitly rejected. The recorded causes\u2014missing text, context mismatch, and an absent old string\u2014indicate that the action did not produce the requested change and must be revised or retried.",
+        "counterevidence": [
+          {
+            "episode_id": "E01",
+            "reason": "A comparable source-edit episode records completion rather than a repair need: E01 L2, \"Edit lab/src/queue.py succeeded: File updated successfully\" (claimed_status: succeeded)."
+          }
+        ],
+        "confidence": "tentative"
+      },
+      {
+        "label": "missing outcome evidence",
+        "episode_ids": [
+          "E03",
+          "E07",
+          "E11"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "quote": "Bash pytest -q unknown: No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "quote": "Bash git commit -am green-suite unknown: No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "quote": "Read lab/src/queue.py unknown: No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          }
+        ],
+        "interpretation": "An episode requires evidentiary correction when the requested test, commit, or inspection has no matching result. Unknown is not failure or success; the action must be rerun, recovered, or explicitly reported as unverifiable before the request can be answered reliably.",
+        "counterevidence": [
+          {
+            "episode_id": "E09",
+            "reason": "The test outcome is observed and successful rather than unknown: E09 L3, \"Bash pytest lab/tests/test_expiry.py -q succeeded: Process exited with code 0\" (claimed_status: succeeded)."
+          }
+        ],
+        "confidence": "tentative"
+      },
+      {
+        "label": "revised target or contract",
+        "episode_ids": [
+          "E04",
+          "E08",
+          "E12"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "quote": "No, I meant the header parser in lab/src/http/headers.py.",
+            "line": 2
+          },
+          {
+            "episode_id": "E08",
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section.",
+            "line": 2
+          },
+          {
+            "episode_id": "E12",
+            "quote": "Keep the helper private. The public API stays the existing enqueue function.",
+            "line": 2
+          }
+        ],
+        "interpretation": "An episode requires correction when the human's operative intent changes or is clarified in a way that invalidates the prior target, scope, or API contract. This can require correction even when tool actions succeed, because execution success does not establish alignment with the revised decision.",
+        "counterevidence": [
+          {
+            "episode_id": "E05",
+            "reason": "The original target and scope remain stable, with no recorded correction: E05 L1, \"Write a TTL note into lab/docs/cache.md and leave the rest of the docs alone.\""
+          }
+        ],
+        "confidence": "tentative"
+      }
+    ],
+    "themes": [
+      {
+        "name": "Completion requires a demonstrated usable outcome",
+        "central_concept": "An episode cannot be accepted as complete when execution is explicitly rejected or its result is absent. The contrast is visible between E06 L2, \"apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch\" (claimed_status: failed), and E03 L2, \"Bash pytest -q unknown: No matching tool result recorded.\" (claimed_status: unknown): one establishes failure, while the other leaves the outcome unresolved.",
+        "codes": [
+          "mechanical action failure",
+          "missing outcome evidence"
+        ],
+        "supporting_episodes": [
+          "E02",
+          "E03",
+          "E06",
+          "E07",
+          "E10",
+          "E11"
+        ],
+        "disconfirming_episodes": [
+          "E01",
+          "E09"
+        ],
+        "limits": "The corpus does not show subsequent retries, so it establishes a need for remediation but not whether correction later occurred. E01 L3 provides disconfirming evidence of a demonstrated outcome: \"Bash pytest lab/tests/test_queue.py -q succeeded: Process exited with code 0\" (claimed_status: succeeded)."
+      },
+      {
+        "name": "Alignment can override successful execution",
+        "central_concept": "Correction can be driven by a revised human decision rather than tool failure. E08 L2 changes file, length, and content scope through \"lab/docs/cache.md, shorter please. Drop the architecture section.\", even though E08 contains successful tool results.",
+        "codes": [
+          "revised target or contract"
+        ],
+        "supporting_episodes": [
+          "E04",
+          "E08",
+          "E12"
+        ],
+        "disconfirming_episodes": [
+          "E05"
+        ],
+        "limits": "The records do not establish whether these revisions arose from agent misunderstanding, ambiguity, or a genuine change of mind. E05 L1 is a contrasting stable instruction: \"Write a TTL note into lab/docs/cache.md and leave the rest of the docs alone.\""
+      }
+    ],
+    "questions_for_human": [
+      "Should \"require correction\" include failed and unknown episodes that need remediation even though their correction field is null, or only episodes with an explicit human correction?",
+      "Should changed-decision episodes be treated as agent errors, human preference changes, or a separate category of interactional realignment?",
+      "What evidence would be sufficient to resolve an unknown result: a rerun, recovered tool output, or an explicit statement that verification was impossible?"
+    ]
+  }
+}

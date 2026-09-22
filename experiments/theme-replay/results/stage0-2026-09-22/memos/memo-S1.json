@@ -1,0 +1,182 @@
+{
+  "memo": "S1",
+  "condition": "S",
+  "arms": [
+    "arm-6"
+  ],
+  "prompt_sha256": "a9fb57d70c990eb31fdcdebd820f10fd75955a28aafc604403c9d2af38790b11",
+  "prompt_chars": 12348,
+  "at": "2026-09-22T21:30:23.103124+00:00",
+  "latency_ms": 253034.8,
+  "usage": {
+    "prompt_tokens": 3186,
+    "completion_tokens": 3131,
+    "reasoning_tokens": 2140,
+    "total_tokens": 6317,
+    "cost_usd": 0.04867075
+  },
+  "finish_reason": "stop",
+  "upstream_provider": "DigitalOcean",
+  "parse_step": "as_returned",
+  "output": {
+    "memo": [
+      {
+        "claim": "Episodes that require correction are marked by an explicit user redirection issued after the agent's initial action (E04, E08, E12).",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": [
+          "E01",
+          "E05",
+          "E09"
+        ]
+      },
+      {
+        "claim": "Each recorded correction fixes a different mismatch \u2014 wrong target file (E04), wrong document and scope (E08), wrong API visibility (E12) \u2014 so 'correction' covers several distinct mismatch types rather than one.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser"
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "Drop the architecture section."
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "A failed tool event alone does not make an episode a correction episode: E02, E06, and E10 end in recorded failures with no correction line and no recorded resolution.",
+        "type": "exception",
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "line": 2,
+            "quote": "Edit failed: text not found",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "line": 2,
+            "quote": "apply_patch rejected: context mismatch",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "line": 2,
+            "quote": "StrReplace failed: old_string not found",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": [
+          "E04"
+        ]
+      },
+      {
+        "claim": "Episodes whose only event is unknown (E03, E07, E11) cannot be classified as requiring correction; they are observability gaps, and per the rules their status must not be upgraded to failed or succeeded.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "line": 2,
+            "quote": "No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "line": 2,
+            "quote": "No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "line": 2,
+            "quote": "No matching tool result recorded.",
+            "claimed_status": "unknown"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "When the agent's first action matches the request, episodes complete with succeeded events and no correction (E01, E05, E09).",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E01",
+            "line": 2,
+            "quote": "File updated successfully",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E05",
+            "line": 2,
+            "quote": "Wrote lab/docs/cache.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E09",
+            "line": 3,
+            "quote": "Process exited with code 0",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": []
+      }
+    ],
+    "reading_decisions": [
+      {
+        "reading": "A",
+        "decision": "KEEP",
+        "why": "Its codes match the corpus \u2014 only E04/E08/E12 carry correction lines, failures in E02/E06/E10 genuinely lack corrections, and unknown statuses are preserved not upgraded \u2014 and its tentative flags on single-episode generalizations are appropriately cautious."
+      }
+    ],
+    "what_changed_my_view": "The one reading did not overturn the basic picture; it sharpened the separation between correction (explicit redirection), failure (broken attempt without recorded follow-up), and unknown status (missing evidence), with E04 as the useful counter-example showing failure can precede correction."
+  },
+  "score": {
+    "hard_failures": [],
+    "claims": 5,
+    "citations": 15,
+    "types": {
+      "pattern": 3,
+      "exception": 1,
+      "open_question": 1,
+      "other": 0
+    },
+    "distinct_episodes_cited": 12,
+    "distinct_counter_episodes": 4,
+    "proxies": {
+      "F1": true,
+      "F2": false,
+      "F3": true,
+      "F4": true,
+      "F5": false
+    },
+    "proxy_count": 3,
+    "reading_decisions": {
+      "KEEP": 1
+    }
+  }
+}

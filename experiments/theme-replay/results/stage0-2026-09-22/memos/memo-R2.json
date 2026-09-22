@@ -1,0 +1,247 @@
+{
+  "memo": "R2",
+  "condition": "R",
+  "arms": [
+    "arm-7",
+    "arm-1",
+    "arm-8"
+  ],
+  "prompt_sha256": "5b80f584d446357f1213f6491ed2db8b9300046c6d146b29f7a574f17f3cc43e",
+  "prompt_chars": 33010,
+  "at": "2026-09-22T21:39:01.009379+00:00",
+  "latency_ms": 99787.3,
+  "usage": {
+    "prompt_tokens": 8244,
+    "completion_tokens": 8004,
+    "reasoning_tokens": 6545,
+    "total_tokens": 16248,
+    "cost_usd": 0.1423107
+  },
+  "finish_reason": "stop",
+  "upstream_provider": "Together",
+  "parse_step": "fence_stripped",
+  "output": {
+    "memo": [
+      {
+        "claim": "Failed edit or patch operations leave the requested change undelivered, so E02, E06, and E10 require corrective work even though none contains a correction line.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "line": 2,
+            "quote": "Edit failed: text not found",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "line": 2,
+            "quote": "apply_patch rejected: context mismatch",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "line": 2,
+            "quote": "StrReplace failed: old_string not found",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": [
+          "E01"
+        ]
+      },
+      {
+        "claim": "Unknown tool results leave the requested report, conditional commit, or file-content answer unsupported by the record, so E03, E07, and E11 require renewed verification before they can be answered.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "line": 2,
+            "quote": "No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "line": 2,
+            "quote": "No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "line": 2,
+            "quote": "No matching tool result recorded.",
+            "claimed_status": "unknown"
+          }
+        ],
+        "counter_episodes": [
+          "E09"
+        ]
+      },
+      {
+        "claim": "Explicit correction lines revise the operative target, scope, or interface decision after the initial request, making prior work misaligned in E04, E08, and E12.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": [
+          "E05"
+        ]
+      },
+      {
+        "claim": "A succeeded tool result does not by itself remove the need for correction, since E08 and E12 record successful operations that the correction lines then supersede.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E08",
+            "line": 3,
+            "quote": "Wrote lab/docs/caching.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E12",
+            "line": 3,
+            "quote": "Edit lab/src/queue.py succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private."
+          }
+        ],
+        "counter_episodes": [
+          "E01",
+          "E09"
+        ]
+      },
+      {
+        "claim": "E04 shows the failure-driven and intent-driven drivers of correction are not mutually exclusive, because an explicit target correction coincides with a failed edit recorded as the wrong file.",
+        "type": "exception",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E04",
+            "line": 3,
+            "quote": "Edit failed: wrong file",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "For the failed and unknown episodes the record ends at the failed or unknown event, so whether any remediation actually occurred remains unresolved.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E06",
+            "line": 2,
+            "quote": "apply_patch rejected: context mismatch",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E07",
+            "line": 2,
+            "quote": "No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E10",
+            "line": 2,
+            "quote": "StrReplace failed: old_string not found",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": [
+          "E04"
+        ]
+      },
+      {
+        "claim": "The lines cannot establish whether the corrections in E04, E08, and E12 reflect agent misunderstanding or the user revising or mis-stating intent.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 1,
+            "quote": "Refactor the auth parser in lab/src/auth/parser.py"
+          },
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E12",
+            "line": 1,
+            "quote": "Ship the retry helper as the public API."
+          }
+        ],
+        "counter_episodes": []
+      }
+    ],
+    "reading_decisions": [
+      {
+        "reading": "A",
+        "decision": "REVISE",
+        "why": "Its three-driver taxonomy is sound and statuses are accurate, but the theme 'Changed intent can require correction despite successful execution' should exclude E04, whose pre-correction edit failed ('wrong file'), so that framing fits only E08 and E12."
+      },
+      {
+        "reading": "B",
+        "decision": "KEEP",
+        "why": "Its codes match the corpus with correct statuses and it preserves unknown as unresolved rather than failure; merging failure and unknown into one theme is acceptable because the separate codes keep the distinction intact."
+      },
+      {
+        "reading": "C",
+        "decision": "KEEP",
+        "why": "It adds the corpus-supported refinements that successful actions can be superseded (E08, E12) and that E04 mixes a failure with an explicit correction, both of which I adopted as memo claims."
+      }
+    ],
+    "what_changed_my_view": "All three readings converged on the same three drivers, so I re-verified each citation against the corpus myself rather than treating agreement as proof. Reading C's observations that E08 and E12 pair succeeded events with superseding corrections, and that E04 mixes a failure with a correction, sharpened my success-supersession claim and the mixed-case exception."
+  },
+  "score": {
+    "hard_failures": [],
+    "claims": 7,
+    "citations": 21,
+    "types": {
+      "pattern": 4,
+      "exception": 1,
+      "open_question": 2,
+      "other": 0
+    },
+    "distinct_episodes_cited": 9,
+    "distinct_counter_episodes": 4,
+    "proxies": {
+      "F1": true,
+      "F2": true,
+      "F3": true,
+      "F4": true,
+      "F5": false
+    },
+    "proxy_count": 4,
+    "reading_decisions": {
+      "REVISE": 1,
+      "KEEP": 2
+    }
+  }
+}

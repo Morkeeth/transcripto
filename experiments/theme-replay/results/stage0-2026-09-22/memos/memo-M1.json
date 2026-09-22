@@ -1,0 +1,211 @@
+{
+  "memo": "M1",
+  "condition": "M",
+  "arms": [
+    "arm-8",
+    "arm-6",
+    "arm-3"
+  ],
+  "prompt_sha256": "d610a69a19f69bd12ea1452d0ba96e12ca1919f50214f8e0769a1e62e10e894a",
+  "prompt_chars": 29554,
+  "at": "2026-09-22T21:42:07.301842+00:00",
+  "latency_ms": 55939.4,
+  "usage": {
+    "prompt_tokens": 7488,
+    "completion_tokens": 4027,
+    "reasoning_tokens": 2699,
+    "total_tokens": 11515,
+    "cost_usd": 0.0784005
+  },
+  "finish_reason": "stop",
+  "upstream_provider": "Together",
+  "parse_step": "fence_stripped",
+  "output": {
+    "memo": [
+      {
+        "claim": "Every explicit correction line in the corpus revises the episode's operative specification mid-stream \u2014 the target file in E04, the path and scope in E08, and the API visibility decision in E12.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": [
+          "E02"
+        ]
+      },
+      {
+        "claim": "A second kind of correction need is technical: failed edit or patch events leave the requested work incomplete even though no user correction is recorded (E02, E06, E10).",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "line": 2,
+            "quote": "Edit failed: text not found",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "line": 2,
+            "quote": "apply_patch rejected: context mismatch",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "line": 2,
+            "quote": "StrReplace failed: old_string not found",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": [
+          "E04"
+        ]
+      },
+      {
+        "claim": "A third kind of correction need is epistemic: episodes whose only event has unknown status cannot support any completion claim and require renewed observation before the request can be answered (E03, E07, E11).",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "line": 2,
+            "quote": "No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "line": 2,
+            "quote": "No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "line": 2,
+            "quote": "No matching tool result recorded.",
+            "claimed_status": "unknown"
+          }
+        ],
+        "counter_episodes": [
+          "E09"
+        ]
+      },
+      {
+        "claim": "A succeeded tool result does not settle whether correction is needed: in E08 and E12 actions recorded as succeeded were superseded by the user's correction of target, scope, or design.",
+        "type": "exception",
+        "evidence": [
+          {
+            "episode_id": "E08",
+            "line": 3,
+            "quote": "Write lab/docs/caching.md succeeded: Wrote lab/docs/caching.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E12",
+            "line": 3,
+            "quote": "Edit lab/src/queue.py succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": [
+          "E01",
+          "E05",
+          "E09"
+        ]
+      },
+      {
+        "claim": "The corpus does not support the claim that a visible tool failure prompts user correction, because in E04 the correction (L2) is recorded before the failed edit to the wrong file (L3).",
+        "type": "exception",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E04",
+            "line": 3,
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: wrong file",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Whether the corrections in E04, E08, and E12 fix an agent's misunderstanding or record the user changing their own initial specification cannot be determined from the lines, since the requests and corrections are both compatible with either reading.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E12",
+            "line": 1,
+            "quote": "Ship the retry helper as the public API."
+          },
+          {
+            "episode_id": "E04",
+            "line": 1,
+            "quote": "Refactor the auth parser in lab/src/auth/parser.py and keep the existing tests green while you do it."
+          }
+        ],
+        "counter_episodes": []
+      }
+    ],
+    "reading_decisions": [
+      {
+        "reading": "A",
+        "decision": "KEEP",
+        "why": "It cleanly separates explicit goal realignment, technical remediation, and epistemic verification, keeps statuses literal, and refuses causal claims the corpus cannot support."
+      },
+      {
+        "reading": "B",
+        "decision": "REVISE",
+        "why": "Its literal-status discipline is sound, but the code 'failed-edit-attempt-precedes-correction' asserts a temporal-causal link in E04 that the line order contradicts, since the correction at L2 precedes the failed edit at L3."
+      },
+      {
+        "reading": "C",
+        "decision": "REVISE",
+        "why": "It correctly identifies the spec-shift corrections in E04/E08/E12 but overclaims that they are 'driven by upstream changes in requester intent,' assigns 'high' confidence on a tiny sample, and ignores the unknown-status episodes entirely."
+      }
+    ],
+    "what_changed_my_view": "The three readings converge on E04/E08/E12 as correction episodes, which matches the corpus, but checking line order in E04 showed the correction precedes the failed edit, so I rejected Reading B's claim that tool failure prompts correction. The remaining disagreement over whether failed or unknown episodes 'require correction' is a definitional scope question, and I treat all three as distinct correction needs rather than choosing one definition."
+  },
+  "score": {
+    "hard_failures": [],
+    "claims": 6,
+    "citations": 16,
+    "types": {
+      "pattern": 3,
+      "exception": 2,
+      "open_question": 1,
+      "other": 0
+    },
+    "distinct_episodes_cited": 9,
+    "distinct_counter_episodes": 5,
+    "proxies": {
+      "F1": true,
+      "F2": true,
+      "F3": true,
+      "F4": true,
+      "F5": false
+    },
+    "proxy_count": 4,
+    "reading_decisions": {
+      "KEEP": 1,
+      "REVISE": 2
+    }
+  }
+}
