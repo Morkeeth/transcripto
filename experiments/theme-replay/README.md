@@ -45,3 +45,20 @@ That path cannot serve Jev. Jev (`typesafe-ai/jev`) is a separate evaluation tri
 Human decisions are KEEP, REVISE, or REJECT plus one sentence. `CHANGES MY VIEW` is accepted as REVISE.
 
 Stage 1 (redacted real episodes) is not in this tree.
+
+## Memo comparison (added 2026-09-22)
+
+Question: does model disagreement improve an evidence-linked analytic memo?
+
+```sh
+cd experiments/theme-replay
+./run_stage0.sh            # live if OPENROUTER_API_KEY is set, else offline mechanics
+./run_stage0.sh --rescore  # no network: re-verify and re-score results/stage0-2026-09-22
+```
+
+- Transport is OpenRouter, not Vercel AI Gateway. No Gateway key exists on this machine. Receipts say `transport: openrouter`. The request asks for `zdr: true` and `data_collection: deny`; whether a provider honoured that is `unverified`. Stage 1 real data must not use this path until it is proven.
+- Three analysis families, three separate requests each (`--repeat 3`), one shared spend ledger with a USD ceiling (`MAX_COST`, default 10).
+- A fixed writer model (`moonshotai/kimi-k3`, outside the three families) stands in for the analyst. It writes memos under four conditions: B (no readings), S (one reading), R (three repeats of one family plus the divergence view), M (three families plus the divergence view). M versus R is the primary contrast.
+- Scoring and the decision rule are in `fixtures/memo-protocol.json`, committed before any live output.
+- `results/stage0-2026-09-22/memos/human-packet.md` is blind. Rate it before you open `memo-report.json`. The model-to-arm key and the packet key stay in `.trial/` (0600, gitignored).
+- The writer is a proxy. It is not the human H or H+M arm in the PRD.

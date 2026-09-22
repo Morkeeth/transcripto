@@ -53,6 +53,13 @@ def main(argv: list[str] | None = None) -> int:
     p_memo.add_argument("--max-cost", type=float, default=10.0)
     p_memo.add_argument("--ledger")
 
+    p_pub = sub.add_parser("publish", help="copy blind aggregate results out of .trial")
+    p_pub.add_argument("trial")
+    p_pub.add_argument("results")
+
+    p_rescore = sub.add_parser("rescore", help="re-verify and re-score committed results, no network")
+    p_rescore.add_argument("results")
+
     p_lines = sub.add_parser("corpus-lines", help="print the frozen corpus as numbered citation lines")
     p_lines.add_argument("frozen")
 
@@ -134,6 +141,17 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"verdict": report["verdict"], "by_condition": report["by_condition"],
                           "spent_usd": report["spent_usd_ledger_total"]}, indent=2))
         return 0
+    if args.cmd == "publish":
+        from .publish import publish
+
+        print(json.dumps({"copied": publish(Path(args.trial), Path(args.results))}, indent=2))
+        return 0
+    if args.cmd == "rescore":
+        from .publish import rescore
+
+        report = rescore(Path(args.results))
+        print(json.dumps(report, indent=2))
+        return 0 if report["corpus_hash_matches"] and report["matches_committed_verdict"] else 2
     if args.cmd == "corpus-lines":
         from .citations import load_frozen
         from .memo import corpus_lines

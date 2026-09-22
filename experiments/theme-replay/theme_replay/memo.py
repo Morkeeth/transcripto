@@ -11,7 +11,6 @@ from __future__ import annotations
 import hashlib
 import json
 import random
-import shutil
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -115,6 +114,14 @@ def _field(episode: dict[str, Any], n: int) -> str | None:
 
 
 def score_memo(output: dict[str, Any], index: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return _score_memo(output, index)
+    except (TypeError, AttributeError, ValueError) as exc:
+        return {"hard_failures": [f"memo does not follow the schema: {type(exc).__name__}"], "claims": 0,
+                "proxies": {}, "proxy_count": 0}
+
+
+def _score_memo(output: dict[str, Any], index: dict[str, Any]) -> dict[str, Any]:
     by_id = episode_map(index)
     hard: list[str] = []
     if not isinstance(output, dict) or "raw_text" in output or not isinstance(output.get("memo"), list):
@@ -264,9 +271,9 @@ def run_memos(frozen: Path, runs: Path, out: Path, *, models: list[str], writer:
         raw = call["payload"]
         choice = (raw.get("choices") or [{}])[0]
         text = (choice.get("message") or {}).get("content") or ""
-        output, step = parse_output_step(text)
         usage = openrouter.usage_numbers(raw)
         ledger.add(f"memo-{row['memo']}", writer, usage["cost_usd"])
+        output, step = parse_output_step(text)
         record.update({
             "latency_ms": call["latency_ms"], "usage": usage, "finish_reason": choice.get("finish_reason"),
             "upstream_provider": raw.get("provider"), "parse_step": step, "output": output,

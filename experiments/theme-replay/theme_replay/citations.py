@@ -63,7 +63,19 @@ def check_status_claim(episode: dict[str, Any], line: int | None, claimed: str |
 
 
 def validate_model_output(output: Any, index: dict[str, Any]) -> list[str]:
-    """Name every failure. Never skip an arm because a key is missing."""
+    """Name every failure. Never skip an arm because a key is missing.
+
+    A live model can return JSON in another shape (a dict where a string is
+    expected, a list where a dict is expected). That is a named failure, never
+    a crash that loses the rest of the run.
+    """
+    try:
+        return _validate(output, index)
+    except (TypeError, AttributeError, ValueError) as exc:
+        return [f"output does not follow the schema: {type(exc).__name__}: {exc}"[:300]]
+
+
+def _validate(output: Any, index: dict[str, Any]) -> list[str]:
     if not isinstance(output, dict) or "raw_text" in output:
         return ["model did not return the JSON schema"]
     errors: list[str] = []

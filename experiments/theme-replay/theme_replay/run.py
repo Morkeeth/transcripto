@@ -34,7 +34,13 @@ def build_user_prompt(frozen: Path) -> str:
     question = (frozen / "question.txt").read_text(encoding="utf8").strip()
     instructions = (frozen / "analysis-prompt.txt").read_text(encoding="utf8").strip()
     corpus = (frozen / "episodes.jsonl").read_text(encoding="utf8")
-    return f"{instructions}\n\nQUESTION\n{question}\n\nCORPUS\n{corpus}\n"
+    prompt = f"{instructions}\n\nQUESTION\n{question}\n\nCORPUS\n{corpus}\n"
+    if "NUMBERED LINES" in instructions:
+        # Prompt v2: the citation line view, derived deterministically from the frozen corpus.
+        from .memo import corpus_lines
+
+        prompt += f"\nNUMBERED LINES\n{corpus_lines(load_frozen(frozen))}\n"
+    return prompt
 
 
 def load_offline_arm(path: Path) -> dict[str, Any]:
@@ -242,10 +248,11 @@ def run_openrouter(
         raw = call["payload"]
         choice = (raw.get("choices") or [{}])[0]
         text = (choice.get("message") or {}).get("content") or ""
-        output, parse_step = parse_output_step(text)
-        errors = validate_model_output(output, index)
+        # Record spend first, so no later failure can hide a paid call.
         usage = openrouter.usage_numbers(raw)
         ledger.add(arm, job["model"], usage["cost_usd"])
+        output, parse_step = parse_output_step(text)
+        errors = validate_model_output(output, index)
         receipt = {
             "arm": arm,
             "offline": False,

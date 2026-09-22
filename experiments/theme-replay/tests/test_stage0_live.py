@@ -146,6 +146,18 @@ class OpenRouterTransportTests(unittest.TestCase):
             self.assertEqual(calls.call_count, 2)
 
 
+class ShapeTests(unittest.TestCase):
+    def test_off_schema_output_is_named_not_a_crash(self):
+        from theme_replay.citations import validate_model_output
+        with tempfile.TemporaryDirectory() as tmp:
+            index = load_frozen(freeze_stage0(Path(tmp) / "frozen"))
+            # Seen live 2026-09-22: a theme listed codes as objects, not labels.
+            output = {"codes": [{"code": "x", "citations": []}], "themes": [{"theme": "t", "codes": [{"code": "x"}]}]}
+            errors = validate_model_output(output, index)
+            self.assertTrue(errors)
+            self.assertTrue(any("schema" in e for e in errors))
+
+
 class MemoScoringTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
