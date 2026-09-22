@@ -10,7 +10,7 @@ from pathlib import Path
 from .compare import compare
 from .freeze import freeze
 from .review import record_decision, render
-from .run import run_gateway, run_offline
+from .run import run_gateway, run_offline, run_openrouter
 from .verify import verify
 
 
@@ -38,6 +38,23 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--no-training", action="store_true")
     p_run.add_argument("--repeat", type=int, default=1)
     p_run.add_argument("--seed", type=int)
+    p_run.add_argument("--transport", choices=("gateway", "openrouter"), default="gateway")
+    p_run.add_argument("--max-cost", type=float, default=10.0, help="USD ceiling across the shared ledger")
+    p_run.add_argument("--ledger", help="spend ledger JSON; default <out>/../spend.json")
+    p_run.add_argument("--max-tokens", type=int)
+
+    p_memo = sub.add_parser("memo", help="memo comparison B/S/R/M with a fixed writer model")
+    p_memo.add_argument("frozen")
+    p_memo.add_argument("runs")
+    p_memo.add_argument("--out", required=True)
+    p_memo.add_argument("--models", required=True)
+    p_memo.add_argument("--writer", required=True)
+    p_memo.add_argument("--seed", type=int, required=True)
+    p_memo.add_argument("--max-cost", type=float, default=10.0)
+    p_memo.add_argument("--ledger")
+
+    p_lines = sub.add_parser("corpus-lines", help="print the frozen corpus as numbered citation lines")
+    p_lines.add_argument("frozen")
 
     p_compare = sub.add_parser("compare")
     p_compare.add_argument("frozen")
@@ -76,6 +93,19 @@ def main(argv: list[str] | None = None) -> int:
             models = [item.strip() for item in args.models.split(",") if item.strip()]
             if not models:
                 raise SystemExit("run needs --offline or --models")
+            if args.transport == "openrouter":
+                summary = run_openrouter(
+                    Path(args.frozen),
+                    models,
+                    out,
+                    ledger_path=Path(args.ledger) if args.ledger else out.parent / "spend.json",
+                    max_cost=args.max_cost,
+                    repeat=args.repeat,
+                    seed=args.seed,
+                    max_tokens=args.max_tokens,
+                )
+                print(json.dumps(summary, indent=2))
+                return 0
             summary = run_gateway(
                 Path(args.frozen),
                 models,
@@ -86,6 +116,29 @@ def main(argv: list[str] | None = None) -> int:
                 seed=args.seed,
             )
         print(json.dumps(summary, indent=2))
+        return 0
+    if args.cmd == "memo":
+        from .memo import run_memos
+
+        out = Path(args.out)
+        report = run_memos(
+            Path(args.frozen),
+            Path(args.runs),
+            out,
+            models=[m.strip() for m in args.models.split(",") if m.strip()],
+            writer=args.writer,
+            ledger_path=Path(args.ledger) if args.ledger else out.parent / "spend.json",
+            max_cost=args.max_cost,
+            seed=args.seed,
+        )
+        print(json.dumps({"verdict": report["verdict"], "by_condition": report["by_condition"],
+                          "spent_usd": report["spent_usd_ledger_total"]}, indent=2))
+        return 0
+    if args.cmd == "corpus-lines":
+        from .citations import load_frozen
+        from .memo import corpus_lines
+
+        print(corpus_lines(load_frozen(Path(args.frozen))))
         return 0
     if args.cmd == "verify":
         report = verify(Path(args.frozen), Path(args.runs))

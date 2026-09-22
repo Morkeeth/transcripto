@@ -1,0 +1,39 @@
+{
+  "name": "theme-replay-stage0-memo-comparison",
+  "frozen_before_any_live_output": "2026-09-22",
+  "question_answered": "Does model disagreement improve an evidence-linked analytic memo?",
+  "analysis_models": ["anthropic/claude-sonnet-5", "openai/gpt-5.6-sol", "google/gemini-3.7-flash"],
+  "analysis_repeats": 3,
+  "memo_writer": "moonshotai/kimi-k3",
+  "memo_writer_note": "A model stands in for the human analyst. It is outside the three analysis families so it does not favour its own reading. It is a proxy, not the human H or H+M arm.",
+  "conditions": {
+    "B": "corpus only, no readings. 3 repeats.",
+    "S": "corpus plus one reading: family f, run 1. One memo per family.",
+    "R": "corpus plus three readings from the SAME family f (runs 1..3) plus the divergence view. One memo per family. Same volume and format as M; the readings differ only by repeat drift.",
+    "M": "corpus plus three readings, one per family, all from run k, plus the divergence view. One memo per k in 1..3."
+  },
+  "primary_contrast": "M versus R. Both give three readings and a divergence view. Only M varies the model family.",
+  "presentation": "Readings are labelled A, B, C in a seeded shuffle. No model id reaches the writer. Each reading carries its verify errors.",
+  "hard_failures": [
+    "a memo citation whose quote does not resolve on the cited line",
+    "a claimed_status that differs from the status on the cited line",
+    "a claim with no evidence",
+    "an episode id that does not exist",
+    "output that is not the JSON object"
+  ],
+  "engagement_proxies": {
+    "note": "Citation-pattern proxies computed from the corpus structure, fixed before any output. They show that a memo engages a feature of the corpus with grounded evidence. They do not show that the memo's sentence about it is right.",
+    "F1": "one claim cites correction lines from at least 2 of E04, E08, E12",
+    "F2": "one claim cites, in the same episode, a correction line and an event:succeeded line",
+    "F3": "the memo cites at least 2 event:unknown lines with claimed_status unknown",
+    "F4": "one claim cites event:failed lines from at least 2 of E02, E06, E10",
+    "F5": "one claim cites both E02 and E04"
+  },
+  "descriptive_measures": ["claims", "citations", "distinct episodes cited", "exception claims", "open_question claims", "distinct counter episodes", "reading decisions by type", "tokens", "latency_ms", "cost_usd"],
+  "decision_rule": {
+    "YES": "M mean proxy count exceeds R mean by at least 1.0, M has zero hard failures, and M mean (exception + open_question claims) is at least R mean.",
+    "NO": "M mean proxy count is at or below both R mean and S mean, or M has more hard failures than R.",
+    "CANNOT_TELL": "anything else.",
+    "limits": "n = 3 memos per condition on 12 synthetic episodes. A YES here shows mechanics can carry a difference. It is not evidence that the method helps on real work. Oscar's blind rating of the memo packet is the gate for that."
+  }
+}
