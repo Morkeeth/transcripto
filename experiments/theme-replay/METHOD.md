@@ -19,6 +19,7 @@ Helicon may check process. It must not score thematic truth.
 - [x] Arms are blind: seeded shuffle, `arm-N` names, key in 0600 `blind.json`.
 - [x] `compare` reports overlap, unique readings, contested episodes, uncited episodes and repeat drift. No single number.
 - [x] Live runs freeze a model manifest from the public catalogue before any paid call, and check for a key before any network request.
+- [x] Live run 2026-09-22 through OpenRouter, not Gateway: 9 arms, 0 unresolved citations, 12 proxy memos. `zdr_confirmation: unverified`. See `results/stage0-2026-09-22/`.
 - [ ] No live Gateway run yet. No key is configured. Which response field proves ZDR routing is unverified.
 - [ ] Human KEEP / REVISE / REJECT decisions by Oscar are still owed. Decisions on record so far came from agents.
 - [ ] Human baseline before live model exposure is still owed for Stage 1.

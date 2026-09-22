@@ -4,6 +4,8 @@ Opt-in experiment. It is not on Transcripto's default path and it does not send 
 
 Frozen question: **What makes an agent-work episode require correction?**
 
+The live run uses `fixtures/analysis-prompt-v2.txt` (adds the PRD schema and the `L<n>` line view). The commands below show v1, which the offline arms and tests use.
+
 The corpus is 12 synthetic episodes (4 Claude, 4 Codex, 4 Cursor). Each harness has one succeeded change, one failed change, one unknown result, and one changed-decision episode.
 
 ```sh
