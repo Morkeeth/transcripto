@@ -18,7 +18,9 @@ Use the stable views:
 - `messages_fts`: full-text search joined to `v_messages.id`.
 
 Version 0.2.0 rebuilds older indexes with the shared Claude Code, Codex, and
-Cursor normalizer. `is_human` follows the harness-specific gate documented in
+Cursor normalizer. From 0.2.1, a store that lacks only later columns is migrated
+in place, and rows with a NULL `harness` are labelled from their source path on
+open (`transcripto backfill-harness` does this without changing the schema). `is_human` follows the harness-specific gate documented in
 the README. For Codex and Cursor, `prompt_source` is a normalized value, not a
 native authorship stamp.
 

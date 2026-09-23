@@ -29,4 +29,12 @@ for v in $(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' README.md | sort -u); do
     echo "  WARN  README mentions $v, shipping $PY (fine if it is a changelog note, not fine if it is the install instruction)"
   fi
 done
+# The newest CHANGELOG heading is the release being shipped. A release whose notes
+# still head with the previous version ships without its notes.
+HEAD_CHANGE=$(grep -m1 -oE '^## [0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | grep -oE '[0-9.]+')
+if [ "$HEAD_CHANGE" != "$PY" ]; then
+  echo "  FAIL  CHANGELOG.md newest entry is $HEAD_CHANGE, shipping $PY"; FAIL=1
+else
+  echo "  ok    CHANGELOG.md newest entry is $PY"
+fi
 [ "$FAIL" -eq 0 ] && echo "green." || { echo "1 RED."; exit 1; }
