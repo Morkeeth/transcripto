@@ -1,4 +1,4 @@
-"""python -m theme_replay freeze|run|verify|review"""
+"""python -m theme_replay freeze|run|verify|compare|review"""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from .compare import compare
 from .freeze import freeze
 from .review import record_decision, render
 from .run import run_gateway, run_offline
@@ -35,6 +36,12 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--out", required=True)
     p_run.add_argument("--zdr", action="store_true")
     p_run.add_argument("--no-training", action="store_true")
+    p_run.add_argument("--repeat", type=int, default=1)
+    p_run.add_argument("--seed", type=int)
+
+    p_compare = sub.add_parser("compare")
+    p_compare.add_argument("frozen")
+    p_compare.add_argument("runs")
 
     p_verify = sub.add_parser("verify")
     p_verify.add_argument("frozen")
@@ -64,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
         out = Path(args.out)
         out.mkdir(parents=True, exist_ok=True)
         if args.offline:
-            summary = run_offline(Path(args.frozen), Path(args.offline), out)
+            summary = run_offline(Path(args.frozen), Path(args.offline), out, seed=args.seed)
         else:
             models = [item.strip() for item in args.models.split(",") if item.strip()]
             if not models:
@@ -75,6 +82,8 @@ def main(argv: list[str] | None = None) -> int:
                 out,
                 zdr=args.zdr,
                 no_training=args.no_training,
+                repeat=args.repeat,
+                seed=args.seed,
             )
         print(json.dumps(summary, indent=2))
         return 0
@@ -82,6 +91,9 @@ def main(argv: list[str] | None = None) -> int:
         report = verify(Path(args.frozen), Path(args.runs))
         print(json.dumps(report, indent=2))
         return 0 if report["ok"] else 2
+    if args.cmd == "compare":
+        print(json.dumps(compare(Path(args.frozen), Path(args.runs)), indent=2))
+        return 0
     if args.cmd == "review":
         frozen = Path(args.frozen) if args.frozen else Path(args.runs).parent / "frozen"
         print(render(frozen, Path(args.runs)))

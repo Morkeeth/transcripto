@@ -40,35 +40,73 @@ def resolve_quote(episode: dict[str, Any], quote: str, line: int | None) -> dict
     return {"ok": False, "reason": f"quote does not resolve in {episode['episode_id']}"}
 
 
-def check_status_upgrade(episode: dict[str, Any], claimed: str | None) -> dict[str, Any] | None:
+def check_status_claim(episode: dict[str, Any], line: int | None, claimed: str | None) -> str | None:
+    """A claimed status must equal the status recorded on the cited line.
+
+    Checking against the episode as a whole let a failed line pass as succeeded
+    whenever some other event in the same episode succeeded.
+    """
     if not claimed:
         return None
     claimed = claimed.strip().lower()
-    actual = {event["status"] for event in episode["events"]}
-    if claimed == "succeeded" and actual and actual <= {"failed", "unknown"}:
-        return {
-            "ok": False,
-            "reason": f"{episode['episode_id']} upgrades {sorted(actual)} to succeeded",
-        }
     if claimed not in STATUSES:
-        return {"ok": False, "reason": f"unknown status {claimed}"}
+        return f"unknown status {claimed}"
+    if line is None:
+        return f"{episode['episode_id']} claims status {claimed} without a line"
+    row = next((item for item in episode["lines"] if int(item["n"]) == int(line)), None)
+    if row is None or not str(row.get("field", "")).startswith("event:"):
+        return f"{episode['episode_id']} line {line} is not a tool result, so it has no status"
+    actual = row["field"].split(":", 1)[1]
+    if actual != claimed:
+        return f"{episode['episode_id']} line {line} records {actual}, claim says {claimed}"
     return None
 
 
-def validate_model_output(output: dict[str, Any], index: dict[str, Any]) -> list[str]:
+def validate_model_output(output: Any, index: dict[str, Any]) -> list[str]:
+    """Name every failure. Never skip an arm because a key is missing."""
+    if not isinstance(output, dict) or "raw_text" in output:
+        return ["model did not return the JSON schema"]
     errors: list[str] = []
     by_id = episode_map(index)
     dumped = json.dumps(output)
     for marker in FORBIDDEN_PATH_MARKERS:
         if marker in dumped:
             errors.append(f"private-path marker {marker} entered a model output")
-    for code in output.get("codes") or []:
+    codes = output.get("codes") or []
+    themes = output.get("themes") or []
+    if not codes:
+        errors.append("output has no codes")
+    if not themes:
+        errors.append("output has no themes")
+    labels = {code.get("label") for code in codes}
+    for code in codes:
+        name = code.get("label")
+        if not code.get("evidence"):
+            errors.append(f"code {name!r} cites no evidence")
         errors.extend(_check_bundle(code, by_id, "code"))
-    for theme in output.get("themes") or []:
+        errors.extend(_check_ids(code.get("episode_ids"), by_id, f"code {name!r} episode_ids"))
+        errors.extend(
+            _check_ids(
+                [row.get("episode_id") for row in code.get("counterevidence") or []],
+                by_id,
+                f"code {name!r} counterevidence",
+            )
+        )
+    for theme in themes:
+        name = theme.get("name")
         errors.extend(_check_bundle(theme, by_id, "theme"))
         if not theme.get("disconfirming_episodes"):
-            errors.append(f"theme {theme.get('name')!r} has no disconfirming episode")
+            errors.append(f"theme {name!r} has no disconfirming episode")
+        errors.extend(_check_ids(theme.get("supporting_episodes"), by_id, f"theme {name!r} supporting"))
+        errors.extend(_check_ids(theme.get("disconfirming_episodes"), by_id, f"theme {name!r} disconfirming"))
+        for label in theme.get("codes") or []:
+            if label not in labels:
+                errors.append(f"theme {name!r} names code {label!r} that no code defines")
     return errors
+
+
+def _check_ids(ids: Any, by_id: dict[str, dict[str, Any]], where: str) -> list[str]:
+    return [f"{where} names missing episode {ep}" for ep in (ids or []) if ep not in by_id]
 
 
 def _check_bundle(bundle: dict[str, Any], by_id: dict[str, dict[str, Any]], kind: str) -> list[str]:
@@ -82,9 +120,10 @@ def _check_bundle(bundle: dict[str, Any], by_id: dict[str, dict[str, Any]], kind
         hit = resolve_quote(episode, ev.get("quote", ""), ev.get("line"))
         if not hit["ok"]:
             errors.append(hit["reason"])
-        upgrade = check_status_upgrade(episode, ev.get("claimed_status"))
-        if upgrade:
-            errors.append(upgrade["reason"])
+            continue
+        status = check_status_claim(episode, hit["line"], ev.get("claimed_status"))
+        if status:
+            errors.append(status)
     return errors
 
 

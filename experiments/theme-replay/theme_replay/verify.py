@@ -6,24 +6,22 @@ import json
 from pathlib import Path
 
 from .citations import load_frozen, validate_model_output
+from .review import load_receipts
 
 
 def verify(frozen: Path, runs: Path) -> dict:
     index = load_frozen(frozen)
     findings = []
-    for file in sorted(runs.glob("*.json")):
-        if file.name == "summary.json":
-            continue
-        receipt = json.loads(file.read_text(encoding="utf8"))
+    for receipt in load_receipts(runs):
         output = receipt.get("output") or {}
         errors = list(receipt.get("errors") or [])
-        if "codes" in output:
-            errors.extend(validate_model_output(output, index))
+        # Validate every arm. PR 6 skipped any output without a "codes" key.
+        errors.extend(validate_model_output(output, index))
         # unique
         errors = sorted(set(errors))
         findings.append(
             {
-                "file": file.name,
+                "file": f"{receipt.get('arm')}.json",
                 "arm": receipt.get("arm"),
                 "ok": not errors,
                 "errors": errors,
