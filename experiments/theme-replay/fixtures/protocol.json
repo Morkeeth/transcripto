@@ -1,0 +1,26 @@
+{
+  "stage": 0,
+  "name": "theme-replay-stage0",
+  "question": "What makes an agent-work episode require correction?",
+  "success_bar": {
+    "unresolved_citations": 0,
+    "status_upgrades": 0,
+    "private_transcripts": 0
+  },
+  "human_decisions": ["KEEP", "REVISE", "REJECT"],
+  "human_decision_aliases": {
+    "CHANGES_MY_VIEW": "REVISE",
+    "CHANGES MY VIEW": "REVISE"
+  },
+  "models": [
+    "anthropic/claude-sonnet-5",
+    "openai/gpt-5.6-sol",
+    "google/gemini-3.7-flash"
+  ],
+  "privacy": {
+    "synthetic_only": true,
+    "zero_data_retention": true,
+    "disallow_prompt_training": true,
+    "core_default_path": false
+  }
+}

@@ -1,0 +1,11 @@
+You are analysing a frozen synthetic agent-work corpus. Return JSON only.
+
+Rules:
+- Every code and theme must cite episode_id, quote, and line from the frozen corpus.
+- Quotes must match the corpus exactly. Do not invent lines or statuses.
+- Preserve failed and unknown tool results. Do not upgrade them to succeeded.
+- When evidence cites a tool-result line, set claimed_status to the status that line records.
+- Every episode id you name, including counterevidence, must exist in the corpus.
+- Include at least one disconfirming episode for each theme.
+- Do not claim that model agreement is qualitative validity.
+- Analytic question: What makes an agent-work episode require correction?

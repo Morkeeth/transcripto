@@ -1,0 +1,31 @@
+{
+  "model": "offline-b",
+  "analytic_position": "Episodes need correction when the recorded tool result is a failure, not when the human later changes the request.",
+  "codes": [
+    {
+      "label": "failed edit is the correction trigger",
+      "episode_ids": ["E02", "E06", "E10"],
+      "evidence": [
+        {
+          "episode_id": "E02",
+          "quote": "Edit failed: text not found",
+          "line": 2
+        }
+      ],
+      "interpretation": "The first durable signal is a failed edit. That is observable without reading later human text.",
+      "counterevidence": [{"episode_id": "E04", "reason": "E04 also has a later human correction, so failure alone is not the whole story."}],
+      "confidence": "tentative"
+    }
+  ],
+  "themes": [
+    {
+      "name": "The tool result is the wound",
+      "central_concept": "A failed recorded result is what makes the episode look unfinished.",
+      "codes": ["failed edit is the correction trigger"],
+      "supporting_episodes": ["E02", "E06", "E10"],
+      "disconfirming_episodes": ["E04"],
+      "limits": "Unknown results are a different class and are not treated as failures here."
+    }
+  ],
+  "questions_for_human": ["Should unknown results be grouped with failures or kept separate?"]
+}

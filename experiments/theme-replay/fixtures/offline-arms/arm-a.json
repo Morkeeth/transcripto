@@ -1,0 +1,31 @@
+{
+  "model": "offline-a",
+  "analytic_position": "Corrections happen when the requested object changes after the first tool call.",
+  "codes": [
+    {
+      "label": "success condition moves after implementation starts",
+      "episode_ids": ["E04", "E08", "E12"],
+      "evidence": [
+        {
+          "episode_id": "E04",
+          "quote": "No, I meant the header parser in lab/src/http/headers.py.",
+          "line": 2
+        }
+      ],
+      "interpretation": "The first file was not the intended object. The later request names a different parser.",
+      "counterevidence": [{"episode_id": "E01", "reason": "E01 keeps the original request and the tests stay green."}],
+      "confidence": "tentative"
+    }
+  ],
+  "themes": [
+    {
+      "name": "The finish line moves",
+      "central_concept": "A later human request replaces the object of work after a first attempt.",
+      "codes": ["success condition moves after implementation starts"],
+      "supporting_episodes": ["E04", "E08", "E12"],
+      "disconfirming_episodes": ["E01"],
+      "limits": "Synthetic corpus only. This cannot establish the pattern in real work."
+    }
+  ],
+  "questions_for_human": ["Does a file-name correction count as a moved success condition, or only a changed target?"]
+}
