@@ -19,6 +19,12 @@ jobs:
       - name: Stage 0 theme-replay experiment
         working-directory: experiments/theme-replay
         run: PYTHONPATH=. python -m unittest tests.test_theme_replay -v
+      - name: Stage 0 live-path tests (mocked transport, no network)
+        working-directory: experiments/theme-replay
+        run: PYTHONPATH=.:tests python -m unittest tests.test_stage0_live -v
+      - name: Stage 0 committed verdict reproduces offline
+        working-directory: experiments/theme-replay
+        run: ./run_stage0.sh --rescore
       - run: for test in test_*.sh; do bash "$test" || exit 1; done
       - run: python -m pip wheel --no-deps . --wheel-dir /tmp/wheels
       - run: python -m pip install --no-deps /tmp/wheels/transcripto-*.whl
