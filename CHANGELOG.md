@@ -4,6 +4,16 @@
 
 Prepared release; publication pending.
 
+- Unlabelled harness rows. A writer whose insert omits `harness` leaves it NULL
+  with no error. The index now detects such rows on every open and labels them
+  from their source path. `transcripto backfill-harness` does the same on any
+  store without touching its schema or `user_version`: dry run by default,
+  `--apply` to write, `--db` to point at a store, `--json` for the report.
+- Schema migration. A store that lacks only later columns (`harness`,
+  `source_line`, `synthetic`, `files.harness`, `indexed.warnings`) is migrated in
+  place with `ALTER TABLE`, not dropped. Files still on disk are re-read for line
+  numbers. Only a store without `is_human` or with an old FTS tokenizer rebuilds.
+
 - `receive-handoff` briefs include an `Open:` command, previous request, and
   recorded follow-up statuses (failed / succeeded / unknown). Missing or
   mismatched sources are marked uncertain with provisional packet outcomes.
@@ -32,8 +42,9 @@ Prepared release; publication pending.
 - Installed-wheel checks cover discovery and replay across Claude, archived
   Codex sessions and Cursor, plus the complete synthetic handoff flow.
 
-Compatibility: Python 3.9+, no runtime dependencies. The local index rebuilds
-at schema version 5. Message IDs must not be retained across rebuilds.
+Compatibility: Python 3.9+, no runtime dependencies. The local index is at
+schema version 5; older stores are migrated in place when they can be. Message
+IDs must not be retained across rebuilds.
 
 
 ## 0.2.0 · instant replay

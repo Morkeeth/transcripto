@@ -96,26 +96,111 @@ def connect(require_index=True):
     return con
 
 
-SCHEMA_VERSION = 5  # bump when a column/tokenizer change needs a full rebuild
+SCHEMA_VERSION = 5  # new columns go in ADDITIVE_COLUMNS; only a tokenizer or is_human change rebuilds
+
+
+# Columns added after the first schema. A store that lacks only these is migrated in
+# place with ALTER TABLE ADD COLUMN, never dropped. Before this, a version mismatch
+# dropped every table, and an older writer that did not know a column inserted rows
+# with it NULL and no error (the unlabelled-harness rows of September 2026).
+ADDITIVE_COLUMNS = (
+    ("messages", "harness", "TEXT"),
+    ("messages", "source_line", "INTEGER"),
+    ("messages", "synthetic", "INTEGER DEFAULT 0"),
+    ("files", "harness", "TEXT"),
+    ("indexed", "warnings", "TEXT"),
+)
+KNOWN_HARNESSES = ("claude", "codex", "codex-history", "cursor")
+
+
+def _columns(con, table):
+    return {r[1] for r in con.execute("PRAGMA table_info(%s)" % table)}
 
 
 def _needs_rebuild(con):
-    """True if the messages table exists but predates the current schema
-    (missing is_human, or an old FTS tokenizer). Triggers a one-time full reindex."""
-    if con.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
-        return True
+    """True only when the store cannot be migrated in place: messages predates
+    is_human (every row would need its authorship recomputed) or the FTS table
+    uses an old tokenizer. Missing ADDITIVE_COLUMNS are migrated, not rebuilt."""
     t = con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='messages'").fetchone()
     if not t:
-        return False  # fresh db — nothing to migrate
-    cols = {r[1] for r in con.execute("PRAGMA table_info(messages)")}
-    if "is_human" not in cols or "harness" not in cols or "source_line" not in cols or "synthetic" not in cols:
-        return True
-    if "warnings" not in {r[1] for r in con.execute("PRAGMA table_info(indexed)")}:
+        return False  # fresh db, nothing to migrate
+    if "is_human" not in _columns(con, "messages"):
         return True
     fts = con.execute("SELECT sql FROM sqlite_master WHERE name='messages_fts'").fetchone()
     if fts and "porter" not in (fts[0] or ""):
         return True
     return False
+
+
+def _migrate_columns(con):
+    """Add any missing ADDITIVE_COLUMNS. Returns the list of 'table.column' added.
+    If source_line was missing, every indexed file is marked stale so files still
+    on disk are re-read with line numbers on this index pass."""
+    added = []
+    for table, column, decl in ADDITIVE_COLUMNS:
+        if not con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone():
+            continue  # created fresh below
+        if column not in _columns(con, table):
+            con.execute("ALTER TABLE %s ADD COLUMN %s %s" % (table, column, decl))
+            added.append("%s.%s" % (table, column))
+    if "messages.source_line" in added:
+        con.execute("UPDATE indexed SET mtime=-1")
+    return added
+
+
+def harness_from_path(path):
+    """The harness a transcript came from, read from its path alone, or None.
+    The innermost known directory wins: ~/.claude, ~/.codex, ~/.cursor, or
+    ~/.transcripto/imports/<harness>/."""
+    parts = [p for p in str(path).replace("\\", "/").split("/") if p]
+    found = None
+    for i, part in enumerate(parts):
+        if part == ".claude":
+            found = "claude"
+        elif part == ".codex":
+            found = "codex-history" if parts[-1] == "history.jsonl" else "codex"
+        elif part == ".cursor":
+            found = "cursor"
+        elif part == ".transcripto" and parts[i + 1:i + 2] == ["imports"] and len(parts) > i + 2:
+            if parts[i + 2] in KNOWN_HARNESSES:
+                found = parts[i + 2]
+    return found
+
+
+def unlabelled_counts(con):
+    """(messages, files) rows whose harness is NULL or empty."""
+    return tuple(con.execute("SELECT COUNT(*) FROM %s WHERE harness IS NULL OR harness=''" % t).fetchone()[0]
+                 for t in ("messages", "files"))
+
+
+def backfill_harness(con, apply=False):
+    """Label unlabelled rows from their session_file path. Returns a report dict.
+    With apply=False nothing is written. Never touches user_version or the schema."""
+    by_file = {}
+    for table in ("messages", "files"):
+        for f, n in con.execute("SELECT session_file, COUNT(*) FROM %s WHERE harness IS NULL OR harness='' "
+                                "GROUP BY session_file" % table):
+            by_file.setdefault(f, {"messages": 0, "files": 0})[table] = n
+    report = {"unlabelled_before": dict(zip(("messages", "files"), unlabelled_counts(con))),
+              "labels": {}, "unresolved_files": 0, "unresolved_rows": 0, "applied": bool(apply)}
+    for f, counts in sorted(by_file.items(), key=lambda kv: kv[0] or ""):
+        label = harness_from_path(f or "")
+        if not label:
+            report["unresolved_files"] += 1
+            report["unresolved_rows"] += counts["messages"] + counts["files"]
+            continue
+        slot = report["labels"].setdefault(label, {"files": 0, "messages": 0, "file_rows": 0})
+        slot["files"] += 1
+        slot["messages"] += counts["messages"]
+        slot["file_rows"] += counts["files"]
+        if apply:
+            for table in ("messages", "files"):
+                con.execute("UPDATE %s SET harness=? WHERE session_file=? AND (harness IS NULL OR harness='')"
+                            % table, (label, f))
+    if apply:
+        con.commit()
+    report["unlabelled_after"] = dict(zip(("messages", "files"), unlabelled_counts(con)))
+    return report
 
 
 def init_schema(con):
@@ -124,6 +209,9 @@ def init_schema(con):
             "DROP TABLE IF EXISTS messages_fts; DROP TABLE IF EXISTS messages;"
             "DROP TABLE IF EXISTS files; DROP TABLE IF EXISTS indexed;")
         con.commit()
+    added = _migrate_columns(con)
+    if added:
+        print("migrated index schema: added " + ", ".join(added), file=sys.stderr)
     con.executescript("""
     CREATE TABLE IF NOT EXISTS messages(
       id INTEGER PRIMARY KEY, session_id TEXT, session_file TEXT, project TEXT,
@@ -138,6 +226,9 @@ def init_schema(con):
       session_id TEXT, session_file TEXT, ts TEXT, cwd TEXT, harness TEXT);
     CREATE INDEX IF NOT EXISTS idx_files_name ON files(name);
     CREATE INDEX IF NOT EXISTS idx_msg_human ON messages(is_human, ts);
+    -- Partial indexes keep the unlabelled-row check on every open to a lookup.
+    CREATE INDEX IF NOT EXISTS idx_msg_unlabelled ON messages(session_file) WHERE harness IS NULL OR harness='';
+    CREATE INDEX IF NOT EXISTS idx_files_unlabelled ON files(session_file) WHERE harness IS NULL OR harness='';
     CREATE TABLE IF NOT EXISTS indexed(session_file TEXT PRIMARY KEY, mtime REAL, warnings TEXT);
 
     -- Stable READ-ONLY views for consumers (ZUP, Helicon). The contract: consumers
@@ -165,6 +256,14 @@ def init_schema(con):
     """)
     con.execute("PRAGMA user_version=%d" % SCHEMA_VERSION)
     con.commit()
+    # A writer that does not know the harness column leaves it NULL without error.
+    # Detect that on every open and label the rows from their paths.
+    if any(unlabelled_counts(con)):
+        report = backfill_harness(con, apply=True)
+        labelled = report["unlabelled_before"]["messages"] - report["unlabelled_after"]["messages"]
+        if labelled:
+            print("labelled %d unlabelled message row(s) from their source paths; %d row(s) unresolved"
+                  % (labelled, report["unresolved_rows"]), file=sys.stderr)
 
 
 def extract(d):
@@ -274,6 +373,7 @@ def _index_once(con, progress=False):
                 print("warning: file could not be indexed; any previous indexed copy is retained", file=sys.stderr)
                 continue
             print("warning: indexing the valid records only", file=sys.stderr)
+        harness = harness or harness_from_path(f) or "claude"
         _drop_indexed_file(con, f)
         proj = core.safe_text(os.path.basename(os.path.dirname(f)))
         fallback_sid = os.path.basename(f)[:-6]
@@ -311,6 +411,41 @@ def cmd_index(args):
         sys.stderr.write(" " * 60 + "\r"); sys.stderr.flush()
     tot = con.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
     print("indexed %d changed sessions · +%d messages · %d total searchable" % (new, msgs, tot))
+
+
+def cmd_backfill_harness(args):
+    """Label rows whose harness is NULL from their source path. Opens the store
+    directly: no schema change, no rebuild, no index pass, no user_version write.
+    Dry run unless --apply; the dry run opens the file read-only."""
+    db = os.path.abspath(os.path.expanduser(args.db or DB))
+    if not os.path.exists(db):
+        print("no index at %s" % db, file=sys.stderr); return 2
+    if args.apply:
+        con = sqlite3.connect(db, timeout=30)
+        con.execute("PRAGMA busy_timeout=30000")
+        con.execute("BEGIN IMMEDIATE")
+    else:
+        con = sqlite3.connect("file:%s?mode=ro" % db, uri=True)
+    missing = [t for t in ("messages", "files") if "harness" not in _columns(con, t)]
+    if missing:
+        print("the %s table has no harness column; run `transcripto index` to migrate the schema first"
+              % " and ".join(missing), file=sys.stderr)
+        con.close(); return 2
+    report = backfill_harness(con, apply=args.apply)
+    con.close()
+    if args.json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        before, after = report["unlabelled_before"], report["unlabelled_after"]
+        print("%s %s" % ("APPLIED" if args.apply else "DRY RUN (nothing written; add --apply)", db.replace(HOME, "~")))
+        print("unlabelled before: %d message rows, %d file rows" % (before["messages"], before["files"]))
+        for label, slot in sorted(report["labels"].items()):
+            print("  %-13s %d source file(s), %d message rows, %d file rows"
+                  % (label, slot["files"], slot["messages"], slot["file_rows"]))
+        print("  unresolved    %d source file(s), %d rows (path names no harness)"
+              % (report["unresolved_files"], report["unresolved_rows"]))
+        print("unlabelled after: %d message rows, %d file rows" % (after["messages"], after["files"]))
+    return 0
 
 
 def cmd_watch(args):
@@ -2147,6 +2282,11 @@ def main():
     s.add_argument("--wheel", help="absolute wheel path to embed in the install commands")
     s.set_defaults(fn=cmd_quickstart)
     sub.add_parser("index").set_defaults(fn=cmd_index)
+    s = sub.add_parser("backfill-harness", help="label unlabelled rows from their source path (dry run by default)")
+    s.add_argument("--db", help="index file (default ~/.trace/trace.db)")
+    s.add_argument("--apply", action="store_true", help="write the labels; without it nothing is written")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(fn=cmd_backfill_harness)
     s = sub.add_parser("watch"); s.add_argument("--interval", type=int, default=5); s.set_defaults(fn=cmd_watch)
     s = sub.add_parser("ask"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=25); s.set_defaults(fn=cmd_ask)
     s = sub.add_parser("search"); s.add_argument("query"); s.add_argument("-n", "--limit", type=int, default=25); s.set_defaults(fn=cmd_search)
@@ -2213,7 +2353,7 @@ def main():
     s.set_defaults(fn=lambda a: sys.exit(cmd_replay(a, _coach_files(_coach_roots(a.root, a.harness), a.harness))))
     for name, parser in sub.choices.items():
         if name not in ("coach", "cost", "export-run", "import-example", "import-lab",
-                        "quickstart", "receive-handoff"):
+                        "quickstart", "receive-handoff", "backfill-harness"):
             parser.add_argument("--root", help="read transcripts in this directory")
             parser.add_argument("--harness", choices=["claude", "codex", "cursor"], help="default: all three")
     a = p.parse_args(["replay"] if len(sys.argv) == 1 else None)
@@ -2226,7 +2366,7 @@ def main():
     if getattr(a, "root", None) and not os.path.exists(os.path.expanduser(a.root)):
         p.error("--root does not exist: " + core.safe_text(a.root))
     global ROOTS, HARNESS
-    if a.cmd not in ("coach", "cost", "export-run", "replay",
+    if a.cmd not in ("coach", "cost", "export-run", "replay", "backfill-harness",
                      "import-example", "import-lab", "quickstart", "receive-handoff"):
         HARNESS = getattr(a, "harness", None)
         ROOTS = _coach_roots(getattr(a, "root", None), HARNESS)
