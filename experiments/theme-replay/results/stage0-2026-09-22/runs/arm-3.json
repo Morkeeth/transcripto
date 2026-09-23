@@ -1,0 +1,121 @@
+{
+  "arm": "arm-3",
+  "offline": false,
+  "transport": "openrouter",
+  "at": "2026-09-22T21:22:28.991769+00:00",
+  "http_status": 200,
+  "latency_ms": 16885.9,
+  "tokens": 6459,
+  "usage": {
+    "prompt_tokens": 3565,
+    "completion_tokens": 2894,
+    "reasoning_tokens": 1958,
+    "total_tokens": 6459,
+    "cost_usd": 0.01352625
+  },
+  "cost": 0.01352625,
+  "finish_reason": "stop",
+  "parse_step": "as_returned",
+  "request_meta": {
+    "max_tokens": 12000,
+    "provider": {
+      "zdr": true,
+      "data_collection": "deny",
+      "allow_fallbacks": true
+    },
+    "usage": {
+      "include": true
+    }
+  },
+  "zdr_confirmation": "unverified",
+  "errors": [],
+  "output": {
+    "analytic_position": "Analysis focuses on identifying the conditions under which agent workflows receive human interventions or redirections. In this synthetic corpus, correction events occur exclusively when requesters revise target specifications, scope, or architectural constraints mid-stream, distinct from uncorrected execution failures.",
+    "codes": [
+      {
+        "label": "requester_target_redirection",
+        "episode_ids": [
+          "E04",
+          "E08"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "quote": "No, I meant the header parser in lab/src/http/headers.py.",
+            "line": 2
+          },
+          {
+            "episode_id": "E04",
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: wrong file",
+            "line": 3,
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E08",
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section.",
+            "line": 2
+          }
+        ],
+        "interpretation": "Episodes require correction when the initial request misidentifies the target file or scope, necessitating an explicit mid-stream pivot by the human requester to redirect file paths or shorten outputs.",
+        "counterevidence": [
+          {
+            "episode_id": "E02",
+            "reason": "In E02, a tool edit failed due to text not found ('Edit lab/src/auth/parser.py failed: Edit failed: text not found'), but no human correction was provided, showing that execution failure alone does not generate a correction."
+          }
+        ],
+        "confidence": "high"
+      },
+      {
+        "label": "design_constraint_reversal",
+        "episode_ids": [
+          "E12"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E12",
+            "quote": "Ship the retry helper as the public API.",
+            "line": 1
+          },
+          {
+            "episode_id": "E12",
+            "quote": "Keep the helper private. The public API stays the existing enqueue function.",
+            "line": 2
+          }
+        ],
+        "interpretation": "Episodes require correction when the user explicitly changes architectural decisions or API visibility requirements after an initial instruction was issued.",
+        "counterevidence": [
+          {
+            "episode_id": "E01",
+            "reason": "In E01, the initial request was executed directly and passed tests without requirement changes or corrections ('Add a retry helper to lab/src/queue.py and keep the tests green.')."
+          }
+        ],
+        "confidence": "high"
+      }
+    ],
+    "themes": [
+      {
+        "name": "requester_specification_shift_triggers_correction",
+        "central_concept": "Corrections in agent work episodes are driven by upstream changes in requester intent\u2014such as target file redirection, scope reduction, or API design reversals\u2014rather than autonomous recovery from tool-level mechanical errors.",
+        "codes": [
+          "requester_target_redirection",
+          "design_constraint_reversal"
+        ],
+        "supporting_episodes": [
+          "E04",
+          "E08",
+          "E12"
+        ],
+        "disconfirming_episodes": [
+          "E02",
+          "E06",
+          "E10"
+        ],
+        "limits": "The corpus is synthetic and treats corrections exclusively as user-injected string prompts ('changed-decision'), leaving unaddressed whether agents could self-correct syntax or tool errors without human intervention."
+      }
+    ],
+    "questions_for_human": [
+      "Should agent tool failures (such as in E02, E06, and E10) trigger an automated retry/correction protocol, or remain terminal failed states?",
+      "Do changed-decision episodes represent flaws in the agent's preliminary actions or purely exogenous human specification updates?"
+    ]
+  }
+}

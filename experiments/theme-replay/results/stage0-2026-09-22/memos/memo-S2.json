@@ -1,0 +1,250 @@
+{
+  "memo": "S2",
+  "condition": "S",
+  "arms": [
+    "arm-8"
+  ],
+  "prompt_sha256": "482a58d468424ba1ea10b708d59a815ade4a5e805232f1bec48cbfdaed8d0d7c",
+  "prompt_chars": 13560,
+  "at": "2026-09-22T21:34:36.137905+00:00",
+  "latency_ms": 125791.7,
+  "usage": {
+    "prompt_tokens": 3465,
+    "completion_tokens": 10802,
+    "reasoning_tokens": 9207,
+    "total_tokens": 14267,
+    "cost_usd": 0.1697952
+  },
+  "finish_reason": "stop",
+  "upstream_provider": "Together",
+  "parse_step": "as_returned",
+  "output": {
+    "memo": [
+      {
+        "claim": "All three recorded correction lines realign the operative specification rather than the method: E04 retargets the file, E08 changes the output path and scope, and E12 reverses the API-exposure decision.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "The three failed episodes that stand in need of technical remediation share one failure mode: the edit tool could not find the anchor text or context it was told to match.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "line": 2,
+            "quote": "Edit failed: text not found",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "line": 2,
+            "quote": "apply_patch rejected: context mismatch",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "line": 2,
+            "quote": "StrReplace failed: old_string not found",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": [
+          "E04"
+        ]
+      },
+      {
+        "claim": "Episodes whose only tool result is unknown cannot deliver what was asked \u2014 a green/red report, a conditional commit, an existence check \u2014 so they require renewed observation rather than repair of a known failure.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "line": 1,
+            "quote": "Run the full suite and report whether it is green."
+          },
+          {
+            "episode_id": "E03",
+            "line": 2,
+            "quote": "Bash pytest -q unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "line": 2,
+            "quote": "git commit -am green-suite unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "line": 2,
+            "quote": "Read lab/src/queue.py unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Succeeded events do not close an episode: E08 and E12 contain only succeeded event lines yet still required user correction, an exception to the E01/E05/E09 pattern where recorded success sufficed.",
+        "type": "exception",
+        "evidence": [
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E08",
+            "line": 3,
+            "quote": "Write lab/docs/caching.md succeeded: Wrote lab/docs/caching.md",
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          },
+          {
+            "episode_id": "E12",
+            "line": 3,
+            "quote": "Edit lab/src/queue.py succeeded: File updated successfully",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": [
+          "E01",
+          "E05",
+          "E09"
+        ]
+      },
+      {
+        "claim": "E04 leaves the causal order of failure and correction undetermined, because the correction is recorded at line 2 while the failed edit to the original target is recorded afterward at line 3.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "line": 2,
+            "quote": "No, I meant the header parser in lab/src/http/headers.py."
+          },
+          {
+            "episode_id": "E04",
+            "line": 3,
+            "quote": "Edit failed: wrong file",
+            "claimed_status": "failed"
+          }
+        ],
+        "counter_episodes": [
+          "E02"
+        ]
+      },
+      {
+        "claim": "Each agent harness exhibits each kind of correction trigger \u2014 failure, unknown result, and explicit correction \u2014 so correction need is not harness-specific in this corpus, although the uniform one-of-each layout may be an artifact of its synthetic construction.",
+        "type": "pattern",
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "line": 2,
+            "quote": "Edit failed: text not found",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E07",
+            "line": 2,
+            "quote": "git commit -am green-suite unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E12",
+            "line": 2,
+            "quote": "Keep the helper private. The public API stays the existing enqueue function."
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "The corpus does not show whether correction requires undoing superseded side effects: in E08 the write to the originally requested path is recorded as succeeded after the correction line, and no line reverts it.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E08",
+            "line": 2,
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section."
+          },
+          {
+            "episode_id": "E08",
+            "line": 3,
+            "quote": "Write lab/docs/caching.md succeeded: Wrote lab/docs/caching.md",
+            "claimed_status": "succeeded"
+          }
+        ],
+        "counter_episodes": []
+      },
+      {
+        "claim": "Whether 'requires correction' covers only the three episodes with explicit correction lines or also the six episodes left failed or unverified cannot be settled from the corpus, because no user turn follows any failed or unknown event.",
+        "type": "open_question",
+        "evidence": [
+          {
+            "episode_id": "E06",
+            "line": 2,
+            "quote": "apply_patch rejected: context mismatch",
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E03",
+            "line": 2,
+            "quote": "Bash pytest -q unknown: No matching tool result recorded.",
+            "claimed_status": "unknown"
+          }
+        ],
+        "counter_episodes": []
+      }
+    ],
+    "reading_decisions": [
+      {
+        "reading": "A",
+        "decision": "KEEP",
+        "why": "Its citations all verify against the corpus, its three-way split of correction triggers (goal realignment, failed execution, unknown results) matches my independent coding, and it avoids causal and intent overclaiming; my memo extends it with the anchor-mismatch sub-pattern and the E04 ordering puzzle rather than correcting it."
+      }
+    ],
+    "what_changed_my_view": "My independent pass converged with Reading A's three-way distinction, so it confirmed rather than altered my framing. It did sharpen one point I had underweighted: E08's successful write to the superseded path raises a side-effect-reversion question, which I promoted to its own open question."
+  },
+  "score": {
+    "hard_failures": [],
+    "claims": 8,
+    "citations": 23,
+    "types": {
+      "pattern": 4,
+      "exception": 1,
+      "open_question": 3,
+      "other": 0
+    },
+    "distinct_episodes_cited": 9,
+    "distinct_counter_episodes": 5,
+    "proxies": {
+      "F1": true,
+      "F2": true,
+      "F3": true,
+      "F4": true,
+      "F5": false
+    },
+    "proxy_count": 4,
+    "reading_decisions": {
+      "KEEP": 1
+    }
+  }
+}

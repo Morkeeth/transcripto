@@ -1,0 +1,40 @@
+You are analysing a frozen synthetic agent-work corpus. Return JSON only.
+
+Version 2, 2026-09-22. Version 1 gave no output schema and did not define "line". A live run of version 1 returned a different schema and cited file row numbers. Version 2 adds the PRD schema and the line definition. The corpus bytes are unchanged.
+
+Rules:
+- Every code and theme must cite episode_id, quote, and line from the frozen corpus.
+- "line" is the number shown as L<n> in the NUMBERED LINES section. It restarts at 1 in every episode.
+- Quotes must match the corpus exactly. Do not invent lines or statuses.
+- Preserve failed and unknown tool results. Do not upgrade them to succeeded.
+- When evidence cites a tool-result line, set claimed_status to the status that line records.
+- Every episode id you name, including counterevidence, must exist in the corpus.
+- Include at least one disconfirming episode for each theme.
+- Do not claim that model agreement is qualitative validity.
+- Analytic question: What makes an agent-work episode require correction?
+
+Return exactly this shape (from the PRD). "codes" inside a theme lists code labels as strings.
+{
+  "analytic_position": "what assumptions guided this reading",
+  "codes": [
+    {
+      "label": "short code label",
+      "episode_ids": ["E03", "E09"],
+      "evidence": [{"episode_id": "E03", "quote": "exact substring", "line": 2, "claimed_status": "only for tool-result lines"}],
+      "interpretation": "...",
+      "counterevidence": [{"episode_id": "E07", "reason": "..."}],
+      "confidence": "tentative"
+    }
+  ],
+  "themes": [
+    {
+      "name": "...",
+      "central_concept": "...",
+      "codes": ["short code label"],
+      "supporting_episodes": ["..."],
+      "disconfirming_episodes": ["..."],
+      "limits": "..."
+    }
+  ],
+  "questions_for_human": ["..."]
+}

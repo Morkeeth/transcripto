@@ -1,0 +1,223 @@
+{
+  "arm": "arm-6",
+  "offline": false,
+  "transport": "openrouter",
+  "at": "2026-09-22T21:24:33.519003+00:00",
+  "http_status": 200,
+  "latency_ms": 45185.8,
+  "tokens": 9760,
+  "usage": {
+    "prompt_tokens": 4921,
+    "completion_tokens": 4839,
+    "reasoning_tokens": 2215,
+    "total_tokens": 9760,
+    "cost_usd": 0.058232
+  },
+  "cost": 0.058232,
+  "finish_reason": "stop",
+  "parse_step": "fence_stripped",
+  "request_meta": {
+    "max_tokens": 12000,
+    "provider": {
+      "zdr": true,
+      "data_collection": "deny",
+      "allow_fallbacks": true
+    },
+    "usage": {
+      "include": true
+    }
+  },
+  "zdr_confirmation": "unverified",
+  "errors": [],
+  "output": {
+    "analytic_position": "This reading assumes that 'requiring correction' is only demonstrable when the corpus contains an explicit correction utterance (the correction field) or an event with status 'failed'/'unknown' that leaves the requested outcome unresolved. Tool status labels are read literally and are not upgraded or downgraded based on inferred intent. Agreement across harnesses (claude/codex/cursor) is treated as a distributional fact, not as evidence of qualitative validity for any single code.",
+    "codes": [
+      {
+        "label": "explicit-correction-issued",
+        "episode_ids": [
+          "E04",
+          "E08",
+          "E12"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "quote": "No, I meant the header parser in lab/src/http/headers.py.",
+            "line": 2
+          },
+          {
+            "episode_id": "E08",
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section.",
+            "line": 2
+          },
+          {
+            "episode_id": "E12",
+            "quote": "Keep the helper private. The public API stays the existing enqueue function.",
+            "line": 2
+          }
+        ],
+        "interpretation": "These episodes contain a correction line where the user redirects target, scope, or design after an action was taken. This is the clearest textual marker that the episode needed correction.",
+        "counterevidence": [
+          {
+            "episode_id": "E01",
+            "reason": "Kind is succeeded with correction null; the agent's action matched the request and no redirection occurred, showing correction is not a universal feature of agent work."
+          }
+        ],
+        "confidence": "confident"
+      },
+      {
+        "label": "failed-edit-attempt-precedes-correction",
+        "episode_ids": [
+          "E04"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "quote": "Edit failed: wrong file",
+            "line": 3,
+            "claimed_status": "failed"
+          }
+        ],
+        "interpretation": "In E04 the failed edit (wrong target file) is temporally and causally linked to the subsequent correction, suggesting one path to correction is a visible tool failure that prompts user clarification.",
+        "counterevidence": [
+          {
+            "episode_id": "E02",
+            "reason": "E02 also records an Edit failed event ('Edit failed: text not found') but has correction null, so a failed tool event does not guarantee a correction follows."
+          }
+        ],
+        "confidence": "tentative"
+      },
+      {
+        "label": "tool-failure-without-correction",
+        "episode_ids": [
+          "E02",
+          "E06",
+          "E10"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "quote": "Edit failed: text not found",
+            "line": 2,
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "quote": "apply_patch rejected: context mismatch",
+            "line": 2,
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "quote": "StrReplace failed: old_string not found",
+            "line": 2,
+            "claimed_status": "failed"
+          }
+        ],
+        "interpretation": "These episodes end in a failed tool event but carry no correction text, indicating that failure alone (without a recorded human follow-up) is a different phenomenon from a correction episode; the corpus records the failure but not any resolution.",
+        "counterevidence": [
+          {
+            "episode_id": "E04",
+            "reason": "E04 shows a failed edit that is immediately followed by an explicit correction and a successful retry, so failure sometimes does co-occur with correction."
+          }
+        ],
+        "confidence": "tentative"
+      },
+      {
+        "label": "unknown-tool-result-ambiguous",
+        "episode_ids": [
+          "E03",
+          "E07",
+          "E11"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "quote": "No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "quote": "No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "quote": "No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          }
+        ],
+        "interpretation": "Episodes whose only event is 'unknown' lack any recorded outcome evidence. They cannot be coded as failures or successes; they represent an observability gap rather than a demonstrated need for correction, and must be preserved as unknown per the rules.",
+        "counterevidence": [
+          {
+            "episode_id": "E05",
+            "reason": "E05 has a clearly recorded succeeded status ('Wrote lab/docs/cache.md'), showing that when tool results are captured, ambiguity does not arise; unknown status is a property of missing evidence, not of the task itself."
+          }
+        ],
+        "confidence": "tentative"
+      }
+    ],
+    "themes": [
+      {
+        "name": "Correction as explicit human redirection",
+        "central_concept": "An episode requires correction when a correction field/text exists, marking a mismatch between the agent's initial action and the user's actual intent (wrong file, wrong scope, wrong design decision).",
+        "codes": [
+          "explicit-correction-issued",
+          "failed-edit-attempt-precedes-correction"
+        ],
+        "supporting_episodes": [
+          "E04",
+          "E08",
+          "E12"
+        ],
+        "disconfirming_episodes": [
+          "E01"
+        ],
+        "limits": "Only three episodes in the corpus carry a non-null correction field; this is a small sample and correction reasons vary (wrong file, wrong doc/scope, wrong visibility), so the code may be conflating distinct sub-phenomena under one label."
+      },
+      {
+        "name": "Tool failure is not sufficient evidence of a correction need",
+        "central_concept": "Failed events (status: failed) mark broken attempts, but corpus evidence shows failure and correction are logically separate categories: some failures are followed by correction (E04), others are not (E02, E06, E10).",
+        "codes": [
+          "tool-failure-without-correction",
+          "failed-edit-attempt-precedes-correction"
+        ],
+        "supporting_episodes": [
+          "E02",
+          "E06",
+          "E10",
+          "E04"
+        ],
+        "disconfirming_episodes": [
+          "E01",
+          "E09"
+        ],
+        "limits": "The corpus does not record whether E02, E06, or E10 were later corrected outside the captured events; absence of a correction field is not proof that no correction ever occurred, only that none is recorded here."
+      },
+      {
+        "name": "Unknown status is a distinct, non-error category requiring preservation",
+        "central_concept": "Episodes with 'unknown' events lack recorded tool outcomes and must not be treated as failures needing correction; they instead flag a gap in observability that is analytically different from a demonstrated failure or an explicit correction.",
+        "codes": [
+          "unknown-tool-result-ambiguous"
+        ],
+        "supporting_episodes": [
+          "E03",
+          "E07",
+          "E11"
+        ],
+        "disconfirming_episodes": [
+          "E05"
+        ],
+        "limits": "Because these episodes carry no completion evidence, it is impossible from the corpus alone to say whether the underlying task actually needed correction; the 'unknown' label reflects missing data, not a settled judgment."
+      }
+    ],
+    "questions_for_human": [
+      "Should a failed tool event with no subsequent correction field (E02, E06, E10) be treated as an unresolved episode requiring correction, or as a closed failed episode outside the scope of 'correction'?",
+      "Is 'correction' meant to capture only user-issued redirections (correction field present), or should it also include agent self-correction visible only through retried tool calls (e.g., E04's failed-then-succeeded edit sequence)?",
+      "For unknown-status episodes (E03, E07, E11), is there an out-of-band signal (outside this corpus) that resolves whether the underlying request succeeded, or should these remain permanently indeterminate for this analysis?"
+    ]
+  }
+}

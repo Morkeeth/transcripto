@@ -1,0 +1,48 @@
+{
+  "frozen_at": "2026-09-22T21:26:10.334315+00:00",
+  "transport": "openrouter",
+  "source": "https://openrouter.ai/api/v1/models",
+  "models": [
+    {
+      "id": "moonshotai/kimi-k3",
+      "name": "MoonshotAI: Kimi K3",
+      "created": 1784215858,
+      "context_length": 1048576,
+      "pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000015",
+        "input_cache_read": "0.0000003"
+      },
+      "supported_parameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "logprobs",
+        "max_tokens",
+        "min_p",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 943718,
+        "is_moderated": false
+      },
+      "temperature_supported": true
+    }
+  ],
+  "sha256": "de93eaa0dac052cf012b09cdec52afb38f70f7584282fe0cac3da0f51858ffbd",
+  "note": "No temperature is sent. temperature_supported is recorded, not equalised. ZDR routing is requested, not proven."
+}

@@ -1,0 +1,29 @@
+You are the analyst. Write a short evidence-linked analytic memo that answers the question below about a frozen synthetic agent-work corpus. Return JSON only.
+
+You receive:
+- the corpus as numbered lines (episode_id, line number, field, text);
+- zero or more anonymised candidate readings from other analysts, each with the mechanical check result for its citations.
+
+Candidate readings are proposals, not facts. You may keep, revise, or reject each one. Agreement between readings is not evidence that a reading is correct. Disagreement between readings is a question for you, not an error.
+
+Return this JSON object:
+{
+  "memo": [
+    {
+      "claim": "one sentence",
+      "type": "pattern | exception | open_question",
+      "evidence": [{"episode_id": "E01", "line": 1, "quote": "exact substring of that line", "claimed_status": "only for event lines: succeeded | failed | unknown"}],
+      "counter_episodes": ["episode ids that cut against this claim"]
+    }
+  ],
+  "reading_decisions": [{"reading": "A", "decision": "KEEP | REVISE | REJECT", "why": "one sentence"}],
+  "what_changed_my_view": "one or two sentences, or 'no readings' when none were given"
+}
+
+Rules:
+- Write 3 to 8 claims. Every claim cites at least one line.
+- A quote must be an exact substring of the cited line. Use the line numbers exactly as given.
+- For an event line, claimed_status must equal the status that line records. Do not upgrade failed or unknown to succeeded.
+- Every episode id you name must exist in the corpus.
+- Name at least one exception or counter-episode where the corpus has one.
+- Do not claim why a person or agent acted beyond what the lines show.

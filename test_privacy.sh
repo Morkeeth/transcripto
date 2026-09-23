@@ -16,7 +16,11 @@ home='/(Users|home)/[^/[:space:]"]+/'
 vault='(^|[^0-9])[0-9]{2} [A-Z][A-Za-z ]*/[^"]*\.md'
 secret='AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY'
 files=$(git ls-files | grep -v -E '^(fixtures[^/]*/|fixtures/|test_privacy\.sh$)')
-path_hits=$(printf '%s\n' "$files" | xargs grep -n -i -E "$home|$vault" 2>/dev/null)
+# Home paths match case-insensitively. Vault paths match case-sensitively: a numbered
+# folder is "00 Dashboard/", and -i would also flag prose such as "E08 the agent wrote x.md".
+path_hits=$(printf '%s\n' "$files" | xargs grep -n -i -E "$home" 2>/dev/null)
+vault_hits=$(printf '%s\n' "$files" | xargs grep -n -E "$vault" 2>/dev/null)
+path_hits="$path_hits$vault_hits"
 secret_hits=$(git ls-files -z | xargs -0 grep -n -i -E "$secret" 2>/dev/null)
 hits="$path_hits$secret_hits"
 if [ -n "$hits" ]; then echo "PRIVACY FAIL:"; echo "$hits" | head -20; exit 1; fi

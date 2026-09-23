@@ -1,0 +1,239 @@
+{
+  "arm": "arm-8",
+  "offline": false,
+  "transport": "openrouter",
+  "at": "2026-09-22T21:25:55.311210+00:00",
+  "http_status": 200,
+  "latency_ms": 48718.2,
+  "tokens": 7356,
+  "usage": {
+    "prompt_tokens": 3223,
+    "completion_tokens": 4133,
+    "reasoning_tokens": 2047,
+    "total_tokens": 7356,
+    "cost_usd": 0.125615
+  },
+  "cost": 0.125615,
+  "finish_reason": "stop",
+  "parse_step": "as_returned",
+  "request_meta": {
+    "max_tokens": 12000,
+    "provider": {
+      "zdr": true,
+      "data_collection": "deny",
+      "allow_fallbacks": true
+    },
+    "usage": {
+      "include": true
+    }
+  },
+  "zdr_confirmation": "unverified",
+  "errors": [],
+  "output": {
+    "analytic_position": "This reading distinguishes explicit conversational correction from technical remediation and evidentiary follow-up. A correction is treated as explicit only when the corpus records a correction line; failed actions indicate work needing repair, while unknown results indicate that completion cannot be established. Tool success is not assumed to prove alignment with the user's revised intent. Because the corpus is small, synthetic, and does not reveal whether users clarified prior intent or changed their minds, causal claims remain tentative. Cross-harness repetition is not treated as qualitative validity.",
+    "codes": [
+      {
+        "label": "goal realignment",
+        "episode_ids": [
+          "E04",
+          "E08",
+          "E12"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E04",
+            "quote": "No, I meant the header parser in lab/src/http/headers.py.",
+            "line": 2
+          },
+          {
+            "episode_id": "E08",
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section.",
+            "line": 2
+          },
+          {
+            "episode_id": "E12",
+            "quote": "Keep the helper private. The public API stays the existing enqueue function.",
+            "line": 2
+          }
+        ],
+        "interpretation": "Explicit correction appears when the operative goal must be realigned: E04 changes the target file, E08 changes the path and requested scope, and E12 reverses the public-versus-private API decision. The corpus cannot determine whether these are corrections of agent misunderstanding or changes in user intent.",
+        "counterevidence": [
+          {
+            "episode_id": "E02",
+            "reason": "A technical failure occurs without an explicit goal revision: E02 L2 records \"Edit lab/src/auth/parser.py failed: Edit failed: text not found\"."
+          }
+        ],
+        "confidence": "tentative"
+      },
+      {
+        "label": "failed execution needs remediation",
+        "episode_ids": [
+          "E02",
+          "E06",
+          "E10"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E02",
+            "quote": "Edit lab/src/auth/parser.py failed: Edit failed: text not found",
+            "line": 2,
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E06",
+            "quote": "apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch",
+            "line": 2,
+            "claimed_status": "failed"
+          },
+          {
+            "episode_id": "E10",
+            "quote": "StrReplace lab/src/worker.py failed: StrReplace failed: old_string not found",
+            "line": 2,
+            "claimed_status": "failed"
+          }
+        ],
+        "interpretation": "Failed edits leave the requested work incomplete and therefore call for technical remediation, such as rereading the file or constructing a new patch. None of these episodes records a user correction, so execution repair should not be conflated with a changed decision.",
+        "counterevidence": [
+          {
+            "episode_id": "E04",
+            "reason": "Failure and explicit correction can coincide: E04 L3 records \"Edit lab/src/auth/parser.py failed: Edit failed: wrong file\", while E04 L2 supplies a revised target."
+          }
+        ],
+        "confidence": "tentative"
+      },
+      {
+        "label": "successful action can be superseded",
+        "episode_ids": [
+          "E08",
+          "E12"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E08",
+            "quote": "Write lab/docs/caching.md succeeded: Wrote lab/docs/caching.md",
+            "line": 3,
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E08",
+            "quote": "lab/docs/cache.md, shorter please. Drop the architecture section.",
+            "line": 2
+          },
+          {
+            "episode_id": "E12",
+            "quote": "Edit lab/src/queue.py succeeded: File updated successfully",
+            "line": 3,
+            "claimed_status": "succeeded"
+          },
+          {
+            "episode_id": "E12",
+            "quote": "Keep the helper private. The public API stays the existing enqueue function.",
+            "line": 2
+          }
+        ],
+        "interpretation": "A successful tool result establishes that an operation completed, not that its target or design remains appropriate after correction. E08 records a successful write to the initially requested path alongside a correction to a different path and narrower scope; E12 records successful edits alongside a reversal of the requested API exposure.",
+        "counterevidence": [
+          {
+            "episode_id": "E01",
+            "reason": "Success can also remain aligned and require no recorded correction: E01 L3 records \"Bash pytest lab/tests/test_queue.py -q succeeded: Process exited with code 0\"."
+          }
+        ],
+        "confidence": "tentative"
+      },
+      {
+        "label": "unknown result needs verification",
+        "episode_ids": [
+          "E03",
+          "E07",
+          "E11"
+        ],
+        "evidence": [
+          {
+            "episode_id": "E03",
+            "quote": "Bash pytest -q unknown: No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E07",
+            "quote": "Bash git commit -am green-suite unknown: No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          },
+          {
+            "episode_id": "E11",
+            "quote": "Read lab/src/queue.py unknown: No matching tool result recorded.",
+            "line": 2,
+            "claimed_status": "unknown"
+          }
+        ],
+        "interpretation": "Unknown results create an epistemic defect: the agent cannot safely report test health, confirm a conditional commit, or answer whether the helper exists. These episodes require renewed observation or clarification before a warranted answer, but the corpus does not show that the attempted operations failed or that the user changed the goal.",
+        "counterevidence": [
+          {
+            "episode_id": "E09",
+            "reason": "Recorded evidence can resolve the relevant uncertainty: E09 L3 states \"Bash pytest lab/tests/test_expiry.py -q succeeded: Process exited with code 0\"."
+          }
+        ],
+        "confidence": "tentative"
+      }
+    ],
+    "themes": [
+      {
+        "name": "Correction follows a change in the operative specification",
+        "central_concept": "The clearest correction requirement is semantic realignment of target, scope, or interface, as in E04 L2, \"No, I meant the header parser in lab/src/http/headers.py.\", E08 L2, \"lab/docs/cache.md, shorter please. Drop the architecture section.\", and E12 L2, \"Keep the helper private. The public API stays the existing enqueue function.\"",
+        "codes": [
+          "goal realignment"
+        ],
+        "supporting_episodes": [
+          "E04",
+          "E08",
+          "E12"
+        ],
+        "disconfirming_episodes": [
+          "E02"
+        ],
+        "limits": "E02 shows that incomplete work does not necessarily produce a conversational correction: E02 L2 says \"Edit lab/src/auth/parser.py failed: Edit failed: text not found\". The correction lines also do not reveal whether the agent misunderstood or the user changed the specification after the initial request."
+      },
+      {
+        "name": "Tool outcome and correction need are distinct",
+        "central_concept": "Both failure and success can coexist with a need for further work. E06 L2 records \"apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch\", while E08 L3 records \"Write lab/docs/caching.md succeeded: Wrote lab/docs/caching.md\" even though E08 contains a revised target and scope.",
+        "codes": [
+          "failed execution needs remediation",
+          "successful action can be superseded"
+        ],
+        "supporting_episodes": [
+          "E02",
+          "E06",
+          "E08",
+          "E10",
+          "E12"
+        ],
+        "disconfirming_episodes": [
+          "E04"
+        ],
+        "limits": "E04 complicates a clean separation because correction and failure coincide: E04 L3 records \"Edit lab/src/auth/parser.py failed: Edit failed: wrong file\". The corpus is too sparse to determine whether that failure caused the correction or merely accompanied it."
+      },
+      {
+        "name": "Missing evidence requires epistemic repair",
+        "central_concept": "An unknown tool result prevents a warranted completion claim rather than proving failure. E03 L2 states \"Bash pytest -q unknown: No matching tool result recorded.\", and E11 L2 states \"Read lab/src/queue.py unknown: No matching tool result recorded.\"",
+        "codes": [
+          "unknown result needs verification"
+        ],
+        "supporting_episodes": [
+          "E03",
+          "E07",
+          "E11"
+        ],
+        "disconfirming_episodes": [
+          "E09"
+        ],
+        "limits": "E09 is a resolved negative case because E09 L3 records \"Bash pytest lab/tests/test_expiry.py -q succeeded: Process exited with code 0\". Unknown episodes contain no explicit user correction, so they support a need for verification, not a claim that a changed decision occurred."
+      }
+    ],
+    "questions_for_human": [
+      "Should \"require correction\" include technical retries and renewed observation, or only episodes with an explicit user correction?",
+      "In E04, E08, and E12, did the user clarify an earlier intention or change the decision after the initial request?",
+      "When a successful action is superseded, should correction include reverting its side effects, such as the successful write to lab/docs/caching.md in E08?"
+    ]
+  }
+}

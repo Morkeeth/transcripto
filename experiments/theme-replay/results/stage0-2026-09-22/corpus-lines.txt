@@ -1,0 +1,44 @@
+E01 (claude)
+  E01 L1 [request] Add a retry helper to lab/src/queue.py and keep the tests green.
+  E01 L2 [event:succeeded] Edit lab/src/queue.py succeeded: File updated successfully
+  E01 L3 [event:succeeded] Bash pytest lab/tests/test_queue.py -q succeeded: Process exited with code 0
+E02 (claude)
+  E02 L1 [request] Refactor the auth parser in lab/src/auth/parser.py and keep the existing tests green.
+  E02 L2 [event:failed] Edit lab/src/auth/parser.py failed: Edit failed: text not found
+E03 (claude)
+  E03 L1 [request] Run the full suite and report whether it is green.
+  E03 L2 [event:unknown] Bash pytest -q unknown: No matching tool result recorded.
+E04 (claude)
+  E04 L1 [request] Refactor the auth parser in lab/src/auth/parser.py and keep the existing tests green while you do it.
+  E04 L2 [correction] No, I meant the header parser in lab/src/http/headers.py.
+  E04 L3 [event:failed] Edit lab/src/auth/parser.py failed: Edit failed: wrong file
+  E04 L4 [event:succeeded] Edit lab/src/http/headers.py succeeded: File updated successfully
+E05 (codex)
+  E05 L1 [request] Write a TTL note into lab/docs/cache.md and leave the rest of the docs alone.
+  E05 L2 [event:succeeded] Write lab/docs/cache.md succeeded: Wrote lab/docs/cache.md
+E06 (codex)
+  E06 L1 [request] Patch lab/src/queue.py to raise after three retries.
+  E06 L2 [event:failed] apply_patch lab/src/queue.py failed: apply_patch rejected: context mismatch
+E07 (codex)
+  E07 L1 [request] Commit if the suite is green.
+  E07 L2 [event:unknown] Bash git commit -am green-suite unknown: No matching tool result recorded.
+E08 (codex)
+  E08 L1 [request] Document the caching layer in lab/docs/caching.md.
+  E08 L2 [correction] lab/docs/cache.md, shorter please. Drop the architecture section.
+  E08 L3 [event:succeeded] Write lab/docs/caching.md succeeded: Wrote lab/docs/caching.md
+  E08 L4 [event:succeeded] Edit lab/docs/cache.md succeeded: File updated successfully
+E09 (cursor)
+  E09 L1 [request] Add a unit test for the expiry branch in lab/tests/test_expiry.py.
+  E09 L2 [event:succeeded] Write lab/tests/test_expiry.py succeeded: Wrote lab/tests/test_expiry.py
+  E09 L3 [event:succeeded] Bash pytest lab/tests/test_expiry.py -q succeeded: Process exited with code 0
+E10 (cursor)
+  E10 L1 [request] Replace the retry helper call site in lab/src/worker.py.
+  E10 L2 [event:failed] StrReplace lab/src/worker.py failed: StrReplace failed: old_string not found
+E11 (cursor)
+  E11 L1 [request] Open the retry helper and tell me if it already exists.
+  E11 L2 [event:unknown] Read lab/src/queue.py unknown: No matching tool result recorded.
+E12 (cursor)
+  E12 L1 [request] Ship the retry helper as the public API.
+  E12 L2 [correction] Keep the helper private. The public API stays the existing enqueue function.
+  E12 L3 [event:succeeded] Edit lab/src/queue.py succeeded: File updated successfully
+  E12 L4 [event:succeeded] Edit lab/src/api.py succeeded: File updated successfully

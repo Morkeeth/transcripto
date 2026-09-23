@@ -1,0 +1,61 @@
+{
+  "ok": true,
+  "unresolved_citations": 0,
+  "arms": [
+    {
+      "file": "arm-1.json",
+      "arm": "arm-1",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "file": "arm-2.json",
+      "arm": "arm-2",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "file": "arm-3.json",
+      "arm": "arm-3",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "file": "arm-4.json",
+      "arm": "arm-4",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "file": "arm-5.json",
+      "arm": "arm-5",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "file": "arm-6.json",
+      "arm": "arm-6",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "file": "arm-7.json",
+      "arm": "arm-7",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "file": "arm-8.json",
+      "arm": "arm-8",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "file": "arm-9.json",
+      "arm": "arm-9",
+      "ok": true,
+      "errors": []
+    }
+  ],
+  "note": "Failures are named. They are not a single quality score."
+}

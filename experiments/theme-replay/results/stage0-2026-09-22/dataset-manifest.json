@@ -1,0 +1,24 @@
+{
+  "stage": 0,
+  "n": 12,
+  "harnesses": {
+    "claude": 4,
+    "codex": 4,
+    "cursor": 4
+  },
+  "kinds": {
+    "succeeded": 3,
+    "failed": 3,
+    "unknown": 3,
+    "changed-decision": 3
+  },
+  "question": "What makes an agent-work episode require correction?",
+  "files": {
+    "episodes.jsonl": "ad4cd9260a25d6561cd5421e4eb07b189284df22626a59bac4c04739ec8b5392",
+    "question.txt": "d2d0cd32d9133f49b09b00d11289d44313912f6920300819fe7a30199fee59b0",
+    "analysis-prompt.txt": "48554a551374c0ac4666f13a6ef9c201a3795caca52f733318b5c42780b8b660",
+    "protocol.json": "8751199808ded1a3e0719dcb689a71178e24debd6f02ec714d9dc9424ec3c292",
+    "corpus-index.json": "1c9a45b97834c60f2b71cc10b56ef7d28ea4673a5d02624fa3ba519fc175c557"
+  },
+  "private_transcripts": false
+}
