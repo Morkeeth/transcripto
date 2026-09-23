@@ -158,3 +158,6 @@ PyPI cut that includes tip stranger verbs + stats caveat, then article/X/PyPI.
   after a real RED.
 - ManagePullRequest: draft PR registered for user approval (not auto-created
   per repo settings). Branch pushed for Oscar to open.
+- Tip HEAD `a710cbd`: CI **success** — `gh run view 35801811539` jobs
+  `test (3.9)`, `test (3.13)`, `cold-verify` all success
+  (subscription `sub_7c361e65-…`).
