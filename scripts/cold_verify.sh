@@ -335,6 +335,7 @@ echo
 # --- SYMLINK INFLATION (find without -type f double-counts) ---
 echo "=== SYMLINK INFLATION TRAP (omit -type f → inflated totals) ==="
 SYM="$WORK/symlink-inflation"
+rm -rf "$SYM"
 mkdir -p "$SYM"
 printf '%s\n' '{"k":1}' > "$SYM/real.jsonl"
 ln -s "$SYM/real.jsonl" "$SYM/alias.jsonl"
@@ -359,6 +360,7 @@ echo
 # can be inflated by a backup tool that hardlinked sessions.
 echo "=== HARDLINK INODE TRAP (path count vs unique inode) ==="
 HL="$WORK/hardlink-inflation"
+rm -rf "$HL"
 mkdir -p "$HL"
 printf '%s\n' '{"k":1}' > "$HL/real.jsonl"
 ln "$HL/real.jsonl" "$HL/hardlink.jsonl"
