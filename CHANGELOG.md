@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `--detector jev --jev-dry-run` previews privacy eligibility and exclusion counts
+  in `coach` and `export-run`, without a key, network calls, or correction verdicts.
+
 - `coach` and `export-run` accept `--detector jev`, an opt-in correction
   detector that sends privacy-filtered typed turns to TypeSafe Jev on
   OpenRouter. Off unless the flag is passed on that run. The default path

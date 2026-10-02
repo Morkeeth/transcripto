@@ -198,6 +198,35 @@ def default_notice(line):
     sys.stderr.flush()
 
 
+class JevPreview(object):
+    """Count privacy eligibility locally, without credentials or verdicts."""
+
+    dry_run = True
+
+    def __init__(self, home=None):
+        self.home = home
+        self.stats = {}
+
+    def score(self, texts):
+        excluded, redactions, eligible = {}, 0, 0
+        for text in texts:
+            clean, reason, count = privacy(text, self.home)
+            if clean is None:
+                excluded[reason] = excluded.get(reason, 0) + 1
+            else:
+                eligible += 1
+                redactions += count
+        self.stats = {
+            "dry_run": True, "turns": len(texts), "eligible": eligible,
+            "excluded": sum(excluded.values()),
+            "excluded_reasons": dict(sorted(excluded.items())),
+            "redactions": redactions, "max_chars_per_turn": MAX_CHARS,
+            "sent": 0, "scored": 0, "requests": 0, "cost_usd": 0.0,
+            "url": URL, "model": MODEL,
+        }
+        return [None] * len(texts)
+
+
 class JevDetector(object):
     """score(texts) -> [True / False / None], one per text, plus self.stats.
 

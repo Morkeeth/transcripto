@@ -1468,6 +1468,9 @@ def _jev_detector(args):
     the regex because no key is set. Exits 2 with a clear message otherwise."""
     if getattr(args, "detector", "regex") != "jev":
         return None
+    if getattr(args, "jev_dry_run", False):
+        import transcripto_jev
+        return transcripto_jev.JevPreview()
     key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     if not key:
         if getattr(args, "jev_fallback_regex", False):
@@ -1495,6 +1498,10 @@ def _jev_score(detector, texts):
     except transcripto_jev.JevAuthError as e:
         sys.stderr.write("transcripto: %s Stopped; no verdicts.\n" % e)
         sys.exit(2)
+    if getattr(detector, "dry_run", False):
+        return {"correction_detector": "jev", "corrections": None,
+                "correction_rate": None, "correction_rate_denominator": None,
+                "jev": detector.stats}
     scored = [(t, v) for t, v in zip(texts, verdicts) if v is not None]
     corr = sum(1 for _, v in scored if v)
     st = detector.stats
@@ -1514,6 +1521,15 @@ def _jev_score(detector, texts):
 
 def _print_jev_line(r):
     j = r["jev"]
+    if j.get("dry_run"):
+        print("Jev privacy preview: %d of %d typed turns eligible; %d excluded; "
+              "%d spans would be redacted (max %d chars per turn)." % (
+                  j["eligible"], j["turns"], j["excluded"], j["redactions"],
+                  j["max_chars_per_turn"]))
+        for reason, count in j["excluded_reasons"].items():
+            print("  %s: %d" % (reason, count))
+        print("Nothing sent. No API key needed. No correction verdicts or cost estimate.")
+        return
     print("Corrections (Jev, P(correction) >= %.2f): %d of %d scored turns (%s). "
           "The local regex flags %d of the same turns." % (
               j["threshold"], r["corrections"], j["scored"],
@@ -2161,6 +2177,8 @@ def cmd_coach(args):
     if args.json:
         print(json.dumps(r, indent=2)); return
     if not r["episodes"]:
+        if r.get("jev", {}).get("dry_run"):
+            _print_jev_line(r)
         print("No prompt episodes found. Looked in: " + ", ".join(_coach_roots(args.root, args.harness)))
         print("Try transcripto replay --demo, --harness codex, --harness cursor, or --root <dir>.")
         return
@@ -2367,6 +2385,8 @@ def _add_detector_args(s):
                    help="regex (default): local, offline. jev: SENDS privacy-filtered "
                         "typed turns to OpenRouter (TypeSafe Jev). Needs OPENROUTER_API_KEY. "
                         "Opt-in per run; no env var or config file turns it on.")
+    g.add_argument("--jev-dry-run", action="store_true",
+                   help="with --detector jev, preview privacy counts locally; no key or network")
     g.add_argument("--jev-threshold", type=float, default=0.30,
                    help="P(correction) at or above this is a correction (default 0.30)")
     g.add_argument("--jev-batch", type=int, default=1,
@@ -2477,6 +2497,8 @@ def main():
         p.error("--line requires a positive line number and an explicit transcript path")
     if getattr(a, "session", None) and a.target != "latest":
         p.error("use either a positional query/path or --session")
+    if getattr(a, "jev_dry_run", False) and a.detector != "jev":
+        p.error("--jev-dry-run requires --detector jev")
     if getattr(a, "detector", "regex") == "jev":
         if not 0.0 < a.jev_threshold < 1.0:
             p.error("--jev-threshold must be between 0 and 1")

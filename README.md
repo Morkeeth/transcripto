@@ -289,6 +289,19 @@ denominator (`correction_rate_denominator: "jev.scored"`). JSON gains a `jev`
 block with `sent`, `excluded`, `excluded_reasons`, `scored`, `errors`,
 `cost_usd` and the served model.
 
+Preview the privacy counts before choosing to send anything:
+
+```sh
+transcripto coach --detector jev --jev-dry-run --json
+transcripto export-run latest --detector jev --jev-dry-run
+```
+
+This needs no API key and makes no requests, even with a key in the environment.
+It reports eligible turns, exclusions by reason, and redaction counts. It does
+not print turn text, estimate cost, or produce correction verdicts. Eligibility
+means the current filter permits a turn; it is not a guarantee that the text
+contains no private information.
+
 Options: `--jev-threshold` (default 0.30 on P(correction)), `--jev-max-usd`
 (default 1.00, stops sending once reached), `--jev-batch` (default 1; larger
 batches are cheaper but change the answers), `--jev-fallback-regex` (with no
