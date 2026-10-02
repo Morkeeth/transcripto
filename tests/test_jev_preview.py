@@ -18,7 +18,7 @@ import transcripto_jev as J
 class PreviewTests(unittest.TestCase):
     def test_counts_use_real_filter_and_never_emit_text_or_verdicts(self):
         preview = J.JevPreview(home="/nonexistent/alicebob")
-        texts = ["fix parser now", "my bank balance", "/home/example/repo.py"]
+        texts = json.loads((ROOT / "fixtures" / "jev-preview-texts.json").read_text())
         with mock.patch.object(J, "_post", side_effect=AssertionError("network")):
             result = transcripto._jev_score(preview, texts)
         self.assertEqual(result["jev"]["eligible"], 2)
