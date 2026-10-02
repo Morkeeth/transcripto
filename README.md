@@ -177,7 +177,7 @@ transcripto replay latest --share           # counts + caveat; no prompts or pat
 ```
 
 `--share` is intentionally small. Full replay output and JSON contain your own
-words and local paths. The tool does not upload either.
+words and local paths. Replay does not upload either.
 
 ## What each harness supports
 
@@ -252,8 +252,9 @@ agent caused them. Without a usable window, the commit fields are null.
 
 ## Privacy and limits
 
-The three runtime modules contain no network client, telemetry, account flow,
-or process execution. Package installation (`pip` or `uvx`) is a separate
+The default commands process transcripts locally, without telemetry or an
+account flow. The optional Jev detector below sends filtered typed text only
+when explicitly selected. Package installation (`pip` or `uvx`) is a separate
 operation that may contact a package registry and write a package cache.
 
 ### Optional network detector: `--detector jev`
@@ -269,7 +270,7 @@ OPENROUTER_API_KEY=... transcripto coach --detector jev
 ```
 
 Before the first request it prints one line to stderr: how many typed turns it
-sends, how many the privacy filter excluded, and the URL
+may send, how many the privacy filter excluded, and the URL
 (`https://openrouter.ai/api/alpha/decisions`, model `typesafe/jev-1.13`).
 Only your typed turns are sent, at most 2,000 characters each, with the fixed
 question. No separate path/session metadata, agent output or tool results are
