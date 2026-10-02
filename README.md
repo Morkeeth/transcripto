@@ -256,6 +256,49 @@ The three runtime modules contain no network client, telemetry, account flow,
 or process execution. Package installation (`pip` or `uvx`) is a separate
 operation that may contact a package registry and write a package cache.
 
+### Optional network detector: `--detector jev`
+
+`coach` and `export-run` can count corrections with TypeSafe Jev instead of the
+local regex. This is the one path that sends text off the machine, and it runs
+only when you pass the flag on that run. No environment variable or config file
+turns it on. The code lives in its own module, `transcripto_jev.py`, which the
+default path never imports.
+
+```sh
+OPENROUTER_API_KEY=... transcripto coach --detector jev
+```
+
+Before the first request it prints one line to stderr: how many typed turns it
+sends, how many the privacy filter excluded, and the URL
+(`https://openrouter.ai/api/alpha/decisions`, model `typesafe/jev-1.13`).
+Only your typed turns are sent, at most 2,000 characters each, with the fixed
+question. No paths, session ids, agent output or tool results are sent.
+
+The privacy filter runs before any request is built:
+
+- **Excluded, never sent:** a turn that names your account, cites a numbered
+  notes-folder path (two digits, a space, a folder name, a `.md` file), mentions a private topic (money,
+  finance, wallet, seed, key, password, token, salary, bank, journal, health,
+  family, whole words), or holds an email address or phone-like number.
+- **Redacted, then sent:** API keys and tokens, AWS key ids, private-key blocks,
+  40-hex `0x` addresses, and home directory paths.
+
+Excluded turns and failed requests get no verdict. They are reported, never
+filled in with the regex. The correction rate then uses the scored turns as its
+denominator (`correction_rate_denominator: "jev.scored"`). JSON gains a `jev`
+block with `sent`, `excluded`, `excluded_reasons`, `scored`, `errors`,
+`cost_usd` and the served model.
+
+Options: `--jev-threshold` (default 0.30 on P(correction)), `--jev-max-usd`
+(default 1.00, stops sending once reached), `--jev-batch` (default 1; larger
+batches are cheaper but change the answers), `--jev-fallback-regex` (with no
+key set, use the regex instead of exiting). A refused key (HTTP 401, 402, 403)
+stops the run after one request.
+
+The default 0.30 comes from a local experiment on 185 turns, labelled by a
+single model rater: agreement F1 about 0.77 to 0.83 against that rater, versus
+0.68 to 0.70 for the regex. That is agreement with a model, not accuracy.
+
 Replay and coach read transcripts without making an index. Search writes text
 and file metadata to `~/.trace/trace.db`. A new index directory is private;
 database and WAL files use mode `0600`. The index stays after the command exits.
