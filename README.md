@@ -308,6 +308,12 @@ batches are cheaper but change the answers), `--jev-fallback-regex` (with no
 key set, use the regex instead of exiting). A refused key (HTTP 401, 402, 403)
 stops the run after one request.
 
+The spend limit must be finite and positive. Costs are reported after requests,
+so requests already in flight can exceed the limit; it is not a provider-side
+hard cap. If any request cost is missing or invalid, no further batch is sent
+and the displayed cost is labelled an incomplete subtotal. Invalid probabilities
+produce no verdict rather than a guessed correction label.
+
 The default 0.30 comes from a local experiment on 185 turns, labelled by a
 single model rater: agreement F1 about 0.77 to 0.83 against that rater, versus
 0.68 to 0.70 for the regex. That is agreement with a model, not accuracy.

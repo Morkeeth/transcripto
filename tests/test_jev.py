@@ -173,9 +173,11 @@ class DetectorTests(unittest.TestCase):
         fake = FakeOpenRouter(fail=urllib.error.URLError("down"))
         d = detector(fake)
         self.assertEqual(d.score(["no, wrong", "redo it"]), [None, None])
-        self.assertEqual(d.stats["errors"], 2)
+        self.assertEqual(d.stats["errors"], 1)
+        self.assertEqual(d.stats["budget_unsent"], 1)
+        self.assertTrue(d.stats["cost_unknown"])
         self.assertEqual(d.stats["scored"], 0)
-        self.assertEqual(len(fake.bodies), 2 * J.RETRIES)
+        self.assertEqual(len(fake.bodies), J.RETRIES)
 
     def test_server_error_and_bad_payload_give_no_verdict(self):
         err = urllib.error.HTTPError(J.URL, 500, "boom", {}, None)

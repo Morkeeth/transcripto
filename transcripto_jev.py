@@ -19,6 +19,7 @@ made by one model rater, so these are agreement numbers, not accuracy.
 Stdlib only, like the rest of Transcripto.
 """
 import json
+import math
 import os
 import re
 import sys
@@ -184,8 +185,10 @@ def parse_answers(resp, n):
         a = answers.get(name) or {}
         p = (a.get("probabilities") or {}).get("correction")
         try:
-            out.append(float(p) if p is not None else None)
-        except (TypeError, ValueError):
+            value = float(p) if p is not None and not isinstance(p, bool) else None
+            out.append(value if value is not None and math.isfinite(value)
+                       and 0 <= value <= 1 else None)
+        except (TypeError, ValueError, OverflowError):
             out.append(None)
     return out
 
@@ -243,6 +246,8 @@ class JevDetector(object):
             raise ValueError("threshold must be between 0 and 1")
         if batch < 1:
             raise ValueError("batch must be at least 1")
+        if not math.isfinite(max_usd) or max_usd <= 0:
+            raise ValueError("max_usd must be finite and above 0")
         self._key = key
         self.threshold, self.batch, self.max_usd = threshold, batch, max_usd
         self.workers = max(1, workers)
@@ -279,7 +284,7 @@ class JevDetector(object):
             "turns": n, "excluded": sum(excluded.values()),
             "excluded_reasons": dict(sorted(excluded.items())),
             "redactions": redactions, "sent": len(send), "scored": 0, "errors": 0,
-            "requests": 0, "cost_usd": 0.0, "priced_requests": 0,
+            "requests": 0, "cost_usd": 0.0, "priced_requests": 0, "cost_unknown": False,
             "budget_stopped": False, "budget_unsent": 0,
             "auth_error": None, "auth_unsent": 0, "served_by": None}
         self.probabilities = probs
@@ -295,9 +300,15 @@ class JevDetector(object):
         def apply(chunk, result):
             ps, cost, served = result
             st["requests"] += 1
-            if cost is not None:
-                st["cost_usd"] += float(cost)
+            try:
+                price = float(cost) if cost is not None and not isinstance(cost, bool) else None
+            except (TypeError, ValueError, OverflowError):
+                price = None
+            if price is not None and math.isfinite(price) and price >= 0:
+                st["cost_usd"] += price
                 st["priced_requests"] += 1
+            else:
+                st["cost_unknown"] = True
             if served and not str(served).startswith("error") and not st["served_by"]:
                 st["served_by"] = served
             for (i, _), p in zip(chunk, ps):
@@ -313,7 +324,7 @@ class JevDetector(object):
         rest = chunks[1:]
         with ThreadPoolExecutor(self.workers) as ex:
             for w in range(0, len(rest), self.workers):
-                if st["cost_usd"] >= self.max_usd:
+                if st["cost_unknown"] or st["cost_usd"] >= self.max_usd:
                     st["budget_stopped"] = True
                     st["budget_unsent"] = sum(len(c) for c in rest[w:])
                     break

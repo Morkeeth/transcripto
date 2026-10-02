@@ -1536,11 +1536,14 @@ def _print_jev_line(r):
               "%d%%" % round(r["correction_rate"] * 100) if r["correction_rate"] is not None else "n/a",
               r["regex_corrections_on_scored"]))
     print("Unscored: %d excluded by the privacy filter, %d failed requests%s. "
-          "Spend $%.4f over %d requests (%s)." % (
+          "Reported spend $%.4f over %d requests (%s)." % (
               j["excluded"], j["errors"],
               (", %d not sent (spend cap)" % j["budget_unsent"] if j["budget_stopped"] else "")
               + (", %d not sent (key refused)" % j["auth_unsent"] if j.get("auth_error") else ""),
               j["cost_usd"], j["requests"], j["served_by"] or j["model"]))
+    if j.get("cost_unknown"):
+        print("Some request costs are unknown. No further requests were started; "
+              "reported spend is an incomplete subtotal.")
 
 
 def _change_records(roots, harness=None):
@@ -2502,8 +2505,8 @@ def main():
     if getattr(a, "detector", "regex") == "jev":
         if not 0.0 < a.jev_threshold < 1.0:
             p.error("--jev-threshold must be between 0 and 1")
-        if a.jev_batch < 1 or a.jev_max_usd <= 0:
-            p.error("--jev-batch must be at least 1 and --jev-max-usd above 0")
+        if a.jev_batch < 1 or not math.isfinite(a.jev_max_usd) or a.jev_max_usd <= 0:
+            p.error("--jev-batch must be at least 1 and --jev-max-usd finite and above 0")
     if getattr(a, "root", None) and not os.path.exists(os.path.expanduser(a.root)):
         p.error("--root does not exist: " + core.safe_text(a.root))
     global ROOTS, HARNESS
