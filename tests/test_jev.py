@@ -193,6 +193,23 @@ class DetectorTests(unittest.TestCase):
             self.assertEqual(len(fake.bodies), 1)
             self.assertNotIn("test-key", str(cm.exception))
 
+    def test_key_refused_mid_run_keeps_scored_turns(self):
+        calls = []
+
+        def flaky(req, timeout=None):
+            calls.append(1)
+            if len(calls) > 2:
+                raise urllib.error.HTTPError(J.URL, 402, "no credit", {}, None)
+            return FakeOpenRouter(p_for=lambda t: 0.9)(req, timeout)
+        d = detector(flaky, workers=1)
+        v = d.score(["t %d" % i for i in range(6)])
+        self.assertEqual(v[:2], [True, True])
+        self.assertEqual(v[2:], [None] * 4)
+        self.assertEqual(d.stats["scored"], 2)
+        self.assertIn("402", d.stats["auth_error"])
+        self.assertEqual(d.stats["auth_unsent"], 3)
+        self.assertEqual(len(calls), 3)
+
     def test_spend_cap_stops_sending(self):
         fake = FakeOpenRouter(cost=0.6)
         d = detector(fake, max_usd=1.0, workers=1)

@@ -251,7 +251,8 @@ class JevDetector(object):
             "excluded_reasons": dict(sorted(excluded.items())),
             "redactions": redactions, "sent": len(send), "scored": 0, "errors": 0,
             "requests": 0, "cost_usd": 0.0, "priced_requests": 0,
-            "budget_stopped": False, "budget_unsent": 0, "served_by": None}
+            "budget_stopped": False, "budget_unsent": 0,
+            "auth_error": None, "auth_unsent": 0, "served_by": None}
         self.probabilities = probs
         self._notice(
             "transcripto: --detector jev sends %d of %d typed turns (privacy filter "
@@ -288,8 +289,16 @@ class JevDetector(object):
                     st["budget_unsent"] = sum(len(c) for c in rest[w:])
                     break
                 wave = rest[w:w + self.workers]
-                for chunk, res in zip(wave, ex.map(
-                        lambda c: self._call([t for _, t in c]), wave)):
-                    apply(chunk, res)
+                futs = [ex.submit(self._call, [t for _, t in c]) for c in wave]
+                for chunk, fut in zip(wave, futs):
+                    try:
+                        apply(chunk, fut.result())
+                    except JevAuthError as e:
+                        # Refused mid-run (credit ran out): keep what was scored.
+                        st["auth_error"] = str(e)
+                        st["errors"] += len(chunk)
+                if st["auth_error"]:
+                    st["auth_unsent"] = sum(len(c) for c in rest[w + self.workers:])
+                    break
         st["cost_usd"] = round(st["cost_usd"], 6)
         return verdicts

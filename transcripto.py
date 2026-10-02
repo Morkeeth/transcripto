@@ -1498,6 +1498,10 @@ def _jev_score(detector, texts):
     scored = [(t, v) for t, v in zip(texts, verdicts) if v is not None]
     corr = sum(1 for _, v in scored if v)
     st = detector.stats
+    if st.get("auth_error"):
+        sys.stderr.write("transcripto: %s Stopped part way: %d turns scored, %d failed, "
+                         "%d not sent. The rate below covers the scored turns only.\n" % (
+                             st["auth_error"], st["scored"], st["errors"], st["auth_unsent"]))
     return {
         "correction_detector": "jev",
         "corrections": corr,
@@ -1518,7 +1522,8 @@ def _print_jev_line(r):
     print("Unscored: %d excluded by the privacy filter, %d failed requests%s. "
           "Spend $%.4f over %d requests (%s)." % (
               j["excluded"], j["errors"],
-              ", %d not sent (spend cap)" % j["budget_unsent"] if j["budget_stopped"] else "",
+              (", %d not sent (spend cap)" % j["budget_unsent"] if j["budget_stopped"] else "")
+              + (", %d not sent (key refused)" % j["auth_unsent"] if j.get("auth_error") else ""),
               j["cost_usd"], j["requests"], j["served_by"] or j["model"]))
 
 
