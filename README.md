@@ -272,7 +272,8 @@ Before the first request it prints one line to stderr: how many typed turns it
 sends, how many the privacy filter excluded, and the URL
 (`https://openrouter.ai/api/alpha/decisions`, model `typesafe/jev-1.13`).
 Only your typed turns are sent, at most 2,000 characters each, with the fixed
-question. No paths, session ids, agent output or tool results are sent.
+question. No separate path/session metadata, agent output or tool results are
+sent. Typed text can still contain paths and private details the filter misses.
 
 The privacy filter runs before any request is built:
 
@@ -306,7 +307,12 @@ Options: `--jev-threshold` (default 0.30 on P(correction)), `--jev-max-usd`
 (default 1.00, stops sending once reached), `--jev-batch` (default 1; larger
 batches are cheaper but change the answers), `--jev-fallback-regex` (with no
 key set, use the regex instead of exiting). A refused key (HTTP 401, 402, 403)
-stops the run after one request.
+on the first request stops before any later batch. If a later request is refused,
+completed verdicts are retained and no further wave starts.
+
+The `eligible` count describes turns allowed by the filter; `sent` counts turns
+submitted to transport, excluding later turns skipped by the spending stop.
+Neither count proves that the remote service received a request successfully.
 
 The spend limit must be finite and positive. Costs are reported after requests,
 so requests already in flight can exceed the limit; it is not a provider-side

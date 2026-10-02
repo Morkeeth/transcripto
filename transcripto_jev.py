@@ -8,7 +8,8 @@ What leaves the machine, and only after the privacy filter below:
   - the typed turn text (at most MAX_CHARS characters per turn), redacted;
   - the fixed question wording (INSTRUCTIONS, CHOICE_CRITERIA).
 Where it goes: URL, authorised by OPENROUTER_API_KEY. Nothing else is sent:
-no file paths, no session ids, no agent output, no tool results.
+no separate path/session metadata, agent output, or tool results. Typed text
+may still contain paths and other private details the filter does not recognise.
 
 The question and the threshold come from the jev-experiment lane (2 Oct 2026):
 185 privacy-cleared, model-labelled turns, Choice formulation picked on split A
@@ -283,13 +284,13 @@ class JevDetector(object):
             "model": MODEL, "url": URL, "threshold": self.threshold, "batch": self.batch,
             "turns": n, "excluded": sum(excluded.values()),
             "excluded_reasons": dict(sorted(excluded.items())),
-            "redactions": redactions, "sent": len(send), "scored": 0, "errors": 0,
+            "redactions": redactions, "eligible": len(send), "sent": 0, "scored": 0, "errors": 0,
             "requests": 0, "cost_usd": 0.0, "priced_requests": 0, "cost_unknown": False,
             "budget_stopped": False, "budget_unsent": 0,
             "auth_error": None, "auth_unsent": 0, "served_by": None}
         self.probabilities = probs
         self._notice(
-            "transcripto: --detector jev sends %d of %d typed turns (privacy filter "
+            "transcripto: --detector jev may send up to %d of %d typed turns (privacy filter "
             "excluded %d, redacted %d spans, max %d chars each) to %s, model %s. "
             "Nothing else leaves this machine." % (
                 len(send), n, st["excluded"], redactions, MAX_CHARS, URL, MODEL))
@@ -320,6 +321,7 @@ class JevDetector(object):
                     st["scored"] += 1
 
         # First request alone: a refused key stops the run before anything else is sent.
+        st["sent"] += len(chunks[0])
         apply(chunks[0], self._call([t for _, t in chunks[0]]))
         rest = chunks[1:]
         with ThreadPoolExecutor(self.workers) as ex:
@@ -329,6 +331,7 @@ class JevDetector(object):
                     st["budget_unsent"] = sum(len(c) for c in rest[w:])
                     break
                 wave = rest[w:w + self.workers]
+                st["sent"] += sum(len(c) for c in wave)
                 futs = [ex.submit(self._call, [t for _, t in c]) for c in wave]
                 for chunk, fut in zip(wave, futs):
                     try:

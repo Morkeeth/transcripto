@@ -45,3 +45,5 @@ def test_unknown_cost_stops_subsequent_requests(cost):
     assert detector.stats['cost_unknown'] is True
     assert detector.stats['budget_stopped'] is True
     assert detector.stats['budget_unsent'] == 2
+    assert detector.stats['sent'] == 1
+    assert detector.stats['eligible'] == 3

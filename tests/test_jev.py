@@ -228,7 +228,7 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(len(seen), 1)
         line, requests_before = seen[0]
         self.assertEqual(requests_before, 0)
-        self.assertIn("sends 1 of 2", line)
+        self.assertIn("may send up to 1 of 2", line)
         self.assertIn("excluded 1", line)
         self.assertIn(J.URL, line)
         self.assertIn(J.MODEL, line)
@@ -381,7 +381,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(r["corrections"], 1)
         self.assertEqual(r["correction_rate"], round(1 / 3, 3))
         self.assertEqual(r["correction_rate_denominator"], "jev.scored")
-        self.assertIn("transcripto: --detector jev sends 3 of 4", err)
+        self.assertIn("transcripto: --detector jev may send up to 3 of 4", err)
         self.assertNotIn("test-key", out + err)
 
     def test_export_run_with_jev(self):
