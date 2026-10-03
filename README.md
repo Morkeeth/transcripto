@@ -416,3 +416,37 @@ transcript text. They retain detector provenance, synthetic/test labels, and
 pending human confirmation and receiver acknowledgement. They do not invoke an
 agent or send a message. Reports, packets and briefs use mode `0600`; inspect
 before sharing. `replay --share` remains counts-only.
+
+### Choose a local replay and author a handoff
+
+A model report is optional. List metadata from an existing index, choose a source,
+then explicitly permit local viewing of its requests and recorded tool outcomes:
+
+```sh
+transcripto selected-context runs --cwd /your/repo
+transcripto selected-context describe --source /your/session.jsonl
+transcripto selected-context episodes --source /your/session.jsonl \
+  --accept-sha SHA256_FROM_DESCRIBE --consent
+transcripto handoff --source /your/session.jsonl \
+  --accept-sha SHA256_FROM_DESCRIBE --line 3 \
+  --instruction 'Repair the selected output and verify the stated condition.' \
+  --consent --to-harness claude --output /your/private/packet.json
+transcripto receive-handoff /your/private/packet.json --as-harness claude \
+  --output /your/private/brief.md
+```
+
+`runs` accepts `--index /your/existing.sqlite`; it does not create or refresh an
+index. It reads only metadata from at most the most recent 20,000 indexed records,
+returning up to 20 runs by default (maximum 30). Suggestions are unbound: sharing a
+working directory does not prove that a run produced your artifact. No title or
+body is read by this query. SQLite may use locking sidecars. Choose a file explicitly
+when the bounded index window has no suitable run.
+
+`describe` reads bytes to compute identity without returning transcript text. The
+consented replay returns at most the first 100 requests from one file of at most
+16 MiB; changed bytes or parsing warnings refuse replay. Authored handoffs retain
+the original request, source hash, exact line and recorded outcomes. The new
+instruction is explicit authorship for this handoff, not a detector verdict,
+inferred human REDO or research label. Same-harness refusal and synthetic labels
+remain. These commands prepare private local files; they do not invoke a receiver
+or send a message. Review the full brief before giving it to another process.

@@ -1658,10 +1658,27 @@ def _write_private(path, text):
             os.unlink(temporary)
 
 
+def cmd_selected_context(args):
+    from transcripto_selected import main
+    return main(args)
+
+
 def cmd_handoff(args):
     """Write one cited correction packet for an explicitly named receiver."""
     observation = None
-    if args.findings:
+    if not getattr(args,"source",None) and any(getattr(args,key,None) for key in ("instruction","accept_sha","consent")):
+        print("Authored instruction flags require --source; model findings keep their own admission rule.",file=sys.stderr)
+        return 2
+    if getattr(args, "source", None):
+        if args.findings or args.query or not getattr(args,"consent",False):
+            print("Selected source requires explicit --consent and no query/findings.",file=sys.stderr)
+            return 2
+        from transcripto_selected import authored
+        try: item=authored(args.source,args.accept_sha,args.line,args.instruction)
+        except (OSError,ValueError,TypeError) as exc:
+            print("Cannot prepare authored instruction: "+str(exc),file=sys.stderr)
+            return 2
+    elif args.findings:
         from transcripto_findings import selected
         try:
             report, ep, prior, harness, observation = selected(args.findings, args.line, candidate=True)
@@ -1703,6 +1720,10 @@ def cmd_handoff(args):
         "missing": missing,
         "caveat": "A packet carries an instruction, not proof that the receiver completed it.",
     }
+    if item.get("instruction_origin"):
+        packet["instruction_origin"]=item["instruction_origin"]
+        packet["source_request"]=item["previous_request"]
+        packet["citation"]["source_sha256"]=item["source_sha256"]
     if observation:
         packet["detector_observation"] = observation
         packet["citation"]["source_sha256"] = observation["source_sha256"]
@@ -1711,7 +1732,7 @@ def cmd_handoff(args):
     if args.findings and os.path.realpath(output) == os.path.realpath(args.findings):
         print("Handoff must not overwrite its findings report.", file=sys.stderr)
         return 2
-    if os.path.realpath(output) == os.path.realpath(item["source"]):
+    if os.path.realpath(output) == os.path.realpath(item["source"]) or (os.path.exists(output) and os.path.samefile(output,item["source"])):
         print("Handoff output must not overwrite the source transcript.", file=sys.stderr)
         return 2
     _write_private(output, json.dumps(packet, indent=2) + "\n")
@@ -1776,6 +1797,9 @@ def _packet_error(packet):
         return "Handoff packet must be a JSON object."
     if packet.get("schema") != "transcripto.handoff/1":
         return "Unsupported handoff schema."
+    if packet.get("instruction_origin") is not None:
+        if packet["instruction_origin"] != "explicitly authored instruction; not a detector verdict or research label" or not isinstance(packet.get("source_request"),str) or not packet["source_request"].strip():
+            return "Invalid authored instruction provenance."
     observation = packet.get("detector_observation")
     if observation is not None and not isinstance(observation, dict):
         return "Detector observation must be an object."
@@ -1834,7 +1858,7 @@ def cmd_receive_handoff(args):
     if citation.get("source") and os.path.realpath(output) == os.path.realpath(citation["source"]):
         print("Receiver brief must not overwrite source transcript.", file=sys.stderr)
         return 2
-    evidence = _source_evidence_state(citation, correction)
+    evidence = _source_evidence_state(citation, packet.get("source_request") if packet.get("instruction_origin") else correction)
     state, open_cmd = evidence["state"], evidence["open"]
     # Outcomes come from the live source only when it still holds this exact
     # request. Otherwise the packet's own record is shown, labelled provisional.
@@ -1895,6 +1919,8 @@ def cmd_receive_handoff(args):
            "".join("- %s\n" % core.safe_text(item) for item in remaining)
            or "- task correctness verification\n")
     )
+    if packet.get("instruction_origin"):
+        brief += "\nInstruction provenance: explicitly authored for this handoff; not a detector verdict, inferred human REDO or research label.\n"
     observation = packet.get("detector_observation")
     if observation:
         brief += "\nDetector observation (historical model suggestion, not a human label):\n" + json.dumps(observation, indent=2) + "\n"
@@ -2527,10 +2553,23 @@ def main():
     s = sub.add_parser("changes", help="show cited disagreement and correction sequences")
     s.add_argument("-n", "--limit", type=int, default=10)
     s.set_defaults(fn=cmd_changes)
+    s = sub.add_parser("selected-context", help="bounded local run metadata and consented selected replay; no refresh or model")
+    s.add_argument("mode",choices=["runs","describe","episodes"])
+    s.add_argument("--index",default=DB,help="existing local index, read-only")
+    s.add_argument("--cwd",help="exact existing repository directory")
+    s.add_argument("--source",help="explicit local session file")
+    s.add_argument("--limit",type=int,default=20)
+    s.add_argument("--accept-sha",help="source SHA256 shown before consent")
+    s.add_argument("--consent",action="store_true",help="allow reading selected session locally")
+    s.set_defaults(fn=cmd_selected_context)
     s = sub.add_parser("handoff", help="write a cited correction packet")
     s.add_argument("query", nargs="?", help="words from the correction to hand off")
     s.add_argument("--findings", help="recorded selected-session Jev report")
-    s.add_argument("--line", type=int, help="exact model candidate source line")
+    s.add_argument("--line", type=int, help="exact selected request source line")
+    s.add_argument("--source",help="explicit session for an authored instruction, no model report required")
+    s.add_argument("--accept-sha",help="source hash shown before local-view consent")
+    s.add_argument("--instruction",help="explicitly authored correction; not a detector verdict")
+    s.add_argument("--consent",action="store_true",help="allow selected replay in the private packet")
     s.add_argument("--to-harness", required=True, choices=["claude", "codex", "cursor"])
     s.add_argument("--output", required=True, help="receiver inbox JSON path")
     s.set_defaults(fn=cmd_handoff)

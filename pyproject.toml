@@ -28,4 +28,4 @@ Source = "https://github.com/Morkeeth/transcripto"
 transcripto = "transcripto:main"
 
 [tool.setuptools]
-py-modules = ["transcripto", "transcripto_core", "transcripto_replay", "transcripto_jev", "transcripto_findings"]
+py-modules = ["transcripto", "transcripto_core", "transcripto_replay", "transcripto_jev", "transcripto_findings", "transcripto_selected"]
