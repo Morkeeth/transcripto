@@ -35,3 +35,6 @@ jobs:
       - name: Installed Jev privacy preview stays counts-only and offline
         working-directory: /tmp
         run: python "$GITHUB_WORKSPACE/tests/check_packaged_jev_preview.py" "$(command -v transcripto)"
+      - name: Installed selected findings journey (fake transport, no network)
+        working-directory: /tmp
+        run: python "$GITHUB_WORKSPACE/tests/check_packaged_jev_findings.py" "$(command -v transcripto)"

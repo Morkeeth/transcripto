@@ -1556,6 +1556,35 @@ def _print_jev_line(r):
               "reported spend is an incomplete subtotal.")
 
 
+def cmd_jev_findings(args):
+    from transcripto_findings import observe
+    from transcripto_jev import JevError
+    if args.detector != "jev" or args.jev_fallback_regex:
+        print("jev-findings requires explicit --detector jev; regex fallback is not a recorded model observation.", file=sys.stderr)
+        return 2
+    source = _resolve_run(args.target, _coach_roots(args.root, args.harness), args.harness)
+    if not source:
+        print("Selected session not found.", file=sys.stderr)
+        return 2
+    if args.output and os.path.realpath(args.output) == os.path.realpath(source):
+        print("Output must not overwrite the source transcript.", file=sys.stderr)
+        return 2
+    try:
+        report = observe(source, _jev_detector(args))
+        if args.output and not args.jev_dry_run:
+            for finding in report["findings"]:
+                finding["replay"] = "transcripto replay --findings %s --line %d" % (shlex.quote(os.path.abspath(os.path.expanduser(args.output))), finding["line"])
+        if args.output:
+            _write_private(os.path.expanduser(args.output), json.dumps(report, indent=2) + "\n")
+        print(json.dumps(report, indent=2))
+        if args.output and not args.jev_dry_run:
+            print("Inspect: transcripto replay --findings %s --line LINE\nPrepare: transcripto handoff --findings %s --line LINE --to-harness codex --output /your/local/packet.json" % (shlex.quote(args.output), shlex.quote(args.output)), file=sys.stderr)
+    except (OSError, ValueError, JevError) as exc:
+        print("Cannot inspect selected session: " + str(exc), file=sys.stderr)
+        return 2
+    return 0
+
+
 def _change_records(roots, harness=None):
     """Return correction episodes with the request they revise and recorded follow-up."""
     found = []
@@ -1631,13 +1660,27 @@ def _write_private(path, text):
 
 def cmd_handoff(args):
     """Write one cited correction packet for an explicitly named receiver."""
-    matches = [item for item in _change_records(_coach_roots(args.root, args.harness),
-                                                 args.harness)
-               if args.query.lower() in item["correction"].lower()]
-    if not matches:
-        print("No correction-shaped request matches '%s'." % args.query, file=sys.stderr)
-        return 2
-    item = matches[0]
+    observation = None
+    if args.findings:
+        from transcripto_findings import selected
+        try:
+            report, ep, prior, harness, observation = selected(args.findings, args.line, candidate=True)
+        except (OSError, ValueError, TypeError) as exc:
+            print("Cannot hand off selected finding: " + str(exc), file=sys.stderr)
+            return 2
+        item = {"harness": harness, "source": report["source"], "line": ep["line"],
+                "correction": ep["prompt"], "previous_request": prior["prompt"] if prior else None,
+                "synthetic": report.get("synthetic") is True, "events": ep["events"]}
+    else:
+        if not args.query or args.line is not None:
+            print("Use a correction query, or --findings REPORT --line LINE.", file=sys.stderr)
+            return 2
+        matches = [item for item in _change_records(_coach_roots(args.root, args.harness), args.harness)
+                   if args.query.lower() in item["correction"].lower()]
+        if not matches:
+            print("No correction-shaped request matches '%s'." % args.query, file=sys.stderr)
+            return 2
+        item = matches[0]
     if item["harness"] == args.to_harness:
         print("Choose a receiver harness different from the source harness (%s)."
               % item["harness"], file=sys.stderr)
@@ -1660,7 +1703,14 @@ def cmd_handoff(args):
         "missing": missing,
         "caveat": "A packet carries an instruction, not proof that the receiver completed it.",
     }
+    if observation:
+        packet["detector_observation"] = observation
+        packet["citation"]["source_sha256"] = observation["source_sha256"]
+        packet["missing"].insert(0, "human confirmation of the model suggestion")
     output = os.path.expanduser(args.output)
+    if args.findings and os.path.realpath(output) == os.path.realpath(args.findings):
+        print("Handoff must not overwrite its findings report.", file=sys.stderr)
+        return 2
     if os.path.realpath(output) == os.path.realpath(item["source"]):
         print("Handoff output must not overwrite the source transcript.", file=sys.stderr)
         return 2
@@ -1693,6 +1743,15 @@ def _source_evidence_state(citation, correction):
     if not os.path.isfile(path):
         result["state"] = "missing"
         return result
+    expected_hash = citation.get("source_sha256")
+    if expected_hash:
+        from transcripto_findings import file_hash
+        try:
+            if file_hash(path) != expected_hash:
+                return result
+        except OSError:
+            result["state"] = "unreadable"
+            return result
     diagnostics = []
     rows, _harness = core.read_session(path, diagnostics)
     if diagnostics and not rows:
@@ -1700,6 +1759,8 @@ def _source_evidence_state(citation, correction):
         return result
     match = next((ep for ep in core.episodes(rows, path) if ep["line"] == line), None)
     if match is None or _normal(match["prompt"]) != _normal(correction):
+        return result
+    if expected_hash and file_hash(path) != expected_hash:
         return result
     result["state"] = "available"
     result["synthetic"] = match["synthetic"]
@@ -1715,6 +1776,9 @@ def _packet_error(packet):
         return "Handoff packet must be a JSON object."
     if packet.get("schema") != "transcripto.handoff/1":
         return "Unsupported handoff schema."
+    observation = packet.get("detector_observation")
+    if observation is not None and not isinstance(observation, dict):
+        return "Detector observation must be an object."
     citation = packet.get("citation")
     if citation is not None and not isinstance(citation, dict):
         return "Handoff citation must be an object."
@@ -1767,6 +1831,9 @@ def cmd_receive_handoff(args):
     if "receiver acknowledgement" not in remaining:
         remaining.append("receiver acknowledgement")
     citation = packet.get("citation") or {}
+    if citation.get("source") and os.path.realpath(output) == os.path.realpath(citation["source"]):
+        print("Receiver brief must not overwrite source transcript.", file=sys.stderr)
+        return 2
     evidence = _source_evidence_state(citation, correction)
     state, open_cmd = evidence["state"], evidence["open"]
     # Outcomes come from the live source only when it still holds this exact
@@ -1828,6 +1895,11 @@ def cmd_receive_handoff(args):
            "".join("- %s\n" % core.safe_text(item) for item in remaining)
            or "- task correctness verification\n")
     )
+    observation = packet.get("detector_observation")
+    if observation:
+        brief += "\nDetector observation (historical model suggestion, not a human label):\n" + json.dumps(observation, indent=2) + "\n"
+        if observation.get("fixture"):
+            brief += "TEST FIXTURE transport; no real model observation.\n"
     _write_private(output, brief)
     print("Prepared receiver brief: " + output)
     if open_cmd:
@@ -2385,6 +2457,7 @@ def export_run(path, detector=None):
     }
     if detector is not None:
         out.update(_jev_score(detector, [t for t, _ in _typed_turns(rows)]))
+        out["proxy"] = out["proxy"].replace("correction_rate is a lexical estimate", "correction_rate is a Jev model estimate over scored turns, not a human correction label")
     return out
 
 
@@ -2455,7 +2528,9 @@ def main():
     s.add_argument("-n", "--limit", type=int, default=10)
     s.set_defaults(fn=cmd_changes)
     s = sub.add_parser("handoff", help="write a cited correction packet")
-    s.add_argument("query", help="words from the correction to hand off")
+    s.add_argument("query", nargs="?", help="words from the correction to hand off")
+    s.add_argument("--findings", help="recorded selected-session Jev report")
+    s.add_argument("--line", type=int, help="exact model candidate source line")
     s.add_argument("--to-harness", required=True, choices=["claude", "codex", "cursor"])
     s.add_argument("--output", required=True, help="receiver inbox JSON path")
     s.set_defaults(fn=cmd_handoff)
@@ -2483,6 +2558,11 @@ def main():
     s.add_argument("--json", action="store_true", help="machine-readable, for other tools")
     _add_detector_args(s)
     s.set_defaults(fn=cmd_coach)
+    s = sub.add_parser("jev-findings", help="inspect one selected session with explicit Jev opt-in; reference-only report")
+    s.add_argument("target", help="explicit session path, ID or latest")
+    s.add_argument("--output", help="private local findings report for replay/handoff")
+    _add_detector_args(s)
+    s.set_defaults(fn=cmd_jev_findings)
     s = sub.add_parser("export-run")
     s.add_argument("target", help="a session id (or a prefix of one), 'latest', or a "
                                   "path to a .jsonl transcript")
@@ -2493,6 +2573,7 @@ def main():
     s.set_defaults(fn=cmd_export_run)
     s = sub.add_parser("replay", help="replay requests and their recorded tool results")
     s.add_argument("target", nargs="?", default="latest", help="latest, a transcript path, or words from a request")
+    s.add_argument("--findings", help="reopen an exact line from a source-bound Jev findings report")
     s.add_argument("--session", help="explicit session ID or an unambiguous filename prefix")
     selection = s.add_mutually_exclusive_group()
     selection.add_argument("--episode", type=int, help="request number within the session")
@@ -2514,7 +2595,7 @@ def main():
     a = p.parse_args(["replay"] if len(sys.argv) == 1 else None)
     if getattr(a, "events", 1) < 1 or getattr(a, "limit", 1) < 1 or (getattr(a, "episode", None) is not None and a.episode < 1):
         p.error("episode, events, and limit must be positive")
-    if getattr(a, "line", None) is not None and (a.line < 1 or a.target == "latest" or getattr(a, "session", None) or a.demo):
+    if a.cmd == "replay" and getattr(a, "line", None) is not None and (a.line < 1 or (a.target == "latest" and not a.findings) or getattr(a, "session", None) or a.demo):
         p.error("--line requires a positive line number and an explicit transcript path")
     if getattr(a, "session", None) and a.target != "latest":
         p.error("use either a positional query/path or --session")

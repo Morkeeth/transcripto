@@ -370,3 +370,49 @@ index permissions, incremental search, and cross-harness retrieval.
 
 MIT. Open an issue with the **record shape** that fails, or a synthetic
 reproduction. Your real prompt text is not needed.
+
+### Inspect one session's Jev findings, then carry one candidate
+
+This source candidate adds a selected-session path; it is not part of the pinned
+PyPI 0.2.1 release above. Build/install this checkout before using these commands.
+Preview remains counts-only, offline and keyless:
+
+```sh
+transcripto jev-findings /path/session.jsonl --detector jev --jev-dry-run
+```
+
+Only when you choose to send that session's privacy-filtered typed turns:
+
+```sh
+transcripto jev-findings /path/session.jsonl --detector jev \
+  --jev-max-usd 0.05 --output /your/private/findings.json
+```
+
+The local report contains references, source/request hashes, exact lines,
+probabilities, threshold, model metadata and observation time, without transcript
+text. It marks candidate, not-candidate, excluded and unknown separately. Each
+row prints its exact replay command. A candidate is a recorded model suggestion,
+not a confirmed human correction. The serving-model hint is not a per-turn
+model guarantee. The cap and provider/privacy limits above still apply.
+
+After inspecting a candidate's request and recorded work, select its exact line:
+
+```sh
+transcripto replay --findings /your/private/findings.json --line 3
+transcripto handoff --findings /your/private/findings.json --line 3 \
+  --to-harness codex --output /your/private/candidate.json
+transcripto receive-handoff /your/private/candidate.json --as-harness codex \
+  --output /your/private/receiver-brief.md
+```
+
+Use the actual line shown by your report and choose a receiver different from
+the source harness. Replay and handoff refuse a changed source, including changed
+follow-up records around an unchanged request. Excluded, unknown and negative
+findings cannot become candidate handoffs. A previously prepared packet whose
+source changes remains historical; its receiver brief marks outcomes provisional.
+
+The packet and receiver brief are private local files and contain selected
+transcript text. They retain detector provenance, synthetic/test labels, and
+pending human confirmation and receiver acknowledgement. They do not invoke an
+agent or send a message. Reports, packets and briefs use mode `0600`; inspect
+before sharing. `replay --share` remains counts-only.

@@ -31,7 +31,7 @@ def main():
                    "corrections", "correction_rate", "correction_rate_denominator", "jev"}
         for key in ("", "unused-offline-sentinel"):
             env = dict(os.environ, PYTHONPATH=str(guard), OPENROUTER_API_KEY=key)
-            for command in (["coach", "--json"], ["export-run", "latest"]):
+            for command in (["coach", "--json"], ["export-run", "latest"], ["jev-findings", str(corpus / "session.jsonl")]):
                 result = subprocess.run([executable] + command + ["--root", str(corpus),
                     "--detector", "jev", "--jev-dry-run"], cwd=tmp, env=env,
                     text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
