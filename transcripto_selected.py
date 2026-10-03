@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import sqlite3
 import time
+import uuid
 import transcripto_core as core
 
 LIMIT = 16 * 1024 * 1024
@@ -41,6 +42,31 @@ def runs(index, cwd, limit=20):
     finally:
         con.close()
 
+def source_session(source, accepted):
+    """Identity only from the exact consented bytes; never filename/index fallbacks."""
+    data = Path(source).read_bytes()
+    if hashlib.sha256(data).hexdigest() != accepted:
+        raise ValueError('Selected source changed.')
+    identities = set()
+    messages = 0
+    try:
+        for line in data.decode('utf-8').splitlines():
+            if not line.strip(): continue
+            row = json.loads(line)
+            if not isinstance(row, dict): raise ValueError('Ambiguous source identity.')
+            if row.get('type') in ('session_meta', 'response_item') or 'role' in row or 'session_id' in row:
+                raise ValueError('New Claude session requires an unmixed Claude source.')
+            if 'sessionId' in row:
+                identities.add(str(uuid.UUID(row['sessionId'])))
+            if row.get('type') in ('user', 'assistant'):
+                messages += 1
+                if not row.get('sessionId'): raise ValueError('Source message has no explicit session identity.')
+        if not messages or len(identities) != 1:
+            raise ValueError('Source session identity is absent or mixed.')
+    except (TypeError, AttributeError, UnicodeError) as exc:
+        raise ValueError('Invalid source session identity.') from exc
+    return {'harness':'claude', 'session_id':next(iter(identities)), 'basis':'exact consented source bytes; local unsigned record'}
+
 def episodes(source, accepted):
     ref = describe(source)
     if ref['sha256'] != accepted:
@@ -50,8 +76,10 @@ def episodes(source, accepted):
     if diagnostics or describe(ref['path']) != ref:
         raise ValueError('Source changed or has parsing warnings; no selected replay.')
     eps = core.episodes(rows, ref['path'])
+    try: identity = source_session(ref['path'], accepted); identity_reason = None
+    except ValueError as exc: identity = None; identity_reason = str(exc)
     return {'schema':'transcripto.selected-episodes/1', 'source':ref,
-            'harness':harness, 'episodes':[{'line':ep['line'], 'request':ep['prompt'],
+            'harness':harness, 'source_session':identity, 'source_session_reason':identity_reason, 'episodes':[{'line':ep['line'], 'request':ep['prompt'],
               'events':ep['events'], 'synthetic':ep['synthetic']} for ep in eps[:100]],
             'truncated':len(eps)>100, 'notice':'Selected local replay only. Tool results are not task correctness. Request authorship follows source provenance, not independent identity verification.'}
 
@@ -75,9 +103,12 @@ def main(args):
     try:
         if args.mode == 'runs': value=runs(args.index, args.cwd, args.limit)
         elif args.mode == 'describe': value={'schema':'transcripto.selected-source/1','source':describe(args.source), 'notice':'File identity only. Confirm local viewing before reading requests or results.'}
-        elif args.mode == 'episodes':
+        elif args.mode in ('episodes', 'authored-continuation'):
             if not args.consent: raise ValueError('Explicit --consent is required to read this session locally.')
             value=episodes(args.source,args.accept_sha)
+            if args.mode == 'authored-continuation':
+                identity=source_session(args.source,args.accept_sha)
+                value={'schema':'transcripto.authored-continuation/1','mode':'authored-new-session','source_session':identity, **authored(args.source,args.accept_sha,args.line,args.instruction)}
         else: raise ValueError('Unknown selected context action.')
         print(json.dumps(value,ensure_ascii=False))
         return 0

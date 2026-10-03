@@ -47,4 +47,16 @@ class SelectedContext(unittest.TestCase):
         self.assertEqual(self.cli('handoff','--source',self.source,'--accept-sha',self.sha,'--line',2,'--instruction','Fix it','--consent','--to-harness','claude','--output',self.root/'drift.json')[0],2)
         self.assertFalse((self.root/'drift.json').exists())
 
+    def test_authored_new_session_is_distinct_and_identity_is_byte_derived(self):
+        row={'type':'user','promptSource':'typed','sessionId':'AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE','transcripto_synthetic':True,'message':{'role':'user','content':'Repair the label.'}}
+        self.source.write_text(json.dumps(row)+'\n');sha=selected.describe(self.source)['sha256']
+        args=['selected-context','authored-continuation','--source',self.source,'--accept-sha',sha,'--line',1,'--instruction','Add the label.']
+        self.assertEqual(self.cli(*args)[0],2)
+        code,text,err=self.cli(*args,'--consent');self.assertEqual(code,0,err)
+        self.assertEqual(json.loads(text)['source_session']['session_id'],'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee')
+        self.assertEqual(self.cli('handoff','--source',self.source,'--accept-sha',sha,'--line',1,'--instruction','Add label','--consent','--to-harness','claude','--output',self.root/'same.json')[0],2)
+        for extra in [{'type':'assistant','message':{'role':'assistant','content':'missing id'}},dict(row,sessionId='11111111-2222-4333-8444-555555555555'),{'type':'session_meta','payload':{'id':'foreign'}}]:
+            self.source.write_text(json.dumps(row)+'\n'+json.dumps(extra)+'\n');current=selected.describe(self.source)['sha256']
+            self.assertRaises(ValueError,selected.source_session,self.source,current)
+
 if __name__=='__main__':unittest.main()

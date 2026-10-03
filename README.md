@@ -450,3 +450,22 @@ instruction is explicit authorship for this handoff, not a detector verdict,
 inferred human REDO or research label. Same-harness refusal and synthetic labels
 remain. These commands prepare private local files; they do not invoke a receiver
 or send a message. Review the full brief before giving it to another process.
+
+### Explicit authored continuation
+
+`handoff` still requires a different receiver harness. For a separately chosen new
+Claude session, the local producer can describe exactly one authored instruction:
+
+```sh
+transcripto selected-context describe --source /path/to/session.jsonl
+transcripto selected-context authored-continuation \
+  --source /path/to/session.jsonl --accept-sha SHA256_FROM_DESCRIBE \
+  --line 1 --instruction 'Add the missing label.' --consent
+```
+
+This returns a typed local selection, not a handoff exception, detector verdict or
+receiver invocation. Its source session UUID is derived from the consented bytes;
+absent, malformed or mixed identities refuse. No filename/index fallback is used.
+ZUP's separate new-session confirmation binds a fresh receiver UUID and actual
+launch contract. New-session work is same-harness authored work, not independent
+judgement or measured model improvement. Only explicitly selected context is carried.
