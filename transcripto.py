@@ -1519,6 +1519,16 @@ def _jev_score(detector, texts):
     }
 
 
+def _jev_preview_report(detector, texts, harness, files=1, records=None):
+    """Counts-only boundary for the full command, not just detector metadata."""
+    out = {"schema": "transcripto.jev-privacy-preview/1", "harness": harness,
+           "files": files}
+    if records is not None:
+        out["total_records"] = records
+    out.update(_jev_score(detector, texts))
+    return out
+
+
 def _print_jev_line(r):
     j = r["jev"]
     if j.get("dry_run"):
@@ -2125,7 +2135,12 @@ def coach(roots=None, harness=None, verified_human=False, detector=None):
         corrections += corr
         if detector is not None:
             typed_texts.extend(t for t, _ in _typed_turns(rows, pasted))
-        episodes += extract_episodes(rows, source=p, pasted=pasted)
+        if not getattr(detector, "dry_run", False):
+            episodes += extract_episodes(rows, source=p, pasted=pasted)
+
+    if getattr(detector, "dry_run", False):
+        resolved = harness or (next(iter(harnesses)) if len(harnesses) == 1 else "mixed" if harnesses else "auto")
+        return _jev_preview_report(detector, typed_texts, resolved, len(paths), records)
 
     patterns = rank_patterns(episodes)
     indistinct = [p for p in patterns if p["rankable"]]
@@ -2179,9 +2194,10 @@ def cmd_coach(args):
               verified_human=args.verified_human, detector=_jev_detector(args))
     if args.json:
         print(json.dumps(r, indent=2)); return
+    if r.get("jev", {}).get("dry_run"):
+        _print_jev_line(r)
+        return
     if not r["episodes"]:
-        if r.get("jev", {}).get("dry_run"):
-            _print_jev_line(r)
         print("No prompt episodes found. Looked in: " + ", ".join(_coach_roots(args.root, args.harness)))
         print("Try transcripto replay --demo, --harness codex, --harness cursor, or --root <dir>.")
         return
@@ -2328,6 +2344,8 @@ def export_run(path, detector=None):
     """The run-level numbers of one transcript file, as a JSON-ready dict.
     detector: None (the local regex) or a JevDetector, see _jev_detector()."""
     rows, harness = _rows_for_file(path)
+    if getattr(detector, "dry_run", False):
+        return _jev_preview_report(detector, [t for t, _ in _typed_turns(rows)], harness, records=len(rows))
     sid = next((r.get("sessionId") for r in rows if r.get("sessionId")), "") \
         or os.path.splitext(os.path.basename(path))[0]
     cwd = next((r.get("cwd") for r in reversed(rows) if r.get("cwd")), "")

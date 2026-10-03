@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep the complete Jev dry-run CLI output counts-only, including installed wheels; omit coach episode text and export source details.
+
 - `--detector jev --jev-dry-run` previews privacy eligibility and exclusion counts
   in `coach` and `export-run`, without a key, network calls, or correction verdicts.
 

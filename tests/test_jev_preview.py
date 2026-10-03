@@ -5,6 +5,7 @@ import json
 import os
 import socket
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -46,6 +47,25 @@ class PreviewTests(unittest.TestCase):
                 self.assertEqual(result["jev"]["sent"], 0)
                 self.assertEqual(result["jev"]["requests"], 0)
                 self.assertIsNone(result["correction_rate"])
+
+    def test_full_cli_preview_never_returns_episode_or_export_details(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = Path(temp) / "session.jsonl"
+            source.write_text("".join(json.dumps(row) + "\n" for row in json.loads((ROOT / "fixtures" / "jev-preview-episode.json").read_text())))
+            for command in (["coach", "--json"], ["export-run", "latest"]):
+                out = io.StringIO()
+                argv = ["transcripto"] + command + ["--root", temp, "--detector", "jev", "--jev-dry-run"]
+                with mock.patch.object(sys, "argv", argv), mock.patch.object(socket, "socket", side_effect=AssertionError("network")), mock.patch.object(transcripto, "_reflog_commits", side_effect=AssertionError("reflog")), mock.patch.object(transcripto, "extract_episodes", side_effect=AssertionError("episodes")), mock.patch.object(transcripto, "_codex_history_overlap", side_effect=AssertionError("history")), contextlib.redirect_stdout(out):
+                    transcripto.main()
+                result = json.loads(out.getvalue())
+                self.assertNotIn("failed_request", result)
+                self.assertNotIn("transcript", result)
+                self.assertNotIn("commits", result)
+                self.assertEqual(result["schema"], "transcripto.jev-privacy-preview/1")
+                self.assertEqual(result["jev"]["turns"], 1)
+                self.assertNotIn("private-preview", out.getvalue())
+                self.assertNotIn("synthetic-private-tool-output", out.getvalue())
+                self.assertNotIn(temp, out.getvalue())
 
     def test_requires_explicit_detector(self):
         with mock.patch.object(sys, "argv", ["transcripto", "coach", "--jev-dry-run"]), \

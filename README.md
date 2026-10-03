@@ -299,6 +299,12 @@ transcripto export-run latest --detector jev --jev-dry-run
 ```
 
 This needs no API key and makes no requests, even with a key in the environment.
+Both commands return the dedicated `transcripto.jev-privacy-preview/1` JSON
+schema in dry-run mode (`coach` needs `--json`). The `jev` count block and null
+correction fields stay available to existing count consumers. Ordinary coach
+episodes and export session, file, tool and commit details are omitted; dry runs
+do not inspect the project reflog or build an episode report.
+
 It reports eligible turns, exclusions by reason, and redaction counts. It does
 not print turn text, estimate cost, or produce correction verdicts. Eligibility
 means the current filter permits a turn; it is not a guarantee that the text

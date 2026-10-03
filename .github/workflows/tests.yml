@@ -32,3 +32,6 @@ jobs:
         run: |
           transcripto --version
           transcripto replay --demo --json | python -c 'import json,sys; r=json.load(sys.stdin); assert r["synthetic"] and r["episodes"][0]["events"][0]["status"] == "failed"'
+      - name: Installed Jev privacy preview stays counts-only and offline
+        working-directory: /tmp
+        run: python "$GITHUB_WORKSPACE/tests/check_packaged_jev_preview.py" "$(command -v transcripto)"
