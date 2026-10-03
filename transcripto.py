@@ -1422,29 +1422,167 @@ def is_correction(text, prev_agent="", version=None):
     return bool(_V1_RE.search(_v1_head(text)))
 
 
-def count_corrections(rows, pasted=None, version=None):
-    """(typed_turns, corrections) over one transcript, walked in order so each
-    typed turn is classified against the agent turn it answers. Same gate and
-    same paste subtraction as the episode grader, so the denominator returned
-    here IS the `typed by you` count coach prints."""
+def _typed_turns(rows, pasted=None):
+    """Yield (typed_text, prev_agent) over one transcript, in order. Same gate
+    and same paste subtraction as the episode grader. prev_agent is only
+    rendered when the NUDGE rule could use it (a short turn)."""
     pasted = pasted or set()
-    typed = corrections = 0
     agent = []                       # assistant records since the last typed turn
     for row in rows:
         t = _human_prompt(row)
         if t:
             if t in pasted:
                 continue             # an echo of agent output, not a turn of yours
-            typed += 1
             prev = ""
             if agent and len(t.split()) < _CORRECTION_SHORT:
                 prev = "\n".join(extract(r)[1] for r in agent)
-            if is_correction(t, prev, version=version):
-                corrections += 1
+            yield t, prev
             agent = []
         elif row.get("type") == "assistant":
             agent.append(row)
+
+
+def count_corrections(rows, pasted=None, version=None):
+    """(typed_turns, corrections) over one transcript, walked in order so each
+    typed turn is classified against the agent turn it answers. Same gate and
+    same paste subtraction as the episode grader, so the denominator returned
+    here IS the `typed by you` count coach prints."""
+    typed = corrections = 0
+    for t, prev in _typed_turns(rows, pasted):
+        typed += 1
+        if is_correction(t, prev, version=version):
+            corrections += 1
     return typed, corrections
+
+
+# ---------------------------------------------------------------------------
+# --detector jev: the opt-in network detector (transcripto_jev.py)
+# ---------------------------------------------------------------------------
+# The default above is local and offline. Jev is used only when a run passes
+# --detector jev; nothing in the environment or a config file can select it.
+# The module is imported here, on that path only, so the default path never
+# loads urllib's network code or opens a socket.
+
+def _jev_detector(args):
+    """A JevDetector for this run, or None when the user asked to fall back to
+    the regex because no key is set. Exits 2 with a clear message otherwise."""
+    if getattr(args, "detector", "regex") != "jev":
+        return None
+    if getattr(args, "jev_dry_run", False):
+        import transcripto_jev
+        return transcripto_jev.JevPreview()
+    key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    if not key:
+        if getattr(args, "jev_fallback_regex", False):
+            sys.stderr.write("transcripto: OPENROUTER_API_KEY is not set; "
+                             "--jev-fallback-regex given, using the local regex. "
+                             "Nothing was sent.\n")
+            return None
+        sys.stderr.write("transcripto: --detector jev needs OPENROUTER_API_KEY in the "
+                         "environment. Nothing was sent. Set the key, drop the flag, or "
+                         "add --jev-fallback-regex to use the local regex instead.\n")
+        sys.exit(2)
+    import transcripto_jev
+    return transcripto_jev.JevDetector(key, threshold=args.jev_threshold,
+                                       batch=args.jev_batch, max_usd=args.jev_max_usd)
+
+
+def _jev_score(detector, texts):
+    """Run the detector over typed turns. Returns the keys coach and export-run
+    add to their JSON. correction_rate's denominator is the SCORED turns: turns
+    the privacy filter excluded or whose request failed have no verdict and are
+    not counted either way."""
+    import transcripto_jev
+    try:
+        verdicts = detector.score(texts)
+    except transcripto_jev.JevAuthError as e:
+        sys.stderr.write("transcripto: %s Stopped; no verdicts.\n" % e)
+        sys.exit(2)
+    if getattr(detector, "dry_run", False):
+        return {"correction_detector": "jev", "corrections": None,
+                "correction_rate": None, "correction_rate_denominator": None,
+                "jev": detector.stats}
+    scored = [(t, v) for t, v in zip(texts, verdicts) if v is not None]
+    corr = sum(1 for _, v in scored if v)
+    st = detector.stats
+    if st.get("auth_error"):
+        sys.stderr.write("transcripto: %s Stopped part way: %d turns scored, %d failed, "
+                         "%d not sent. The rate below covers the scored turns only.\n" % (
+                             st["auth_error"], st["scored"], st["errors"], st["auth_unsent"]))
+    return {
+        "correction_detector": "jev",
+        "corrections": corr,
+        "correction_rate": round(corr / len(scored), 3) if scored else None,
+        "correction_rate_denominator": "jev.scored",
+        "regex_corrections_on_scored": sum(1 for t, _ in scored if is_correction(t)),
+        "jev": st,
+    }
+
+
+def _jev_preview_report(detector, texts, harness, files=1, records=None):
+    """Counts-only boundary for the full command, not just detector metadata."""
+    out = {"schema": "transcripto.jev-privacy-preview/1", "harness": harness,
+           "files": files}
+    if records is not None:
+        out["total_records"] = records
+    out.update(_jev_score(detector, texts))
+    return out
+
+
+def _print_jev_line(r):
+    j = r["jev"]
+    if j.get("dry_run"):
+        print("Jev privacy preview: %d of %d typed turns eligible; %d excluded; "
+              "%d spans would be redacted (max %d chars per turn)." % (
+                  j["eligible"], j["turns"], j["excluded"], j["redactions"],
+                  j["max_chars_per_turn"]))
+        for reason, count in j["excluded_reasons"].items():
+            print("  %s: %d" % (reason, count))
+        print("Nothing sent. No API key needed. No correction verdicts or cost estimate.")
+        return
+    print("Corrections (Jev, P(correction) >= %.2f): %d of %d scored turns (%s). "
+          "The local regex flags %d of the same turns." % (
+              j["threshold"], r["corrections"], j["scored"],
+              "%d%%" % round(r["correction_rate"] * 100) if r["correction_rate"] is not None else "n/a",
+              r["regex_corrections_on_scored"]))
+    print("Unscored: %d excluded by the privacy filter, %d failed requests%s. "
+          "Reported spend $%.4f over %d requests (%s)." % (
+              j["excluded"], j["errors"],
+              (", %d not sent (spend cap)" % j["budget_unsent"] if j["budget_stopped"] else "")
+              + (", %d not sent (key refused)" % j["auth_unsent"] if j.get("auth_error") else ""),
+              j["cost_usd"], j["requests"], j["served_by"] or j["model"]))
+    if j.get("cost_unknown"):
+        print("Some request costs are unknown. No further requests were started; "
+              "reported spend is an incomplete subtotal.")
+
+
+def cmd_jev_findings(args):
+    from transcripto_findings import observe
+    from transcripto_jev import JevError
+    if args.detector != "jev" or args.jev_fallback_regex:
+        print("jev-findings requires explicit --detector jev; regex fallback is not a recorded model observation.", file=sys.stderr)
+        return 2
+    source = _resolve_run(args.target, _coach_roots(args.root, args.harness), args.harness)
+    if not source:
+        print("Selected session not found.", file=sys.stderr)
+        return 2
+    if args.output and os.path.realpath(args.output) == os.path.realpath(source):
+        print("Output must not overwrite the source transcript.", file=sys.stderr)
+        return 2
+    try:
+        report = observe(source, _jev_detector(args))
+        if args.output and not args.jev_dry_run:
+            for finding in report["findings"]:
+                finding["replay"] = "transcripto replay --findings %s --line %d" % (shlex.quote(os.path.abspath(os.path.expanduser(args.output))), finding["line"])
+        if args.output:
+            _write_private(os.path.expanduser(args.output), json.dumps(report, indent=2) + "\n")
+        print(json.dumps(report, indent=2))
+        if args.output and not args.jev_dry_run:
+            print("Inspect: transcripto replay --findings %s --line LINE\nPrepare: transcripto handoff --findings %s --line LINE --to-harness codex --output /your/local/packet.json" % (shlex.quote(args.output), shlex.quote(args.output)), file=sys.stderr)
+    except (OSError, ValueError, JevError) as exc:
+        print("Cannot inspect selected session: " + str(exc), file=sys.stderr)
+        return 2
+    return 0
 
 
 def _change_records(roots, harness=None):
@@ -1520,15 +1658,46 @@ def _write_private(path, text):
             os.unlink(temporary)
 
 
+def cmd_selected_context(args):
+    from transcripto_selected import main
+    return main(args)
+
+
 def cmd_handoff(args):
     """Write one cited correction packet for an explicitly named receiver."""
-    matches = [item for item in _change_records(_coach_roots(args.root, args.harness),
-                                                 args.harness)
-               if args.query.lower() in item["correction"].lower()]
-    if not matches:
-        print("No correction-shaped request matches '%s'." % args.query, file=sys.stderr)
+    observation = None
+    if not getattr(args,"source",None) and any(getattr(args,key,None) for key in ("instruction","accept_sha","consent")):
+        print("Authored instruction flags require --source; model findings keep their own admission rule.",file=sys.stderr)
         return 2
-    item = matches[0]
+    if getattr(args, "source", None):
+        if args.findings or args.query or not getattr(args,"consent",False):
+            print("Selected source requires explicit --consent and no query/findings.",file=sys.stderr)
+            return 2
+        from transcripto_selected import authored
+        try: item=authored(args.source,args.accept_sha,args.line,args.instruction)
+        except (OSError,ValueError,TypeError) as exc:
+            print("Cannot prepare authored instruction: "+str(exc),file=sys.stderr)
+            return 2
+    elif args.findings:
+        from transcripto_findings import selected
+        try:
+            report, ep, prior, harness, observation = selected(args.findings, args.line, candidate=True)
+        except (OSError, ValueError, TypeError) as exc:
+            print("Cannot hand off selected finding: " + str(exc), file=sys.stderr)
+            return 2
+        item = {"harness": harness, "source": report["source"], "line": ep["line"],
+                "correction": ep["prompt"], "previous_request": prior["prompt"] if prior else None,
+                "synthetic": report.get("synthetic") is True, "events": ep["events"]}
+    else:
+        if not args.query or args.line is not None:
+            print("Use a correction query, or --findings REPORT --line LINE.", file=sys.stderr)
+            return 2
+        matches = [item for item in _change_records(_coach_roots(args.root, args.harness), args.harness)
+                   if args.query.lower() in item["correction"].lower()]
+        if not matches:
+            print("No correction-shaped request matches '%s'." % args.query, file=sys.stderr)
+            return 2
+        item = matches[0]
     if item["harness"] == args.to_harness:
         print("Choose a receiver harness different from the source harness (%s)."
               % item["harness"], file=sys.stderr)
@@ -1551,8 +1720,19 @@ def cmd_handoff(args):
         "missing": missing,
         "caveat": "A packet carries an instruction, not proof that the receiver completed it.",
     }
+    if item.get("instruction_origin"):
+        packet["instruction_origin"]=item["instruction_origin"]
+        packet["source_request"]=item["previous_request"]
+        packet["citation"]["source_sha256"]=item["source_sha256"]
+    if observation:
+        packet["detector_observation"] = observation
+        packet["citation"]["source_sha256"] = observation["source_sha256"]
+        packet["missing"].insert(0, "human confirmation of the model suggestion")
     output = os.path.expanduser(args.output)
-    if os.path.realpath(output) == os.path.realpath(item["source"]):
+    if args.findings and os.path.realpath(output) == os.path.realpath(args.findings):
+        print("Handoff must not overwrite its findings report.", file=sys.stderr)
+        return 2
+    if os.path.realpath(output) == os.path.realpath(item["source"]) or (os.path.exists(output) and os.path.samefile(output,item["source"])):
         print("Handoff output must not overwrite the source transcript.", file=sys.stderr)
         return 2
     _write_private(output, json.dumps(packet, indent=2) + "\n")
@@ -1584,6 +1764,15 @@ def _source_evidence_state(citation, correction):
     if not os.path.isfile(path):
         result["state"] = "missing"
         return result
+    expected_hash = citation.get("source_sha256")
+    if expected_hash:
+        from transcripto_findings import file_hash
+        try:
+            if file_hash(path) != expected_hash:
+                return result
+        except OSError:
+            result["state"] = "unreadable"
+            return result
     diagnostics = []
     rows, _harness = core.read_session(path, diagnostics)
     if diagnostics and not rows:
@@ -1591,6 +1780,8 @@ def _source_evidence_state(citation, correction):
         return result
     match = next((ep for ep in core.episodes(rows, path) if ep["line"] == line), None)
     if match is None or _normal(match["prompt"]) != _normal(correction):
+        return result
+    if expected_hash and file_hash(path) != expected_hash:
         return result
     result["state"] = "available"
     result["synthetic"] = match["synthetic"]
@@ -1606,6 +1797,12 @@ def _packet_error(packet):
         return "Handoff packet must be a JSON object."
     if packet.get("schema") != "transcripto.handoff/1":
         return "Unsupported handoff schema."
+    if packet.get("instruction_origin") is not None:
+        if packet["instruction_origin"] != "explicitly authored instruction; not a detector verdict or research label" or not isinstance(packet.get("source_request"),str) or not packet["source_request"].strip():
+            return "Invalid authored instruction provenance."
+    observation = packet.get("detector_observation")
+    if observation is not None and not isinstance(observation, dict):
+        return "Detector observation must be an object."
     citation = packet.get("citation")
     if citation is not None and not isinstance(citation, dict):
         return "Handoff citation must be an object."
@@ -1658,7 +1855,10 @@ def cmd_receive_handoff(args):
     if "receiver acknowledgement" not in remaining:
         remaining.append("receiver acknowledgement")
     citation = packet.get("citation") or {}
-    evidence = _source_evidence_state(citation, correction)
+    if citation.get("source") and os.path.realpath(output) == os.path.realpath(citation["source"]):
+        print("Receiver brief must not overwrite source transcript.", file=sys.stderr)
+        return 2
+    evidence = _source_evidence_state(citation, packet.get("source_request") if packet.get("instruction_origin") else correction)
     state, open_cmd = evidence["state"], evidence["open"]
     # Outcomes come from the live source only when it still holds this exact
     # request. Otherwise the packet's own record is shown, labelled provisional.
@@ -1719,6 +1919,13 @@ def cmd_receive_handoff(args):
            "".join("- %s\n" % core.safe_text(item) for item in remaining)
            or "- task correctness verification\n")
     )
+    if packet.get("instruction_origin"):
+        brief += "\nInstruction provenance: explicitly authored for this handoff; not a detector verdict, inferred human REDO or research label.\n"
+    observation = packet.get("detector_observation")
+    if observation:
+        brief += "\nDetector observation (historical model suggestion, not a human label):\n" + json.dumps(observation, indent=2) + "\n"
+        if observation.get("fixture"):
+            brief += "TEST FIXTURE transport; no real model observation.\n"
     _write_private(output, brief)
     print("Prepared receiver brief: " + output)
     if open_cmd:
@@ -1998,13 +2205,14 @@ def _coach_roots(root=None, harness=None):
     return list(ROOTS)
 
 
-def coach(roots=None, harness=None, verified_human=False):
-    """Describe submitted requests and the execution evidence attached to them."""
+def coach(roots=None, harness=None, verified_human=False, detector=None):
+    """Describe submitted requests and the execution evidence attached to them.
+    detector: None (the local regex) or a JevDetector, see _jev_detector()."""
     if not roots:
         roots = _coach_roots(None, harness)
     paths = _coach_files(roots, harness)
     episodes, records, humans, pastes, corrections = [], 0, 0, 0, 0
-    human_texts, harnesses = [], set()
+    human_texts, harnesses, typed_texts = [], set(), []
     for p in paths:
         rows, fh = _rows_for_file(p)
         rows = [row for row in rows if row.get("transcripto_synthetic") is not True]
@@ -2023,7 +2231,14 @@ def coach(roots=None, harness=None, verified_human=False):
         typed, corr = count_corrections(rows, pasted)   # same gate as the line above
         humans += typed
         corrections += corr
-        episodes += extract_episodes(rows, source=p, pasted=pasted)
+        if detector is not None:
+            typed_texts.extend(t for t, _ in _typed_turns(rows, pasted))
+        if not getattr(detector, "dry_run", False):
+            episodes += extract_episodes(rows, source=p, pasted=pasted)
+
+    if getattr(detector, "dry_run", False):
+        resolved = harness or (next(iter(harnesses)) if len(harnesses) == 1 else "mixed" if harnesses else "auto")
+        return _jev_preview_report(detector, typed_texts, resolved, len(paths), records)
 
     patterns = rank_patterns(episodes)
     indistinct = [p for p in patterns if p["rankable"]]
@@ -2038,7 +2253,7 @@ def coach(roots=None, harness=None, verified_human=False):
     hist_lines, hist_matched = (_codex_history_overlap(roots, human_texts)
                                 if "codex" in harnesses or harness == "codex"
                                 else (0, 0))
-    return {
+    out = {
         "schema": "transcripto.coach/2",
         "harness": resolved,
         "verified_human": verified_human, "pastes_flagged": pastes,
@@ -2066,14 +2281,20 @@ def coach(roots=None, harness=None, verified_human=False):
         "proxy": ("PROXY: a matching tool result reported a successful change. "
                   "Not proof of correctness, durability, or shipping. Unknown outcomes are excluded from habit proportions."),
     }
+    if detector is not None:
+        out.update(_jev_score(detector, typed_texts))
+    return out
 
 
 
 def cmd_coach(args):
     r = coach([args.root] if args.root else None, harness=args.harness,
-              verified_human=args.verified_human)
+              verified_human=args.verified_human, detector=_jev_detector(args))
     if args.json:
         print(json.dumps(r, indent=2)); return
+    if r.get("jev", {}).get("dry_run"):
+        _print_jev_line(r)
+        return
     if not r["episodes"]:
         print("No prompt episodes found. Looked in: " + ", ".join(_coach_roots(args.root, args.harness)))
         print("Try transcripto replay --demo, --harness codex, --harness cursor, or --root <dir>.")
@@ -2090,8 +2311,12 @@ def cmd_coach(args):
     print("Change attempts with known outcomes only. These overlapping groups are descriptive, not instructions.")
     for p in r["indistinct_patterns"]:
         print("  %3d%% (%d/%d) %s" % (round(p["survival_rate"] * 100), p["survived"], p["n"], p["pattern"]))
-    print("\nCorrection markers: %d of %d turns (%d%%). A lexical estimate, with false positives and misses." % (
-        r["corrections"], r["human_turns"], round(r["correction_rate"] * 100)))
+    if r.get("correction_detector") == "jev":
+        print()
+        _print_jev_line(r)
+    else:
+        print("\nCorrection markers: %d of %d turns (%d%%). A lexical estimate, with false positives and misses." % (
+            r["corrections"], r["human_turns"], round(r["correction_rate"] * 100)))
     if r["history_lines"]:
         print("Codex history overlap: %d/%d checkable entries." % (r["history_matched"], r["history_lines"]))
     if r["verified_human"]:
@@ -2213,9 +2438,12 @@ def _resolve_run(target, roots, harness):
     return max(hits, key=os.path.getmtime) if hits else None
 
 
-def export_run(path):
-    """The run-level numbers of one transcript file, as a JSON-ready dict."""
+def export_run(path, detector=None):
+    """The run-level numbers of one transcript file, as a JSON-ready dict.
+    detector: None (the local regex) or a JevDetector, see _jev_detector()."""
     rows, harness = _rows_for_file(path)
+    if getattr(detector, "dry_run", False):
+        return _jev_preview_report(detector, [t for t, _ in _typed_turns(rows)], harness, records=len(rows))
     sid = next((r.get("sessionId") for r in rows if r.get("sessionId")), "") \
         or os.path.splitext(os.path.basename(path))[0]
     cwd = next((r.get("cwd") for r in reversed(rows) if r.get("cwd")), "")
@@ -2231,7 +2459,7 @@ def export_run(path):
                 fp = inp.get("file_path") or inp.get("notebook_path")
                 files.update(p for p in (inp.get("paths") or ([fp] if fp else [])) if isinstance(p, str))
     commits = _reflog_commits(cwd, start, end) if cwd and start is not None and end is not None else None
-    return {
+    out = {
         "schema": "transcripto.export-run/1",
         "session_id": sid,
         "project": cwd,
@@ -2253,6 +2481,10 @@ def export_run(path):
                   "commits_in_window is this tree's reflog inside the run window, "
                   "null when the project is not a git repo."),
     }
+    if detector is not None:
+        out.update(_jev_score(detector, [t for t, _ in _typed_turns(rows)]))
+        out["proxy"] = out["proxy"].replace("correction_rate is a lexical estimate", "correction_rate is a Jev model estimate over scored turns, not a human correction label")
+    return out
 
 
 def cmd_export_run(args):
@@ -2264,7 +2496,27 @@ def cmd_export_run(args):
         sys.stderr.write("  pass a session id (or a prefix of one), 'latest', or a path "
                          "to a .jsonl; --root / --harness as for coach.\n\n")
         sys.exit(2)
-    print(json.dumps(export_run(path), indent=2))
+    print(json.dumps(export_run(path, detector=_jev_detector(args)), indent=2))
+
+
+def _add_detector_args(s):
+    g = s.add_argument_group("correction detector")
+    g.add_argument("--detector", choices=["regex", "jev"], default="regex",
+                   help="regex (default): local, offline. jev: SENDS privacy-filtered "
+                        "typed turns to OpenRouter (TypeSafe Jev). Needs OPENROUTER_API_KEY. "
+                        "Opt-in per run; no env var or config file turns it on.")
+    g.add_argument("--jev-dry-run", action="store_true",
+                   help="with --detector jev, preview privacy counts locally; no key or network")
+    g.add_argument("--jev-threshold", type=float, default=0.30,
+                   help="P(correction) at or above this is a correction (default 0.30)")
+    g.add_argument("--jev-batch", type=int, default=1,
+                   help="turns per Jev request (default 1, the measured formulation). "
+                        "Above 1 is cheaper but MOVES the answers: on 10 live rows, "
+                        "P(correction) shifted by up to 0.55 at batch 5 and 10")
+    g.add_argument("--jev-max-usd", type=float, default=1.00,
+                   help="stop sending once this much is spent (default 1.00)")
+    g.add_argument("--jev-fallback-regex", action="store_true",
+                   help="with --detector jev and no key, use the local regex instead of failing")
 
 
 def main():
@@ -2301,8 +2553,25 @@ def main():
     s = sub.add_parser("changes", help="show cited disagreement and correction sequences")
     s.add_argument("-n", "--limit", type=int, default=10)
     s.set_defaults(fn=cmd_changes)
+    s = sub.add_parser("selected-context", help="bounded local run metadata and consented selected replay; no refresh or model")
+    s.add_argument("mode",choices=["runs","describe","episodes","authored-continuation"])
+    s.add_argument("--index",default=DB,help="existing local index, read-only")
+    s.add_argument("--cwd",help="exact existing repository directory")
+    s.add_argument("--source",help="explicit local session file")
+    s.add_argument("--limit",type=int,default=20)
+    s.add_argument("--accept-sha",help="source SHA256 shown before consent")
+    s.add_argument("--consent",action="store_true",help="allow reading selected session locally")
+    s.add_argument("--line",type=int,help="exact selected request for authored continuation")
+    s.add_argument("--instruction",help="explicit authored change; separate from cross-harness handoff")
+    s.set_defaults(fn=cmd_selected_context)
     s = sub.add_parser("handoff", help="write a cited correction packet")
-    s.add_argument("query", help="words from the correction to hand off")
+    s.add_argument("query", nargs="?", help="words from the correction to hand off")
+    s.add_argument("--findings", help="recorded selected-session Jev report")
+    s.add_argument("--line", type=int, help="exact selected request source line")
+    s.add_argument("--source",help="explicit session for an authored instruction, no model report required")
+    s.add_argument("--accept-sha",help="source hash shown before local-view consent")
+    s.add_argument("--instruction",help="explicitly authored correction; not a detector verdict")
+    s.add_argument("--consent",action="store_true",help="allow selected replay in the private packet")
     s.add_argument("--to-harness", required=True, choices=["claude", "codex", "cursor"])
     s.add_argument("--output", required=True, help="receiver inbox JSON path")
     s.set_defaults(fn=cmd_handoff)
@@ -2328,16 +2597,24 @@ def main():
                         "verbatim/high n-gram echo of an earlier agent or tool message "
                         "in the same session, from the human signal before grading")
     s.add_argument("--json", action="store_true", help="machine-readable, for other tools")
+    _add_detector_args(s)
     s.set_defaults(fn=cmd_coach)
+    s = sub.add_parser("jev-findings", help="inspect one selected session with explicit Jev opt-in; reference-only report")
+    s.add_argument("target", help="explicit session path, ID or latest")
+    s.add_argument("--output", help="private local findings report for replay/handoff")
+    _add_detector_args(s)
+    s.set_defaults(fn=cmd_jev_findings)
     s = sub.add_parser("export-run")
     s.add_argument("target", help="a session id (or a prefix of one), 'latest', or a "
                                   "path to a .jsonl transcript")
     s.add_argument("--root", help="look in this transcript dir instead of ~/.claude/projects")
     s.add_argument("--harness", choices=["claude", "codex", "cursor"],
                    help="which agent's transcripts to look in. default: all three")
+    _add_detector_args(s)
     s.set_defaults(fn=cmd_export_run)
     s = sub.add_parser("replay", help="replay requests and their recorded tool results")
     s.add_argument("target", nargs="?", default="latest", help="latest, a transcript path, or words from a request")
+    s.add_argument("--findings", help="reopen an exact line from a source-bound Jev findings report")
     s.add_argument("--session", help="explicit session ID or an unambiguous filename prefix")
     selection = s.add_mutually_exclusive_group()
     selection.add_argument("--episode", type=int, help="request number within the session")
@@ -2359,10 +2636,17 @@ def main():
     a = p.parse_args(["replay"] if len(sys.argv) == 1 else None)
     if getattr(a, "events", 1) < 1 or getattr(a, "limit", 1) < 1 or (getattr(a, "episode", None) is not None and a.episode < 1):
         p.error("episode, events, and limit must be positive")
-    if getattr(a, "line", None) is not None and (a.line < 1 or a.target == "latest" or getattr(a, "session", None) or a.demo):
+    if a.cmd == "replay" and getattr(a, "line", None) is not None and (a.line < 1 or (a.target == "latest" and not a.findings) or getattr(a, "session", None) or a.demo):
         p.error("--line requires a positive line number and an explicit transcript path")
     if getattr(a, "session", None) and a.target != "latest":
         p.error("use either a positional query/path or --session")
+    if getattr(a, "jev_dry_run", False) and a.detector != "jev":
+        p.error("--jev-dry-run requires --detector jev")
+    if getattr(a, "detector", "regex") == "jev":
+        if not 0.0 < a.jev_threshold < 1.0:
+            p.error("--jev-threshold must be between 0 and 1")
+        if a.jev_batch < 1 or not math.isfinite(a.jev_max_usd) or a.jev_max_usd <= 0:
+            p.error("--jev-batch must be at least 1 and --jev-max-usd finite and above 0")
     if getattr(a, "root", None) and not os.path.exists(os.path.expanduser(a.root)):
         p.error("--root does not exist: " + core.safe_text(a.root))
     global ROOTS, HARNESS

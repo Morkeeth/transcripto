@@ -54,6 +54,19 @@ def _demo(path):
 def cmd_replay(args, paths):
     diagnostics = []
     target = args.target
+    detector_observation = None
+    bound_hash = None
+    if getattr(args, "findings", None):
+        from transcripto_findings import selected, file_hash
+        try:
+            report, _ep, _prior, _harness, detector_observation = selected(args.findings, args.line)
+        except (OSError, ValueError, TypeError) as exc:
+            print("Cannot replay recorded finding: " + safe_text(str(exc)))
+            return 2
+        if args.target != "latest" or args.demo or args.session or args.episode is not None:
+            print("Use --findings REPORT with --line only, not another source selector.")
+            return 2
+        target, bound_hash = report["source"], report["source_sha256"]
     temp = tempfile.TemporaryDirectory(prefix="transcripto-demo-") if args.demo else None
     try:
         if temp:
@@ -91,6 +104,9 @@ def cmd_replay(args, paths):
             rows, harness = read_session(path, diagnostics)
             if not any(human_text(r) for r in rows):
                 continue
+            if bound_hash and file_hash(path) != bound_hash:
+                print("Source changed during replay. Nothing replayed.")
+                return 2
             eps = episodes(rows, path)
             for i, ep in enumerate(eps, 1):
                 ep.update(number=i, harness=harness, title=title(ep))
@@ -133,13 +149,25 @@ def cmd_replay(args, paths):
             print("Transcripto replay · %d request(s) · %d succeeded · %d failed · %d unknown" % (
                 len(selected), counts["succeeded"], counts["failed"], counts["unknown"]))
             print(PROXY)
+            if detector_observation and detector_observation.get("fixture"):
+                print("TEST FIXTURE transport; no real model observation.")
             if synthetic:
                 print("Synthetic demo/examples; not measured user data.")
             return 0
         if args.json:
             print(json.dumps({"schema": "transcripto.replay/1", "synthetic": synthetic,
-                              "episodes": selected, "warnings": diagnostics, "proxy": PROXY}, indent=2))
+                              "episodes": selected, "warnings": diagnostics, "proxy": PROXY,
+                              "detector_observation": detector_observation}, indent=2))
             return 0
+        if detector_observation:
+            finding = detector_observation["finding"]
+            print("Recorded Jev observation: %s; P(correction)=%s; observed %s." % (
+                safe_text(finding.get("status", "unknown")),
+                finding.get("probability") if finding.get("probability") is not None else "no verdict",
+                safe_text(detector_observation.get("observed_at") or "unknown")))
+            print("Not a human correction label or task verification.")
+            if detector_observation.get("fixture"):
+                print("TEST FIXTURE transport; no real model observation.")
         if synthetic:
             print("SYNTHETIC DEMO · contains invented prompts and results\n")
         for ep in selected:

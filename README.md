@@ -177,7 +177,7 @@ transcripto replay latest --share           # counts + caveat; no prompts or pat
 ```
 
 `--share` is intentionally small. Full replay output and JSON contain your own
-words and local paths. The tool does not upload either.
+words and local paths. Replay does not upload either.
 
 ## What each harness supports
 
@@ -252,9 +252,84 @@ agent caused them. Without a usable window, the commit fields are null.
 
 ## Privacy and limits
 
-The three runtime modules contain no network client, telemetry, account flow,
-or process execution. Package installation (`pip` or `uvx`) is a separate
+The default commands process transcripts locally, without telemetry or an
+account flow. The optional Jev detector below sends filtered typed text only
+when explicitly selected. Package installation (`pip` or `uvx`) is a separate
 operation that may contact a package registry and write a package cache.
+
+### Optional network detector: `--detector jev`
+
+`coach` and `export-run` can count corrections with TypeSafe Jev instead of the
+local regex. This is the one path that sends text off the machine, and it runs
+only when you pass the flag on that run. No environment variable or config file
+turns it on. The code lives in its own module, `transcripto_jev.py`, which the
+default path never imports.
+
+```sh
+OPENROUTER_API_KEY=... transcripto coach --detector jev
+```
+
+Before the first request it prints one line to stderr: how many typed turns it
+may send, how many the privacy filter excluded, and the URL
+(`https://openrouter.ai/api/alpha/decisions`, model `typesafe/jev-1.13`).
+Only your typed turns are sent, at most 2,000 characters each, with the fixed
+question. No separate path/session metadata, agent output or tool results are
+sent. Typed text can still contain paths and private details the filter misses.
+
+The privacy filter runs before any request is built:
+
+- **Excluded, never sent:** a turn that names your account, cites a numbered
+  notes-folder path (two digits, a space, a folder name, a `.md` file), mentions a private topic (money,
+  finance, wallet, seed, key, password, token, salary, bank, journal, health,
+  family, whole words), or holds an email address or phone-like number.
+- **Redacted, then sent:** API keys and tokens, AWS key ids, private-key blocks,
+  40-hex `0x` addresses, and home directory paths.
+
+Excluded turns and failed requests get no verdict. They are reported, never
+filled in with the regex. The correction rate then uses the scored turns as its
+denominator (`correction_rate_denominator: "jev.scored"`). JSON gains a `jev`
+block with `sent`, `excluded`, `excluded_reasons`, `scored`, `errors`,
+`cost_usd` and the served model.
+
+Preview the privacy counts before choosing to send anything:
+
+```sh
+transcripto coach --detector jev --jev-dry-run --json
+transcripto export-run latest --detector jev --jev-dry-run
+```
+
+This needs no API key and makes no requests, even with a key in the environment.
+Both commands return the dedicated `transcripto.jev-privacy-preview/1` JSON
+schema in dry-run mode (`coach` needs `--json`). The `jev` count block and null
+correction fields stay available to existing count consumers. Ordinary coach
+episodes and export session, file, tool and commit details are omitted; dry runs
+do not inspect the project reflog or build an episode report.
+
+It reports eligible turns, exclusions by reason, and redaction counts. It does
+not print turn text, estimate cost, or produce correction verdicts. Eligibility
+means the current filter permits a turn; it is not a guarantee that the text
+contains no private information.
+
+Options: `--jev-threshold` (default 0.30 on P(correction)), `--jev-max-usd`
+(default 1.00, stops sending once reached), `--jev-batch` (default 1; larger
+batches are cheaper but change the answers), `--jev-fallback-regex` (with no
+key set, use the regex instead of exiting). A refused key (HTTP 401, 402, 403)
+on the first request stops before any later batch. If a later request is refused,
+completed verdicts are retained and no further wave starts.
+
+The `eligible` count describes turns allowed by the filter; `sent` counts turns
+submitted to transport, excluding later turns skipped by the spending stop.
+Neither count proves that the remote service received a request successfully.
+
+The spend limit must be finite and positive. Costs are reported after requests,
+so requests already in flight can exceed the limit; it is not a provider-side
+hard cap. If any request cost is missing or invalid, no further batch is sent
+and the displayed cost is labelled an incomplete subtotal. Invalid probabilities
+produce no verdict rather than a guessed correction label.
+
+The default 0.30 comes from a local experiment on 185 turns, labelled by a
+single model rater: agreement F1 about 0.77 to 0.83 against that rater, versus
+0.68 to 0.70 for the regex. That is agreement with a model, not accuracy.
 
 Replay and coach read transcripts without making an index. Search writes text
 and file metadata to `~/.trace/trace.db`. A new index directory is private;
@@ -295,3 +370,102 @@ index permissions, incremental search, and cross-harness retrieval.
 
 MIT. Open an issue with the **record shape** that fails, or a synthetic
 reproduction. Your real prompt text is not needed.
+
+### Inspect one session's Jev findings, then carry one candidate
+
+This source candidate adds a selected-session path; it is not part of the pinned
+PyPI 0.2.1 release above. Build/install this checkout before using these commands.
+Preview remains counts-only, offline and keyless:
+
+```sh
+transcripto jev-findings /path/session.jsonl --detector jev --jev-dry-run
+```
+
+Only when you choose to send that session's privacy-filtered typed turns:
+
+```sh
+transcripto jev-findings /path/session.jsonl --detector jev \
+  --jev-max-usd 0.05 --output /your/private/findings.json
+```
+
+The local report contains references, source/request hashes, exact lines,
+probabilities, threshold, model metadata and observation time, without transcript
+text. It marks candidate, not-candidate, excluded and unknown separately. Each
+row prints its exact replay command. A candidate is a recorded model suggestion,
+not a confirmed human correction. The serving-model hint is not a per-turn
+model guarantee. The cap and provider/privacy limits above still apply.
+
+After inspecting a candidate's request and recorded work, select its exact line:
+
+```sh
+transcripto replay --findings /your/private/findings.json --line 3
+transcripto handoff --findings /your/private/findings.json --line 3 \
+  --to-harness codex --output /your/private/candidate.json
+transcripto receive-handoff /your/private/candidate.json --as-harness codex \
+  --output /your/private/receiver-brief.md
+```
+
+Use the actual line shown by your report and choose a receiver different from
+the source harness. Replay and handoff refuse a changed source, including changed
+follow-up records around an unchanged request. Excluded, unknown and negative
+findings cannot become candidate handoffs. A previously prepared packet whose
+source changes remains historical; its receiver brief marks outcomes provisional.
+
+The packet and receiver brief are private local files and contain selected
+transcript text. They retain detector provenance, synthetic/test labels, and
+pending human confirmation and receiver acknowledgement. They do not invoke an
+agent or send a message. Reports, packets and briefs use mode `0600`; inspect
+before sharing. `replay --share` remains counts-only.
+
+### Choose a local replay and author a handoff
+
+A model report is optional. List metadata from an existing index, choose a source,
+then explicitly permit local viewing of its requests and recorded tool outcomes:
+
+```sh
+transcripto selected-context runs --cwd /your/repo
+transcripto selected-context describe --source /your/session.jsonl
+transcripto selected-context episodes --source /your/session.jsonl \
+  --accept-sha SHA256_FROM_DESCRIBE --consent
+transcripto handoff --source /your/session.jsonl \
+  --accept-sha SHA256_FROM_DESCRIBE --line 3 \
+  --instruction 'Repair the selected output and verify the stated condition.' \
+  --consent --to-harness claude --output /your/private/packet.json
+transcripto receive-handoff /your/private/packet.json --as-harness claude \
+  --output /your/private/brief.md
+```
+
+`runs` accepts `--index /your/existing.sqlite`; it does not create or refresh an
+index. It reads only metadata from at most the most recent 20,000 indexed records,
+returning up to 20 runs by default (maximum 30). Suggestions are unbound: sharing a
+working directory does not prove that a run produced your artifact. No title or
+body is read by this query. SQLite may use locking sidecars. Choose a file explicitly
+when the bounded index window has no suitable run.
+
+`describe` reads bytes to compute identity without returning transcript text. The
+consented replay returns at most the first 100 requests from one file of at most
+16 MiB; changed bytes or parsing warnings refuse replay. Authored handoffs retain
+the original request, source hash, exact line and recorded outcomes. The new
+instruction is explicit authorship for this handoff, not a detector verdict,
+inferred human REDO or research label. Same-harness refusal and synthetic labels
+remain. These commands prepare private local files; they do not invoke a receiver
+or send a message. Review the full brief before giving it to another process.
+
+### Explicit authored continuation
+
+`handoff` still requires a different receiver harness. For a separately chosen new
+Claude session, the local producer can describe exactly one authored instruction:
+
+```sh
+transcripto selected-context describe --source /path/to/session.jsonl
+transcripto selected-context authored-continuation \
+  --source /path/to/session.jsonl --accept-sha SHA256_FROM_DESCRIBE \
+  --line 1 --instruction 'Add the missing label.' --consent
+```
+
+This returns a typed local selection, not a handoff exception, detector verdict or
+receiver invocation. Its source session UUID is derived from the consented bytes;
+absent, malformed or mixed identities refuse. No filename/index fallback is used.
+ZUP's separate new-session confirmation binds a fresh receiver UUID and actual
+launch contract. New-session work is same-harness authored work, not independent
+judgement or measured model improvement. Only explicitly selected context is carried.

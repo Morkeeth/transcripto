@@ -1,5 +1,18 @@
 # Changes
 
+## Unreleased
+
+- Keep the complete Jev dry-run CLI output counts-only, including installed wheels; omit coach episode text and export source details.
+
+- `--detector jev --jev-dry-run` previews privacy eligibility and exclusion counts
+  in `coach` and `export-run`, without a key, network calls, or correction verdicts.
+
+- `coach` and `export-run` accept `--detector jev`, an opt-in correction
+  detector that sends privacy-filtered typed turns to TypeSafe Jev on
+  OpenRouter. Off unless the flag is passed on that run. The default path
+  stays local, never imports the network module, and its output is unchanged.
+  See README, "Optional network detector".
+
 ## 0.2.1 · evidence for the receiving agent
 
 Prepared release; publication pending.

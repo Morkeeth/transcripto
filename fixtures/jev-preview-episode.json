@@ -1,0 +1,45 @@
+[
+  {
+    "type": "user",
+    "promptSource": "typed",
+    "timestamp": "2026-01-01T00:00:00Z",
+    "sessionId": "synthetic-privacy-preview-session",
+    "cwd": "/synthetic/private-project",
+    "message": {
+      "role": "user",
+      "content": "Fix the private-preview-sentinel parser in private-preview-source.py"
+    }
+  },
+  {
+    "type": "assistant",
+    "timestamp": "2026-01-01T00:00:01Z",
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "preview-call",
+          "name": "Edit",
+          "input": {
+            "file_path": "/synthetic/private-preview-source.py"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "type": "user",
+    "timestamp": "2026-01-01T00:00:02Z",
+    "message": {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "preview-call",
+          "is_error": true,
+          "content": "synthetic-private-tool-output edit failed"
+        }
+      ]
+    }
+  }
+]
