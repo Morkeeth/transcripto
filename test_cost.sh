@@ -25,7 +25,7 @@ check () {  # check <name> <jq-ish python expr> <expected>
   else printf '  FAIL  %-46s got %s, want %s\n' "$1" "$got" "$3"; FAIL=$((FAIL+1)); fi
 }
 
-echo "trace cost — 12 assertions on a real-shaped fixture"
+echo "trace cost — 18 assertions: 12 on a real-shaped fixture, 6 on the price table"
 echo
 echo "the number"
 check "total API-equivalent spend"        "round(r['usd'],3)"            "29.08"
@@ -48,6 +48,21 @@ check "1h cache write billed at 2x input" "round(r['by_model']['claude-opus-5'][
 check "dated model id normalises"         "round(r['by_model']['claude-haiku-4-5']['usd'],2)" "1.0"
 check "unknown model = UNPRICED"          "int(r['by_model']['claude-notarealmodel-9']['priced'])" "0"
 check "  ...and never a silent \$0"        "r['unpriced_tokens']"         "2000"
+
+echo "the price table: current models, per-model cache-read rate"
+# Source: platform.claude.com/docs/en/about-claude/pricing, read 2026-10-04.
+# Cache reads are 0.05x input on Opus 5.5 and 0.025x on Fable 5.1, not the 0.1x default.
+unit () {  # unit <name> <model> <usage json> <expected usd>
+  got=$(python3 -c "import transcripto as t,json,sys;u,_=t.price_message(sys.argv[1],json.loads(sys.argv[2]),'2026-10-04');print('UNPRICED' if u is None else round(u,4))" "$2" "$3")
+  if [ "$got" = "$4" ]; then printf '  ok    %-46s %s\n' "$1" "$got"; PASS=$((PASS+1))
+  else printf '  FAIL  %-46s got %s, want %s\n' "$1" "$got" "$4"; FAIL=$((FAIL+1)); fi
+}
+unit "opus-5-5 1M cache read = \$0.20"     claude-opus-5-5   '{"cache_read_input_tokens":1000000}' "0.2"
+unit "opus-5-5 1M in + 1M out = \$24"      claude-opus-5-5   '{"input_tokens":1000000,"output_tokens":1000000}' "24.0"
+unit "fable-5-1 1M cache read = \$0.25"    claude-fable-5-1  '{"cache_read_input_tokens":1000000}' "0.25"
+unit "sonnet-5-5 1M in = \$2"              claude-sonnet-5-5 '{"input_tokens":1000000}' "2.0"
+unit "sonnet-5 stays \$2 after intro date" claude-sonnet-5   '{"input_tokens":1000000}' "2.0"
+unit "opus-5 cache read keeps 0.1x"        claude-opus-5     '{"cache_read_input_tokens":1000000}' "0.5"
 
 echo
 if [ "$FAIL" -eq 0 ]; then echo "$PASS/$((PASS+FAIL)) green."; exit 0

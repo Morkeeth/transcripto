@@ -976,25 +976,35 @@ def cmd_stats(args):
 # still the only comparable unit, and it is what ccusage reports too.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# USD per 1M tokens (input, output), Anthropic list price, cached 2026-08-25.
+# USD per 1M tokens (input, output), Anthropic list price, cached 2026-10-04
+# from platform.claude.com/docs/en/about-claude/pricing.
 PRICES = {
+    "claude-fable-5-1":  (10.0, 50.0),
+    "claude-mythos-5-1": (10.0, 50.0),
     "claude-fable-5":    (10.0, 50.0),
     "claude-mythos-5":   (10.0, 50.0),
+    "claude-opus-5-5":   (4.0, 20.0),
     "claude-opus-5":     (5.0, 25.0),
     "claude-opus-4-8":   (5.0, 25.0),
     "claude-opus-4-7":   (5.0, 25.0),
     "claude-opus-4-6":   (5.0, 25.0),
     "claude-opus-4-5":   (5.0, 25.0),
-    "claude-sonnet-5":   (3.0, 15.0),
+    "claude-sonnet-5-5": (2.0, 10.0),
+    "claude-sonnet-5":   (2.0, 10.0),
     "claude-sonnet-4-6": (3.0, 15.0),
     "claude-sonnet-4-5": (3.0, 15.0),
     "claude-haiku-4-5":  (1.0, 5.0),
 }
-# fast mode is the same model at premium rates — Opus 5 / 4.8 only.
-FAST_PRICES = {"claude-opus-5": (10.0, 50.0), "claude-opus-4-8": (10.0, 50.0)}
-# Sonnet 5 shipped at intro pricing through 2026-08-31.
-INTRO = {"claude-sonnet-5": ((2.0, 10.0), "2026-08-31")}
+# fast mode is the same model at premium rates — Opus 5.5 / 5 / 4.8 only.
+FAST_PRICES = {"claude-opus-5-5": (8.0, 40.0), "claude-opus-5": (10.0, 50.0),
+               "claude-opus-4-8": (10.0, 50.0)}
+# Sonnet 5's $2/$10 launch price became the standard price; the increase to
+# $3/$15 planned for 2026-09-01 did not occur, so there is no intro window.
+INTRO = {}
 CACHE_WRITE_5M, CACHE_WRITE_1H, CACHE_READ = 1.25, 2.0, 0.10
+# Cache reads are a multiple of input price, and the multiple is per model.
+CACHE_READ_BY_MODEL = {"claude-opus-5-5": 0.05, "claude-fable-5-1": 0.025,
+                       "claude-mythos-5-1": 0.025}
 
 
 def normalise_model(model):
@@ -1035,7 +1045,8 @@ def price_message(model, usage, ts=""):
     if rate is None:
         return None, tokens
     pin, pout = rate[0] / 1e6, rate[1] / 1e6
-    usd = (inp * pin + out * pout + read * pin * CACHE_READ
+    usd = (inp * pin + out * pout
+           + read * pin * CACHE_READ_BY_MODEL.get(model, CACHE_READ)
            + w5m * pin * CACHE_WRITE_5M + w1h * pin * CACHE_WRITE_1H)
     return usd, tokens
 
