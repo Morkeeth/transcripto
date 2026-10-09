@@ -25,7 +25,7 @@ check () {  # check <name> <jq-ish python expr> <expected>
   else printf '  FAIL  %-46s got %s, want %s\n' "$1" "$got" "$3"; FAIL=$((FAIL+1)); fi
 }
 
-echo "trace cost — 22 assertions: 12 on a real-shaped fixture, 10 on the price table"
+echo "trace cost — 24 assertions: 12 on a real-shaped fixture, 10 on the price table, 2 on a streamed message"
 echo
 echo "the number"
 check "total API-equivalent spend"        "round(r['usd'],3)"            "29.08"
@@ -68,6 +68,13 @@ unit "sonnet-5-5 1M cache read = \$0.10"   claude-sonnet-5-5 '{"cache_read_input
 unit "sonnet-5 cache read keeps 0.1x"      claude-sonnet-5   '{"cache_read_input_tokens":1000000}' "0.2"
 unit "haiku-5-5 100k prompt = low tier"    claude-haiku-5-5  '{"input_tokens":100000,"output_tokens":100000}' "0.06"
 unit "haiku-5-5 over 100k = high tier"     claude-haiku-5-5  '{"input_tokens":1,"cache_read_input_tokens":100000,"output_tokens":100000}' "0.255"
+
+echo "a streamed message: the first line carries a placeholder output count"
+# One API message written as three lines: output_tokens 3, then 278, then 278.
+# The spend is the final record, counted once. Keeping the first line reads 3.
+J=$(python3 transcripto.py cost --days 0 --root fixtures-stream --json)
+check "final record wins, not the first"   "r['tokens']['output']"       "278"
+check "  ...and it is still one message"   "r['agent_messages']"         "1"
 
 echo
 if [ "$FAIL" -eq 0 ]; then echo "$PASS/$((PASS+FAIL)) green."; exit 0
