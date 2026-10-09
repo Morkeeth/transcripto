@@ -1059,8 +1059,10 @@ def price_message(model, usage, ts=""):
 
 def _msg_key(d, msg):
     """Claude Code writes one transcript line per content BLOCK of the same API
-    message, repeating the identical usage object 2-3x. Summing lines inflates
-    spend ~2.7x on a real session. Dedupe on the API message id."""
+    message, repeating the usage object 2-3x. Summing lines inflates spend
+    ~2.7x on a real session. Dedupe on the API message id. The repeats are not
+    always identical: a streamed message's first line can carry a placeholder
+    output count, so the caller keeps the largest record per id, not the first."""
     return msg.get("id") or d.get("requestId") or d.get("uuid")
 
 
@@ -1076,7 +1078,7 @@ def collect_cost(days=30, roots=None):
     rep = {"days": days, "usd": 0.0, "decisions": 0, "raw_user_turns": 0, "agent_messages": 0,
            "unpriced_messages": 0, "unpriced_tokens": 0, "sessions": set(),
            "by_model": {}, "by_repo": {}, "tokens": {}, "first_ts": "", "last_ts": ""}
-    seen = set()
+    final = {}   # message key -> (total, model, usage, ts, repo), the largest record wins
     for root in roots:
         for f in sorted(glob.glob(os.path.join(root, "**", "*.jsonl"), recursive=True)):
             # append-only files: an mtime before the window means every record is older
@@ -1110,27 +1112,27 @@ def collect_cost(days=30, roots=None):
                 if not usage:
                     continue
                 key = _msg_key(d, msg)
-                if key in seen:
-                    continue
-                seen.add(key)
-                model = normalise_model(msg.get("model"))
-                usd, tok = price_message(model, usage, ts)
-                rep["agent_messages"] += 1
-                for k, v in tok.items():
-                    rep["tokens"][k] = rep["tokens"].get(k, 0) + v
-                m = rep["by_model"].setdefault(model, {"usd": 0.0, "messages": 0,
-                                                       "tokens": 0, "priced": usd is not None})
-                m["messages"] += 1
-                m["tokens"] += tok["total"]
-                if usd is None:
-                    if tok["total"]:      # a 0-token <synthetic> row costs nothing either way
-                        rep["unpriced_messages"] += 1
-                        rep["unpriced_tokens"] += tok["total"]
-                    continue
-                rep["usd"] += usd
-                m["usd"] += usd
-                rep["by_repo"].setdefault(repo, {"usd": 0.0, "decisions": 0})
-                rep["by_repo"][repo]["usd"] += usd
+                total = price_message(None, usage)[1]["total"]
+                if key not in final or total > final[key][0]:
+                    final[key] = (total, normalise_model(msg.get("model")), usage, ts, repo)
+    for _, model, usage, ts, repo in final.values():
+        usd, tok = price_message(model, usage, ts)
+        rep["agent_messages"] += 1
+        for k, v in tok.items():
+            rep["tokens"][k] = rep["tokens"].get(k, 0) + v
+        m = rep["by_model"].setdefault(model, {"usd": 0.0, "messages": 0,
+                                               "tokens": 0, "priced": usd is not None})
+        m["messages"] += 1
+        m["tokens"] += tok["total"]
+        if usd is None:
+            if tok["total"]:      # a 0-token <synthetic> row costs nothing either way
+                rep["unpriced_messages"] += 1
+                rep["unpriced_tokens"] += tok["total"]
+            continue
+        rep["usd"] += usd
+        m["usd"] += usd
+        rep["by_repo"].setdefault(repo, {"usd": 0.0, "decisions": 0})
+        rep["by_repo"][repo]["usd"] += usd
     rep["sessions"] = len(rep["sessions"])
     rep["per_decision"] = (rep["usd"] / rep["decisions"]) if rep["decisions"] else None
     rep["gate_factor"] = (rep["raw_user_turns"] / rep["decisions"]) if rep["decisions"] else None
