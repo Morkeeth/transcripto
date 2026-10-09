@@ -993,8 +993,12 @@ PRICES = {
     "claude-sonnet-5":   (2.0, 10.0),
     "claude-sonnet-4-6": (3.0, 15.0),
     "claude-sonnet-4-5": (3.0, 15.0),
+    "claude-haiku-5-5":  (0.10, 0.50),
     "claude-haiku-4-5":  (1.0, 5.0),
 }
+# Haiku 5.5 is priced by prompt length: a request whose prompt (input, cache
+# reads and cache writes together) is over the threshold pays the higher rate.
+TIERED = {"claude-haiku-5-5": (100_000, (0.50, 2.50))}
 # fast mode is the same model at premium rates — Opus 5.5 / 5 / 4.8 only.
 FAST_PRICES = {"claude-opus-5-5": (8.0, 40.0), "claude-opus-5": (10.0, 50.0),
                "claude-opus-4-8": (10.0, 50.0)}
@@ -1003,8 +1007,8 @@ FAST_PRICES = {"claude-opus-5-5": (8.0, 40.0), "claude-opus-5": (10.0, 50.0),
 INTRO = {}
 CACHE_WRITE_5M, CACHE_WRITE_1H, CACHE_READ = 1.25, 2.0, 0.10
 # Cache reads are a multiple of input price, and the multiple is per model.
-CACHE_READ_BY_MODEL = {"claude-opus-5-5": 0.05, "claude-fable-5-1": 0.025,
-                       "claude-mythos-5-1": 0.025}
+CACHE_READ_BY_MODEL = {"claude-opus-5-5": 0.05, "claude-sonnet-5-5": 0.05,
+                       "claude-fable-5-1": 0.025, "claude-mythos-5-1": 0.025}
 
 
 def normalise_model(model):
@@ -1044,6 +1048,8 @@ def price_message(model, usage, ts=""):
         rate = PRICES[model]
     if rate is None:
         return None, tokens
+    if model in TIERED and inp + read + w5m + w1h > TIERED[model][0]:
+        rate = TIERED[model][1]
     pin, pout = rate[0] / 1e6, rate[1] / 1e6
     usd = (inp * pin + out * pout
            + read * pin * CACHE_READ_BY_MODEL.get(model, CACHE_READ)
