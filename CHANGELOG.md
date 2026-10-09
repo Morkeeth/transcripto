@@ -1,6 +1,24 @@
 # Changes
 
-## Unreleased
+## 0.3.0 · cost you can trust, optional network detector
+
+- `cost` counts each Claude message at its final streamed record, not its first.
+  A streamed message is written several times and the first record often holds
+  a partial output count. Cost and token totals rise for streamed sessions.
+  Numbers from 0.2.1 and earlier are too low and are not comparable.
+- Price table adds Opus 5.5 (4/20 USD per million tokens, cache reads at 0.05x
+  input), Sonnet 5.5 (2/10, cache reads at 0.05x), Fable 5.1 (10/50, cache reads
+  at 0.025x) and Haiku 5.5 (0.10/0.50 for prompts up to 100,000 tokens,
+  0.50/2.50 above). Cache-read rates are now per model.
+- `jev-findings` inspects one selected session with the opt-in Jev detector.
+  `selected-context` lists bounded metadata from an existing index and shows one
+  run's requests and tool outcomes after consent. Authored handoffs bind the
+  exact source bytes and line.
+- Privacy wording changed. Up to 0.2.1 no module held a network client. From
+  0.3.0 the wheel includes `transcripto_jev.py`, which sends privacy-filtered
+  typed turns to OpenRouter only when `--detector jev` is passed on that run.
+  Default commands stay local and never import it. Retention of sent text is
+  set by OpenRouter and the model provider; this tool does not verify it.
 
 - Keep the complete Jev dry-run CLI output counts-only, including installed wheels; omit coach episode text and export source details.
 
@@ -15,7 +33,7 @@
 
 ## 0.2.1 · evidence for the receiving agent
 
-Prepared release; publication pending.
+Published to PyPI on 2 October 2026.
 
 - Unlabelled harness rows. A writer whose insert omits `harness` leaves it NULL
   with no error. The index now detects such rows on every open and labels them
