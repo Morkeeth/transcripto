@@ -25,7 +25,7 @@ PROG = _prog()
 # packaging. A stranger who reads the README on GitHub and installs from PyPI can be
 # holding a different build than the one the README describes, and until this flag
 # existed there was no way for them to tell which.
-VERSION = "0.2.1"
+VERSION = "0.3.0"
 
 USAGE = """
   transcripto                         replay your latest human session
@@ -631,7 +631,7 @@ Use a built wheel. Do not require PyPI. All lab records are invented.
 ## 1. Install from a wheel path
 
 ```sh
-WHEEL=/absolute/path/to/transcripto-0.2.1-py3-none-any.whl
+WHEEL=/absolute/path/to/transcripto-0.3.0-py3-none-any.whl
 python3 -m venv /tmp/transcripto-flight
 /tmp/transcripto-flight/bin/python -m pip install --no-index --no-deps "$WHEEL"
 export PATH="/tmp/transcripto-flight/bin:$PATH"
@@ -679,7 +679,7 @@ Status describes tool execution, not task correctness. Missing results stay unkn
 """
 
 
-WHEEL_PLACEHOLDER = "/absolute/path/to/transcripto-0.2.1-py3-none-any.whl"
+WHEEL_PLACEHOLDER = "/absolute/path/to/transcripto-0.3.0-py3-none-any.whl"
 
 
 def cmd_quickstart(args):

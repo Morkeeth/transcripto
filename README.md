@@ -11,7 +11,7 @@ Claude Code · Codex · Cursor. Local files. No account. No runtime dependencies
 ## Start with something you remember saying
 
 ```sh
-uvx --from transcripto==0.2.1 transcripto ask "retry"
+uvx --from transcripto==0.3.0 transcripto ask "retry"
 ```
 
 Replace `retry` with a word you remember using. `ask` searches messages identified
@@ -27,17 +27,17 @@ and its recorded work. This also works when search matches a word variant
 You can also search replay directly:
 
 ```sh
-uvx --from transcripto==0.2.1 transcripto replay "retry"
+uvx --from transcripto==0.3.0 transcripto replay "retry"
 
 # Or open your latest human session:
-uvx --from transcripto==0.2.1 transcripto
+uvx --from transcripto==0.3.0 transcripto
 ```
 
 Replay puts your request, tool calls and recorded results in order. Failed edits
 stay failed. Missing results stay unknown. Status describes tool execution,
 not whether the task was done correctly.
 
-Or install with `python3 -m pip install transcripto==0.2.1`, then run
+Or install with `python3 -m pip install transcripto==0.3.0`, then run
 `transcripto ask "retry"`. Requires Python 3.9 or newer.
 
 ## Try the stranger flow without your transcripts
@@ -96,7 +96,7 @@ succeeded check, Cursor an unknown missing result.
 ### Offline flight card
 
 ```sh
-transcripto quickstart --wheel /absolute/path/to/transcripto-0.2.1-py3-none-any.whl
+transcripto quickstart --wheel /absolute/path/to/transcripto-0.3.0-py3-none-any.whl
 ```
 
 Prints install, `import-lab`, search, and reopen commands for a built wheel
@@ -275,6 +275,8 @@ may send, how many the privacy filter excluded, and the URL
 Only your typed turns are sent, at most 2,000 characters each, with the fixed
 question. No separate path/session metadata, agent output or tool results are
 sent. Typed text can still contain paths and private details the filter misses.
+What OpenRouter and the model provider keep, and for how long, is set by their
+terms. Transcripto does not verify it. Read those terms before the first send.
 
 The privacy filter runs before any request is built:
 
@@ -373,8 +375,7 @@ reproduction. Your real prompt text is not needed.
 
 ### Inspect one session's Jev findings, then carry one candidate
 
-This source candidate adds a selected-session path; it is not part of the pinned
-PyPI 0.2.1 release above. Build/install this checkout before using these commands.
+Added in 0.3.0: a selected-session path.
 Preview remains counts-only, offline and keyless:
 
 ```sh
