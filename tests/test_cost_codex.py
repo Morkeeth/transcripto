@@ -6,8 +6,10 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import transcripto
+import transcripto_core
 
 
 def record(kind, payload, ts="2026-10-10T12:00:00Z"):
@@ -68,6 +70,53 @@ class CodexCostTest(unittest.TestCase):
                             "--root", str(self.root)], capture_output=True, text=True, check=True)
         self.assertIn("future-model", p.stdout)
         self.assertIn("/tmp/unknown", p.stdout)
+
+    def test_decisions_share_replay_authorship_filter(self):
+        self.rollout("authorship.jsonl", "/tmp/project", [
+            record("response_item", {"type": "message", "role": "user",
+                                     "content": [{"type": "input_text", "text": "# AGENTS.md instructions\n<INSTRUCTIONS>rules</INSTRUCTIONS>"}]}),
+            record("response_item", {"type": "message", "role": "user",
+                                     "content": [{"type": "input_text", "text": "<environment_context>\n<cwd>/tmp/project</cwd>\n</environment_context>"}]}),
+            record("response_item", {"type": "message", "role": "user",
+                                     "content": [{"type": "input_text", "text": "The following is the Codex agent history added since your last approval"}]}),
+            record("response_item", {"type": "message", "role": "user",
+                                     "content": [{"type": "input_text", "text": "Please fix the search result."}]}),
+            record("turn_context", {"model": "gpt-6-sol"}), counter(1000, 0, 100),
+        ])
+        rep = transcripto.collect_cost(0, [str(self.root)])
+        rows, harness = transcripto_core.read_session(str(self.root / "authorship.jsonl"))
+        self.assertEqual(harness, "codex")
+        self.assertEqual(sum(row.get("type") == "user" for row in rows), 1)
+        self.assertEqual(rep["decisions"], 1)
+        self.assertEqual(rep["raw_user_turns"], 1)
+        self.assertEqual(rep["by_repo"]["/tmp/project"]["decisions"], 1)
+
+    def test_large_rollout_streams_past_general_file_limit(self):
+        self.rollout("large.jsonl", "/tmp/project", [
+            record("turn_context", {"model": "gpt-6-sol"}),
+            record("response_item", {"type": "message", "role": "user", "content": "Fix it"}),
+            counter(1000, 200, 100),
+        ])
+        self.assertGreater((self.root / "large.jsonl").stat().st_size, 100)
+        with mock.patch.object(transcripto_core, "MAX_FILE_BYTES", 100):
+            rep = transcripto.collect_cost(0, [str(self.root)])
+        self.assertEqual(rep["incomplete_files"], [])
+        self.assertEqual(rep["decisions"], 1)
+        self.assertAlmostEqual(rep["usd"], 0.00264)
+
+    def test_oversize_record_marks_file_incomplete_and_excludes_partial_cost(self):
+        self.rollout("oversize.jsonl", "/tmp/project", [
+            record("turn_context", {"model": "gpt-6-sol"}),
+            counter(1000, 200, 100),
+            record("response_item", {"type": "message", "role": "user",
+                                     "content": "x" * 1000}),
+        ])
+        with mock.patch.object(transcripto_core, "MAX_LINE_BYTES", 400):
+            rep = transcripto.collect_cost(0, [str(self.root)])
+        self.assertEqual(rep["usd"], 0)
+        self.assertEqual(rep["decisions"], 0)
+        self.assertEqual(len(rep["incomplete_files"]), 1)
+        self.assertIn("oversized", rep["incomplete_files"][0]["reason"])
 
 
 if __name__ == "__main__":

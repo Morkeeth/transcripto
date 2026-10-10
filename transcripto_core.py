@@ -39,11 +39,11 @@ def text_of(value):
     return ""
 
 
-def iter_json(path, diagnostics=None):
+def iter_json(path, diagnostics=None, allow_large=False):
     counts = {"invalid": 0, "oversize": 0}
     try:
         with open(path, "rb") as f:
-            if os.fstat(f.fileno()).st_size > MAX_FILE_BYTES:
+            if not allow_large and os.fstat(f.fileno()).st_size > MAX_FILE_BYTES:
                 raise ValueError("file exceeds 128 MiB safety limit; split it into smaller JSONL files")
             line_no = 0
             while True:

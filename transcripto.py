@@ -1095,7 +1095,8 @@ def _codex_cost_events(path, cut_iso):
     model = "(unknown)"
     previous = {}
     events = []
-    for d in core.iter_json(path):
+    diagnostics = []
+    for d in core.iter_json(path, diagnostics, allow_large=True):
         kind, payload = d.get("type"), d.get("payload") or {}
         if kind == "session_meta":
             cwd = payload.get("cwd") or ""
@@ -1103,7 +1104,8 @@ def _codex_cost_events(path, cut_iso):
             model = payload.get("model") or model
         elif kind == "response_item" and payload.get("type") == "message" and payload.get("role") == "user":
             ts = d.get("timestamp") or ""
-            if not cut_iso or not ts or ts[:19] >= cut_iso[:19]:
+            if core._codex_human_content(payload.get("content")) and (
+                    not cut_iso or not ts or ts[:19] >= cut_iso[:19]):
                 events.append(("decision", ts, model, None))
         elif kind == "event_msg" and payload.get("type") == "token_count":
             usage = (payload.get("info") or {}).get("total_token_usage") or {}
@@ -1118,7 +1120,7 @@ def _codex_cost_events(path, cut_iso):
             ts = d.get("timestamp") or ""
             if (not cut_iso or not ts or ts[:19] >= cut_iso[:19]) and any(delta.values()):
                 events.append(("usage", ts, model, delta))
-    return _cost_folder(cwd, "(unknown folder)"), events
+    return _cost_folder(cwd, "(unknown folder)"), events, diagnostics
 
 
 def collect_cost(days=30, roots=None):
@@ -1133,7 +1135,8 @@ def collect_cost(days=30, roots=None):
         cut_iso = datetime.fromtimestamp(cutoff, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
     rep = {"days": days, "usd": 0.0, "decisions": 0, "raw_user_turns": 0, "agent_messages": 0,
            "unpriced_messages": 0, "unpriced_tokens": 0, "sessions": set(),
-           "by_model": {}, "by_repo": {}, "tokens": {}, "first_ts": "", "last_ts": ""}
+           "by_model": {}, "by_repo": {}, "tokens": {}, "first_ts": "", "last_ts": "",
+           "incomplete_files": []}
     final = {}   # message key -> (total, model, usage, ts, repo), the largest record wins
     for root in roots:
         for f in sorted(glob.glob(os.path.join(root, "**", "*.jsonl"), recursive=True)):
@@ -1142,9 +1145,14 @@ def collect_cost(days=30, roots=None):
                 continue
             # Codex writes session_meta and cumulative token_count events, not
             # Claude's assistant.message. Read each file under its declared cwd.
-            first = next(core.iter_json(f), {})
+            first_diagnostics = []
+            first = next(core.iter_json(f, first_diagnostics, allow_large=True), {})
             if first.get("type") == "session_meta":
-                folder, events = _codex_cost_events(f, cut_iso)
+                folder, events, diagnostics = _codex_cost_events(f, cut_iso)
+                if first_diagnostics or diagnostics:
+                    rep["incomplete_files"].append({"path": f,
+                                                    "reason": "; ".join(first_diagnostics + diagnostics)})
+                    continue
                 for kind, ts, model, usage in events:
                     if ts:
                         rep["first_ts"] = min(rep["first_ts"] or ts, ts)
@@ -1255,6 +1263,11 @@ def cmd_cost(args):
     if rep["first_ts"]:
         span = "  \033[2m%s → %s\033[0m" % (rep["first_ts"][:10], rep["last_ts"][:10])
     print("\033[1mcost per human decision\033[0m  %s%s\n" % (win, span))
+    if rep["incomplete_files"]:
+        print("  \033[31mINCOMPLETE: %d Codex file(s) could not be read; totals exclude them.\033[0m"
+              % len(rep["incomplete_files"]))
+        for item in rep["incomplete_files"]:
+            print("  \033[31m%s: %s\033[0m" % (item["path"], item["reason"]))
     if not rep["decisions"]:
         print("  no turns you typed in this window. widen it with --days.")
     print("  API-equivalent spend      \033[1m$%s\033[0m" % format(rep["usd"], ",.2f"))
