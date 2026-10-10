@@ -11,7 +11,7 @@ Claude Code · Codex · Cursor. Local files. No account. No runtime dependencies
 ## Start with something you remember saying
 
 ```sh
-uvx --from transcripto==0.3.0 transcripto ask "retry"
+uvx --from transcripto==0.3.1 transcripto ask "retry"
 ```
 
 Replace `retry` with a word you remember using. `ask` searches messages identified
@@ -27,17 +27,17 @@ and its recorded work. This also works when search matches a word variant
 You can also search replay directly:
 
 ```sh
-uvx --from transcripto==0.3.0 transcripto replay "retry"
+uvx --from transcripto==0.3.1 transcripto replay "retry"
 
 # Or open your latest human session:
-uvx --from transcripto==0.3.0 transcripto
+uvx --from transcripto==0.3.1 transcripto
 ```
 
 Replay puts your request, tool calls and recorded results in order. Failed edits
 stay failed. Missing results stay unknown. Status describes tool execution,
 not whether the task was done correctly.
 
-Or install with `python3 -m pip install transcripto==0.3.0`, then run
+Or install with `python3 -m pip install transcripto==0.3.1`, then run
 `transcripto ask "retry"`. Requires Python 3.9 or newer.
 
 ## Try the stranger flow without your transcripts
@@ -96,7 +96,7 @@ succeeded check, Cursor an unknown missing result.
 ### Offline flight card
 
 ```sh
-transcripto quickstart --wheel /absolute/path/to/transcripto-0.3.0-py3-none-any.whl
+transcripto quickstart --wheel /absolute/path/to/transcripto-0.3.1-py3-none-any.whl
 ```
 
 Prints install, `import-lab`, search, and reopen commands for a built wheel
@@ -188,7 +188,16 @@ words and local paths. Replay does not upload either.
 | Execution status | Matched results | Matched results; ambiguous wrappers stay unknown | Unknown when the export omits results or call IDs |
 | Authorship | `promptSource` typed/queued, excluding injected/tool records | User messages with known injected context excluded | `<user_query>` wrapper; a weaker signal |
 | Coach, export-run | Yes | Yes | Yes, with missing evidence preserved |
-| API-equivalent cost | Yes | Not supported | Not supported |
+| API-equivalent cost | Yes | Yes, by recorded session folder | Not supported |
+
+`transcripto cost` reads Claude Code and Codex local records. Codex spend is
+grouped by the session's recorded working directory; the home directory appears
+as `(home folder, no project)`. Folders with spend and no typed decisions still
+appear, with `n/a` cost per decision. Dollar figures use standard short-context
+API prices, not subscription charges. Unknown models stay unpriced.
+Oversized compaction and tool-output records are counted as skipped. The command
+names any Codex file with an oversized usage or user record and marks the total
+`INCOMPLETE`; it does not silently count that file as zero.
 
 ```sh
 transcripto replay --harness claude

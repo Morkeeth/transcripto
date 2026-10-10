@@ -25,7 +25,7 @@ PROG = _prog()
 # packaging. A stranger who reads the README on GitHub and installs from PyPI can be
 # holding a different build than the one the README describes, and until this flag
 # existed there was no way for them to tell which.
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 
 USAGE = """
   transcripto                         replay your latest human session
@@ -46,7 +46,7 @@ USAGE = """
 
   --harness claude|codex|cursor        select one harness (default: all)
   --root <dir>                        use a transcript directory
-  cost is Claude-only; replay needs no index. Search refreshes its index automatically.
+  cost reads Claude Code and Codex; replay needs no index. Search refreshes its index automatically.
 """
 
 
@@ -631,7 +631,7 @@ Use a built wheel. Do not require PyPI. All lab records are invented.
 ## 1. Install from a wheel path
 
 ```sh
-WHEEL=/absolute/path/to/transcripto-0.3.0-py3-none-any.whl
+WHEEL=/absolute/path/to/transcripto-0.3.1-py3-none-any.whl
 python3 -m venv /tmp/transcripto-flight
 /tmp/transcripto-flight/bin/python -m pip install --no-index --no-deps "$WHEEL"
 export PATH="/tmp/transcripto-flight/bin:$PATH"
@@ -679,7 +679,7 @@ Status describes tool execution, not task correctness. Missing results stay unkn
 """
 
 
-WHEEL_PLACEHOLDER = "/absolute/path/to/transcripto-0.3.0-py3-none-any.whl"
+WHEEL_PLACEHOLDER = "/absolute/path/to/transcripto-0.3.1-py3-none-any.whl"
 
 
 def cmd_quickstart(args):
@@ -1066,23 +1066,160 @@ def _msg_key(d, msg):
     return msg.get("id") or d.get("requestId") or d.get("uuid")
 
 
+# Standard, short-context API-equivalent USD / 1M tokens. Codex subscription
+# charges and service tier are not recorded in rollout JSONL. Source:
+# https://developers.openai.com/api/docs/models/compare (2026-10-10).
+CODEX_PRICES = {
+    "gpt-6-astra": (10.0, 1.0, 12.5, 50.0),
+    "gpt-6.1-sol": (2.0, 0.1, 2.5, 10.0),
+    "gpt-6-sol": (2.0, 0.2, 2.5, 10.0),
+    "gpt-6-luna": (0.1, 0.01, 0.125, 0.5),
+    "gpt-5.6-sol": (4.0, 0.4, 5.0, 20.0),
+}
+
+
+def _cost_folder(cwd, fallback=""):
+    """Keep the source directory as the grouping key; never label home a repo."""
+    path = os.path.normpath(cwd) if cwd else fallback
+    return "(home folder, no project)" if path == os.path.normpath(HOME) else path
+
+
+def _codex_irrelevant_oversize(prefix):
+    """Classify only headers that prove an oversized line cannot affect cost.
+
+    The first 2 KiB must expose top-level type and the start of payload. Any
+    other shape (especially token_count or a user message) fails closed.
+    """
+    header_match = re.match(rb'^\s*\{\s*"timestamp"\s*:\s*"[^"]*"\s*,', prefix)
+    marker = re.search(rb',\s*"payload"\s*:\s*\{', prefix)
+    if not header_match or not marker:
+        return None
+    header = prefix[:marker.start()]
+    top = re.search(rb'(?:^|,)\s*"type"\s*:\s*"([^"]+)"\s*$', header)
+    if not top:
+        return None
+    if top.group(1) == b"compacted":
+        return "compacted"
+    if top.group(1) != b"response_item":
+        return None
+    payload = prefix[marker.end():]
+    output = re.match(rb'\s*"type"\s*:\s*"(function_call_output|custom_tool_call_output)"\s*,', payload)
+    return output.group(1).decode("ascii") if output else None
+
+
+def _codex_cost_events(path, cut_iso):
+    """One Codex rollout: yield measured usage deltas and typed user turns.
+
+    token_count.total_token_usage is cumulative. Summing snapshots multiplies
+    spend; last_token_usage can be repeated by progress events. Delta the
+    cumulative counters, with a reset treated as a fresh counter epoch.
+    """
+    cwd = ""
+    model = "(unknown)"
+    previous = {}
+    events = []
+    diagnostics = []
+    ignored = []
+    for d in core.iter_json(path, diagnostics, allow_large=True,
+                            classify_oversized=_codex_irrelevant_oversize,
+                            ignored_oversized=ignored):
+        kind, payload = d.get("type"), d.get("payload") or {}
+        if kind == "session_meta":
+            cwd = payload.get("cwd") or ""
+        elif kind == "turn_context":
+            model = payload.get("model") or model
+        elif kind == "response_item" and payload.get("type") == "message" and payload.get("role") == "user":
+            ts = d.get("timestamp") or ""
+            if core._codex_human_content(payload.get("content")) and (
+                    not cut_iso or not ts or ts[:19] >= cut_iso[:19]):
+                events.append(("decision", ts, model, None))
+        elif kind == "event_msg" and payload.get("type") == "token_count":
+            usage = (payload.get("info") or {}).get("total_token_usage") or {}
+            if not usage:
+                continue
+            fields = ("input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens")
+            current = {key: max(0, int(usage.get(key) or 0)) for key in fields}
+            delta = {key: max(0, current[key] - previous.get(key, 0)) for key in fields}
+            if any(current[key] < previous.get(key, 0) for key in fields):
+                delta = current
+            previous = current
+            ts = d.get("timestamp") or ""
+            if (not cut_iso or not ts or ts[:19] >= cut_iso[:19]) and any(delta.values()):
+                events.append(("usage", ts, model, delta))
+    return _cost_folder(cwd, "(unknown folder)"), events, diagnostics, ignored
+
+
 def collect_cost(days=30, roots=None):
     """Walk the transcripts once. Returns a report dict. Numerator = deduped
     assistant token spend (sub-agent runs included — that is real money).
     Denominator = is_human_turn, the gate `ask` already uses."""
-    roots = roots or [os.path.join(HOME, ".claude", "projects")]
+    roots = roots or [os.path.join(HOME, ".claude", "projects"),
+                      os.path.join(HOME, ".codex", "sessions")]
     cutoff = cut_iso = None
     if days:
         cutoff = datetime.now(timezone.utc).timestamp() - days * 86400
         cut_iso = datetime.fromtimestamp(cutoff, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
     rep = {"days": days, "usd": 0.0, "decisions": 0, "raw_user_turns": 0, "agent_messages": 0,
            "unpriced_messages": 0, "unpriced_tokens": 0, "sessions": set(),
-           "by_model": {}, "by_repo": {}, "tokens": {}, "first_ts": "", "last_ts": ""}
+           "by_model": {}, "by_repo": {}, "tokens": {}, "first_ts": "", "last_ts": "",
+           "incomplete_files": [], "skipped_irrelevant_records": []}
     final = {}   # message key -> (total, model, usage, ts, repo), the largest record wins
     for root in roots:
         for f in sorted(glob.glob(os.path.join(root, "**", "*.jsonl"), recursive=True)):
             # append-only files: an mtime before the window means every record is older
             if cutoff and os.path.getmtime(f) < cutoff:
+                continue
+            # Codex writes session_meta and cumulative token_count events, not
+            # Claude's assistant.message. Read each file under its declared cwd.
+            first_diagnostics = []
+            first = next(core.iter_json(f, first_diagnostics, allow_large=True), {})
+            if first.get("type") == "session_meta":
+                folder, events, diagnostics, ignored = _codex_cost_events(f, cut_iso)
+                if ignored:
+                    rep["skipped_irrelevant_records"].append({
+                        "path": f, "records": len(ignored),
+                        "bytes": sum(item["bytes"] for item in ignored),
+                        "types": sorted({item["type"] for item in ignored})})
+                if first_diagnostics or diagnostics:
+                    rep["incomplete_files"].append({"path": f,
+                                                    "reason": "; ".join(first_diagnostics + diagnostics)})
+                    continue
+                for kind, ts, model, usage in events:
+                    if ts:
+                        rep["first_ts"] = min(rep["first_ts"] or ts, ts)
+                        rep["last_ts"] = max(rep["last_ts"], ts)
+                    row = rep["by_repo"].setdefault(folder, {"usd": 0.0, "decisions": 0})
+                    if kind == "decision":
+                        rep["decisions"] += 1
+                        rep["raw_user_turns"] += 1
+                        row["decisions"] += 1
+                        rep["sessions"].add(f)
+                        continue
+                    inp = usage["input_tokens"] - usage["cached_input_tokens"]
+                    cached = usage["cached_input_tokens"]
+                    write = usage["cache_write_input_tokens"]
+                    output = usage["output_tokens"]
+                    tokens = inp + cached + write + output
+                    rep["agent_messages"] += 1
+                    rep["sessions"].add(f)
+                    rep["tokens"]["total"] = rep["tokens"].get("total", 0) + tokens
+                    for name, amount in (("input", inp), ("cache_read", cached),
+                                         ("cache_write_5m", write), ("output", output)):
+                        rep["tokens"][name] = rep["tokens"].get(name, 0) + amount
+                    rates = CODEX_PRICES.get(model)
+                    m = rep["by_model"].setdefault(model, {"usd": 0.0, "messages": 0,
+                                                           "tokens": 0, "priced": rates is not None})
+                    m["messages"] += 1
+                    m["tokens"] += tokens
+                    if rates is None:
+                        rep["unpriced_messages"] += 1
+                        rep["unpriced_tokens"] += tokens
+                        continue
+                    usd = (inp * rates[0] + cached * rates[1] + write * rates[2]
+                           + output * rates[3]) / 1e6
+                    rep["usd"] += usd
+                    row["usd"] += usd
+                    m["usd"] += usd
                 continue
             for d in core.iter_json(f):
                 t = d.get("type")
@@ -1091,7 +1228,7 @@ def collect_cost(days=30, roots=None):
                 ts = d.get("timestamp") or ""
                 if cut_iso and ts and ts[:19] < cut_iso[:19]:
                     continue
-                repo = _repo(d.get("cwd"), os.path.basename(os.path.dirname(f)))
+                repo = _cost_folder(d.get("cwd"), os.path.basename(os.path.dirname(f)))
                 if ts:
                     rep["first_ts"] = min(rep["first_ts"] or ts, ts)
                     rep["last_ts"] = max(rep["last_ts"], ts)
@@ -1157,21 +1294,33 @@ def cmd_cost(args):
     if rep["first_ts"]:
         span = "  \033[2m%s → %s\033[0m" % (rep["first_ts"][:10], rep["last_ts"][:10])
     print("\033[1mcost per human decision\033[0m  %s%s\n" % (win, span))
+    if rep["incomplete_files"]:
+        print("  \033[31mINCOMPLETE: %d Codex file(s) could not be read; totals exclude them.\033[0m"
+              % len(rep["incomplete_files"]))
+        for item in rep["incomplete_files"]:
+            print("  \033[31m%s: %s\033[0m" % (item["path"], item["reason"]))
+    if rep["skipped_irrelevant_records"]:
+        skipped = rep["skipped_irrelevant_records"]
+        print("  \033[2mskipped %d oversized Codex compaction/tool-output record(s)"
+              " in %d file(s); usage and typed turns remain counted.\033[0m"
+              % (sum(item["records"] for item in skipped), len(skipped)))
     if not rep["decisions"]:
         print("  no turns you typed in this window. widen it with --days.")
-        return
     print("  API-equivalent spend      \033[1m$%s\033[0m" % format(rep["usd"], ",.2f"))
     print("  your decisions            \033[1m%d\033[0m   \033[2mturns you actually typed"
           " (promptSource typed/queued)\033[0m" % rep["decisions"])
     print("  " + "─" * 52)
-    print("  \033[1mcost per human decision   $%.2f\033[0m" % rep["per_decision"])
-    print("\n  %s agent messages · %.0f per decision · %s tokens · %d sessions"
-          % (_hm(rep["agent_messages"]), rep["turns_per_decision"],
+    print("  \033[1mcost per human decision   %s\033[0m" %
+          ("$%.2f" % rep["per_decision"] if rep["per_decision"] is not None else "n/a"))
+    print("\n  %s usage records · %s per decision · %s tokens · %d sessions"
+          % (_hm(rep["agent_messages"]),
+             "%.0f" % rep["turns_per_decision"] if rep["turns_per_decision"] is not None else "n/a",
              _hm(rep["tokens"].get("total", 0)), rep["sessions"]))
-    print("  \033[2m%s raw `type: user` records in the same window. dividing by those"
-          " instead\n  would read $%.2f, %.1fx too cheap.\033[0m"
-          % (_hm(rep["raw_user_turns"]), rep["usd"] / rep["raw_user_turns"],
-             rep["gate_factor"]))
+    if rep["raw_user_turns"] and rep["gate_factor"] is not None:
+        print("  \033[2m%s raw user records in the same window. dividing by those"
+              " instead\n  would read $%.2f, %.1fx too cheap.\033[0m"
+              % (_hm(rep["raw_user_turns"]), rep["usd"] / rep["raw_user_turns"],
+                 rep["gate_factor"]))
     if rep["unpriced_messages"]:
         print("  \033[33m%d message(s) unpriced (%s tokens): model not in the price table\033[0m"
               % (rep["unpriced_messages"], _hm(rep["unpriced_tokens"])))
@@ -1179,13 +1328,13 @@ def cmd_cost(args):
     for model, m in sorted(rep["by_model"].items(), key=lambda kv: -kv[1]["usd"])[:8]:
         tag = "$%8.2f" % m["usd"] if m["priced"] else "unpriced"
         print("  %10s  %-18s %5d msg  %6s tok" % (tag, model[:18], m["messages"], _hm(m["tokens"])))
-    rows = [(r, v) for r, v in rep["by_repo"].items() if v["decisions"]]
+    rows = list(rep["by_repo"].items())
     if rows:
-        print("\n\033[1mby repo\033[0m  \033[2m(spend attributed by the cwd of each turn)\033[0m")
-        for repo, v in sorted(rows, key=lambda kv: -kv[1]["usd"])[:8]:
-            per = "$%.2f" % (v["usd"] / v["decisions"])
+        print("\n\033[1mby folder\033[0m  \033[2m(Codex uses session_meta.cwd)\033[0m")
+        for repo, v in sorted(rows, key=lambda kv: -kv[1]["usd"]):
+            per = "$%.2f" % (v["usd"] / v["decisions"]) if v["decisions"] else "n/a"
             print("  %8s  %3d decisions  %8s / decision  \033[36m%s\033[0m"
-                  % ("$%.2f" % v["usd"], v["decisions"], per, repo[:28]))
+                  % ("$%.2f" % v["usd"], v["decisions"], per, repo))
     print("\n\033[2mno cost field exists in a transcript. these are list-price equivalents"
           " for the tokens spent.\n  on a subscription you did not pay this; it is the"
           " comparable unit, same as ccusage.\033[0m")
