@@ -78,9 +78,10 @@ def cmd_replay(args, paths):
         # A path that is not a file must not fall through to a word search:
         # 0.3.1 answered `replay /nonexistent/session.jsonl` with "No matching
         # human session found". Words from a request contain spaces; a path does not.
+        # A bare `package.json` stays a word search: `.jsonl` is the transcript ending.
         path_shaped = (" " not in target and not temp and not bound_hash
                        and (os.sep in target or target.startswith("~")
-                            or target.endswith((".jsonl", ".json"))))
+                            or target.endswith(".jsonl")))
         if path_shaped and not is_path and source_line is None:
             print("No transcript file at " + safe_text(expanded) + ".")
             if os.path.isdir(expanded):

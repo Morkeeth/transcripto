@@ -41,6 +41,11 @@ class ColdPaths(unittest.TestCase):
         self.assertIn("--root", r.stdout)
         self.assertNotIn("No matching human session", r.stdout)
 
+    def test_replay_bare_json_name_is_a_word_search(self):
+        run(self.home, "import-example")
+        r = run(self.home, "replay", "package.json")
+        self.assertNotIn("No transcript file", r.stdout)
+
     def test_replay_words_with_a_slash_still_search(self):
         r = run(self.home, "replay", "fix src/app.py please")
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
