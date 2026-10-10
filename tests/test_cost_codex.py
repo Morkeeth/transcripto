@@ -118,6 +118,22 @@ class CodexCostTest(unittest.TestCase):
         self.assertEqual(len(rep["incomplete_files"]), 1)
         self.assertIn("oversized", rep["incomplete_files"][0]["reason"])
 
+    def test_oversize_tool_output_is_skipped_without_losing_usage_or_decision(self):
+        self.rollout("tool-output.jsonl", "/tmp/project", [
+            record("turn_context", {"model": "gpt-6-sol"}),
+            record("response_item", {"type": "message", "role": "user", "content": "Fix it"}),
+            record("response_item", {"type": "function_call_output", "call_id": "call-1",
+                                     "output": "x" * 1000}),
+            counter(1000, 200, 100),
+        ])
+        with mock.patch.object(transcripto_core, "MAX_LINE_BYTES", 400):
+            rep = transcripto.collect_cost(0, [str(self.root)])
+        self.assertEqual(rep["incomplete_files"], [])
+        self.assertEqual(rep["decisions"], 1)
+        self.assertAlmostEqual(rep["usd"], 0.00264)
+        self.assertEqual(rep["skipped_irrelevant_records"][0]["records"], 1)
+        self.assertEqual(rep["skipped_irrelevant_records"][0]["types"], ["function_call_output"])
+
 
 if __name__ == "__main__":
     unittest.main()

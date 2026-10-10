@@ -2,7 +2,7 @@
 
 ## 0.3.1 · Codex cost by session folder
 
-- `cost` now prices recorded Codex token counters alongside Claude Code. It groups each Codex session by `session_meta.cwd`, counts typed turns through the replay authorship filter, labels a session started in the home directory `(home folder, no project)`, and shows folders with zero typed decisions as `n/a` per decision. Large Codex rollouts stream with an 8 MiB line limit; an unreadable file is excluded and named in an `INCOMPLETE` warning.
+- `cost` now prices recorded Codex token counters alongside Claude Code. It groups each Codex session by `session_meta.cwd`, counts typed turns through the replay authorship filter, labels a session started in the home directory `(home folder, no project)`, and shows folders with zero typed decisions as `n/a` per decision. Large Codex rollouts stream with an 8 MiB line limit. Oversized compaction and tool-output records are skipped and counted separately; any other oversized record makes the file `INCOMPLETE` and excludes it from totals.
 - Dollar figures are standard short-context API equivalents from the model price table, not subscription charges. Unrecognised models remain unpriced. Codex rollout counters do not record service tier or enough per-request detail to price long-context requests exactly.
 
 

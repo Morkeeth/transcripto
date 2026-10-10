@@ -39,7 +39,8 @@ def text_of(value):
     return ""
 
 
-def iter_json(path, diagnostics=None, allow_large=False):
+def iter_json(path, diagnostics=None, allow_large=False,
+              classify_oversized=None, ignored_oversized=None):
     counts = {"invalid": 0, "oversize": 0}
     try:
         with open(path, "rb") as f:
@@ -52,9 +53,16 @@ def iter_json(path, diagnostics=None, allow_large=False):
                     break
                 line_no += 1
                 if len(raw) > MAX_LINE_BYTES:
+                    prefix = raw[:2048]
+                    size = len(raw)
                     while raw and not raw.endswith(b"\n"):
                         raw = f.readline(MAX_LINE_BYTES + 1)
-                    counts["oversize"] += 1
+                        size += len(raw)
+                    category = classify_oversized(prefix) if classify_oversized else None
+                    if category and ignored_oversized is not None:
+                        ignored_oversized.append({"line": line_no, "bytes": size, "type": category})
+                    else:
+                        counts["oversize"] += 1
                     continue
                 if not raw.strip():
                     continue

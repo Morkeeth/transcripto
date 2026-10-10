@@ -195,7 +195,8 @@ grouped by the session's recorded working directory; the home directory appears
 as `(home folder, no project)`. Folders with spend and no typed decisions still
 appear, with `n/a` cost per decision. Dollar figures use standard short-context
 API prices, not subscription charges. Unknown models stay unpriced.
-The command names any Codex file it cannot read and marks the total
+Oversized compaction and tool-output records are counted as skipped. The command
+names any Codex file with an oversized usage or user record and marks the total
 `INCOMPLETE`; it does not silently count that file as zero.
 
 ```sh

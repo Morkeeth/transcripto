@@ -1084,6 +1084,29 @@ def _cost_folder(cwd, fallback=""):
     return "(home folder, no project)" if path == os.path.normpath(HOME) else path
 
 
+def _codex_irrelevant_oversize(prefix):
+    """Classify only headers that prove an oversized line cannot affect cost.
+
+    The first 2 KiB must expose top-level type and the start of payload. Any
+    other shape (especially token_count or a user message) fails closed.
+    """
+    header_match = re.match(rb'^\s*\{\s*"timestamp"\s*:\s*"[^"]*"\s*,', prefix)
+    marker = re.search(rb',\s*"payload"\s*:\s*\{', prefix)
+    if not header_match or not marker:
+        return None
+    header = prefix[:marker.start()]
+    top = re.search(rb'(?:^|,)\s*"type"\s*:\s*"([^"]+)"\s*$', header)
+    if not top:
+        return None
+    if top.group(1) == b"compacted":
+        return "compacted"
+    if top.group(1) != b"response_item":
+        return None
+    payload = prefix[marker.end():]
+    output = re.match(rb'\s*"type"\s*:\s*"(function_call_output|custom_tool_call_output)"\s*,', payload)
+    return output.group(1).decode("ascii") if output else None
+
+
 def _codex_cost_events(path, cut_iso):
     """One Codex rollout: yield measured usage deltas and typed user turns.
 
@@ -1096,7 +1119,10 @@ def _codex_cost_events(path, cut_iso):
     previous = {}
     events = []
     diagnostics = []
-    for d in core.iter_json(path, diagnostics, allow_large=True):
+    ignored = []
+    for d in core.iter_json(path, diagnostics, allow_large=True,
+                            classify_oversized=_codex_irrelevant_oversize,
+                            ignored_oversized=ignored):
         kind, payload = d.get("type"), d.get("payload") or {}
         if kind == "session_meta":
             cwd = payload.get("cwd") or ""
@@ -1120,7 +1146,7 @@ def _codex_cost_events(path, cut_iso):
             ts = d.get("timestamp") or ""
             if (not cut_iso or not ts or ts[:19] >= cut_iso[:19]) and any(delta.values()):
                 events.append(("usage", ts, model, delta))
-    return _cost_folder(cwd, "(unknown folder)"), events, diagnostics
+    return _cost_folder(cwd, "(unknown folder)"), events, diagnostics, ignored
 
 
 def collect_cost(days=30, roots=None):
@@ -1136,7 +1162,7 @@ def collect_cost(days=30, roots=None):
     rep = {"days": days, "usd": 0.0, "decisions": 0, "raw_user_turns": 0, "agent_messages": 0,
            "unpriced_messages": 0, "unpriced_tokens": 0, "sessions": set(),
            "by_model": {}, "by_repo": {}, "tokens": {}, "first_ts": "", "last_ts": "",
-           "incomplete_files": []}
+           "incomplete_files": [], "skipped_irrelevant_records": []}
     final = {}   # message key -> (total, model, usage, ts, repo), the largest record wins
     for root in roots:
         for f in sorted(glob.glob(os.path.join(root, "**", "*.jsonl"), recursive=True)):
@@ -1148,7 +1174,12 @@ def collect_cost(days=30, roots=None):
             first_diagnostics = []
             first = next(core.iter_json(f, first_diagnostics, allow_large=True), {})
             if first.get("type") == "session_meta":
-                folder, events, diagnostics = _codex_cost_events(f, cut_iso)
+                folder, events, diagnostics, ignored = _codex_cost_events(f, cut_iso)
+                if ignored:
+                    rep["skipped_irrelevant_records"].append({
+                        "path": f, "records": len(ignored),
+                        "bytes": sum(item["bytes"] for item in ignored),
+                        "types": sorted({item["type"] for item in ignored})})
                 if first_diagnostics or diagnostics:
                     rep["incomplete_files"].append({"path": f,
                                                     "reason": "; ".join(first_diagnostics + diagnostics)})
@@ -1268,6 +1299,11 @@ def cmd_cost(args):
               % len(rep["incomplete_files"]))
         for item in rep["incomplete_files"]:
             print("  \033[31m%s: %s\033[0m" % (item["path"], item["reason"]))
+    if rep["skipped_irrelevant_records"]:
+        skipped = rep["skipped_irrelevant_records"]
+        print("  \033[2mskipped %d oversized Codex compaction/tool-output record(s)"
+              " in %d file(s); usage and typed turns remain counted.\033[0m"
+              % (sum(item["records"] for item in skipped), len(skipped)))
     if not rep["decisions"]:
         print("  no turns you typed in this window. widen it with --days.")
     print("  API-equivalent spend      \033[1m$%s\033[0m" % format(rep["usd"], ",.2f"))
