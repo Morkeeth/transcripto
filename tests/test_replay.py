@@ -543,7 +543,8 @@ class CLITests(FixtureCase):
         self.read([user('deletedneedle')])
         self.assertIn('1 message you typed', self.run_cli('ask','deletedneedle','--root',str(self.root)).stdout)
         (self.root/'session.jsonl').unlink()
-        self.assertIn('nothing about', self.run_cli('ask','deletedneedle','--root',str(self.root)).stdout)
+        # The only transcript is gone, so the refreshed index is empty and says so.
+        self.assertIn('No transcripts indexed', self.run_cli('ask','deletedneedle','--root',str(self.root)).stdout)
 
     def test_harness_filters_mixed_root_for_search_and_replay(self):
         self.read([user('sharedneedle Claude')], 'claude.jsonl')
