@@ -1,5 +1,11 @@
 # Changes
 
+## 0.3.1 · Codex cost by session folder
+
+- `cost` now prices recorded Codex token counters alongside Claude Code. It groups each Codex session by `session_meta.cwd`, labels a session started in the home directory `(home folder, no project)`, and shows folders with zero typed decisions as `n/a` per decision.
+- Dollar figures are standard short-context API equivalents from the model price table, not subscription charges. Unrecognised models remain unpriced. Codex rollout counters do not record service tier or enough per-request detail to price long-context requests exactly.
+
+
 ## 0.3.0 · cost you can trust, optional network detector
 
 - `cost` counts each Claude message at its final streamed record, not its first.
