@@ -775,6 +775,18 @@ def cmd_ask(args):
     if not rows:
         if examples:
             return 0
+        # An empty index is not a history with no hits. 0.3.1 told a stranger with
+        # no transcripts "nothing about 'retry' in the selected history".
+        try:
+            indexed = con.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+        except sqlite3.OperationalError:
+            indexed = 0
+        if not indexed:
+            print("No transcripts indexed from: "
+                  + ", ".join(r.replace(HOME, "~") for r in ROOTS) + ".")
+            print("Nothing to search yet. Try `%s import-example` for a synthetic trace, "
+                  "or --root <dir> to point at your transcript folder." % PROG)
+            return 2
         # Did the topic exist at all (just not in the operator's words)? Say so honestly.
         try:
             any_hit = con.execute(
