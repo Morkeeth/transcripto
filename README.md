@@ -40,6 +40,53 @@ not whether the task was done correctly.
 Or install with `python3 -m pip install transcripto==0.3.1`, then run
 `transcripto ask "retry"`. Requires Python 3.9 or newer.
 
+## Why save the transcript?
+
+The final answer is only the neat ending. The transcript keeps the route: what
+you asked, which files and commands the agent touched, what failed, what you
+corrected, and what you later changed your mind about.
+
+That record is useful when you need to:
+
+- recover a decision without reconstructing it from memory;
+- check the work behind an agent's confident summary;
+- find an abandoned idea or repeated request across projects; or
+- carry one exact request and its recorded outcome into another harness.
+
+It is also sensitive. A transcript can contain source code, shell output, local
+paths, email addresses, private prompts, and secrets that appeared in a command
+or tool result. Treat it like a development log, not a harmless chat export.
+Transcripto does not encrypt or redact your source transcripts. Search also
+copies searchable text and file metadata into `~/.trace/trace.db`. The default
+commands make no network request, but terminal output and exported handoffs can
+repeat private text, so inspect them before sharing.
+
+### What exists depends on where the agent ran
+
+Desktop and mobile are sometimes only control surfaces. The useful question is
+whether the run happened on this computer or in a provider's cloud.
+
+| Setup | Where the record lives and how long | What Transcripto can reach |
+|---|---|---|
+| Claude Code on this computer | Plaintext JSONL under `~/.claude/projects/`. Claude Code cleans local sessions after 30 days by default; `cleanupPeriodDays` changes that. Sessions started or most recently continued in Claude Desktop or Cowork are exempt from that local limit by default. | Supported files that are still present. |
+| Codex CLI or a local/worktree Codex chat in the desktop app | `$CODEX_HOME/sessions` and `$CODEX_HOME/archived_sessions` (normally `~/.codex/...`). OpenAI documents no fixed age limit for these files: archiving keeps a transcript; deleting removes it. The separate `history.persistence` and `history.max_bytes` settings control `history.jsonl`. | Sessions and archived sessions that are still present. |
+| Cursor Agent on this computer | Supported JSONL records under `~/.cursor/projects/*/agent-transcripts/`. Cursor builds a local transcript search index, but does not state a fixed local lifetime in its Agent documentation. | Supported records that are still present. Some Cursor exports omit tool results, so those outcomes stay unknown. |
+| Claude cloud sessions | Anthropic stores the transcript. Consumer retention is 30 days when model-improvement use is off and 5 years when it is on; commercial standard retention is 30 days, with zero-data-retention available to qualified organizations. | Not the provider-side copy. A local run only sees supported local files. |
+| Codex Cloud, including tasks opened from web or mobile | The task runs in an isolated cloud workspace and follows the ChatGPT workspace's retention policy. There is no single retention period across plans and workspace settings. | Not the cloud task. Transcripto has no OpenAI account or cloud-history connection. |
+| Cursor Cloud Agents | Conversation state is stored in Cursor's backend indefinitely by default, deletable on demand; eligible Enterprise teams can set a retention window. | Not the cloud transcript. Transcripto has no Cursor account or cloud-history connection. |
+
+Sources: [Claude Code data usage](https://code.claude.com/docs/en/data-usage),
+[Codex local transcript paths](https://learn.chatgpt.com/docs/reference/troubleshooting),
+[Codex history controls](https://learn.chatgpt.com/docs/config-file/config-advanced),
+[Codex local and cloud modes](https://learn.chatgpt.com/docs/environments/modes),
+[Cursor Agent](https://cursor.com/docs/agent/overview), and
+[Cursor Cloud Agent security](https://cursor.com/docs/cloud-agent/security).
+
+Transcripto is a reader, not a backup service. It cannot recover a file the
+original product deleted, fetch a cloud-only conversation, or prove that a
+recorded successful command produced a correct result. If the history matters,
+set the original harness's retention deliberately and keep a protected backup.
+
 ## Try the stranger flow without your transcripts
 
 The bundled public example is synthetic. It works in an isolated home and does
