@@ -352,7 +352,7 @@ Malformed records and unreadable files produce diagnostics. Search indexes the
 valid records of partially malformed files and repeats the warning on later
 queries until the source is repaired. A wholly unreadable file keeps any prior
 indexed copy, with an explicit warning; replay always reads the source. Files larger than
-128 MiB are skipped before parsing; lines larger than 8 MiB are discarded as
+1 GiB are skipped before parsing (set `TRANSCRIPTO_MAX_FILE_MIB` to change it); lines larger than 8 MiB are discarded as
 whole records. Split larger files into smaller JSONL files to inspect them.
 Individual displayed text fields are bounded at 16,000 characters. Replay's
 source references let you inspect the original. Terminal control sequences are

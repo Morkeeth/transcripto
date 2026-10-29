@@ -715,7 +715,7 @@ def cmd_search(args):
         rows = con.execute(
             "SELECT m.ts,m.project,m.role,m.is_human,m.cwd,"
             " snippet(messages_fts,0,'\033[1m','\033[0m','…',14)"
-            " FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid"
+            " FROM messages_fts CROSS JOIN messages m ON m.id=messages_fts.rowid"
             " WHERE messages_fts MATCH ?"
             " ORDER BY m.is_human DESC, m.ts DESC LIMIT ?",
             (_match(args.query), args.limit)).fetchall()
@@ -752,7 +752,7 @@ def cmd_ask(args):
     con = connect()
     examples = con.execute(
         "SELECT m.text,m.session_file,m.source_line FROM messages_fts "
-        "JOIN messages m ON m.id=messages_fts.rowid "
+        "CROSS JOIN messages m ON m.id=messages_fts.rowid "
         "WHERE messages_fts MATCH ? AND m.synthetic=1 AND m.prompt_source IN ('typed','queued') "
         "ORDER BY m.ts DESC LIMIT ?", (_match(args.query), args.limit)).fetchall()
     if examples:
@@ -766,7 +766,7 @@ def cmd_ask(args):
         rows = con.execute(
             "SELECT m.id,m.ts,m.project,m.cwd,m.session_id,m.text,m.session_file,m.source_line,"
             " snippet(messages_fts,0,'\033[1m','\033[0m','…',16)"
-            " FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid"
+            " FROM messages_fts CROSS JOIN messages m ON m.id=messages_fts.rowid"
             " WHERE messages_fts MATCH ? AND m.is_human=1"
             " ORDER BY m.ts DESC LIMIT ?",
             (_match(args.query), args.limit)).fetchall()
@@ -790,7 +790,7 @@ def cmd_ask(args):
         # Did the topic exist at all (just not in the operator's words)? Say so honestly.
         try:
             any_hit = con.execute(
-                "SELECT COUNT(*) FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid WHERE messages_fts MATCH ?",
+                "SELECT COUNT(*) FROM messages_fts CROSS JOIN messages m ON m.id=messages_fts.rowid WHERE messages_fts MATCH ?",
                 (_match(args.query),)).fetchone()[0]
         except sqlite3.OperationalError:
             any_hit = 0
@@ -806,7 +806,7 @@ def cmd_ask(args):
     # ---- rollup: the arc across ALL your matches, not just the shown page ----
     allm = con.execute(
         "SELECT m.ts,m.project,m.cwd,m.session_id"
-        " FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid"
+        " FROM messages_fts CROSS JOIN messages m ON m.id=messages_fts.rowid"
         " WHERE messages_fts MATCH ? AND m.is_human=1",
         (_match(args.query),)).fetchall()
     total = len(allm)
