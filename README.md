@@ -1,10 +1,10 @@
 # Transcripto
 
-**You might already be keeping a journal. Read your side of it.**
-
-Your agent transcripts contain what you asked for, what you changed your mind
-about, and what you kept coming back to. Transcripto helps you find those words
-and read the recorded work around them.
+**Transcripto replays what your coding agent actually did, so you read the record instead of trusting the summary.**
+Agent transcripts hold what you asked for, what you changed your mind about, and what each tool really returned, but the raw files are hard to read.
+For anyone who works with coding agents and wants to find an earlier request and check what happened to it.
+Search your own words, reopen the exact request, and replay the tool calls in order: failed edits stay failed and missing results stay unknown.
+Try it: `uvx --from transcripto==0.3.1 transcripto ask "retry"`
 
 Claude Code · Codex · Cursor. Local files. No account. No runtime dependencies.
 
