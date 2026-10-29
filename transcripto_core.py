@@ -10,7 +10,18 @@ import shlex
 import sys
 from datetime import datetime, timedelta, timezone
 
-MAX_FILE_BYTES = 128 * 1024 * 1024
+def _file_cap_mib(default=1024):
+    """Whole-file safety cap in MiB, from TRANSCRIPTO_MAX_FILE_MIB. Records are read line by line under
+    MAX_LINE_BYTES, so the cap bounds indexing time, not line memory. 128 MiB skipped whole long-running
+    agent sessions, and with them every typed turn they held. A bad or non-positive value keeps the default."""
+    try:
+        value = int(os.environ.get("TRANSCRIPTO_MAX_FILE_MIB", default))
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+MAX_FILE_BYTES = _file_cap_mib() * 1024 * 1024
 MAX_LINE_BYTES = 8 * 1024 * 1024
 MAX_TEXT = 16000
 WRITES = {"Write", "Edit", "MultiEdit", "NotebookEdit", "StrReplace", "apply_patch"}
@@ -45,7 +56,7 @@ def iter_json(path, diagnostics=None, allow_large=False,
     try:
         with open(path, "rb") as f:
             if not allow_large and os.fstat(f.fileno()).st_size > MAX_FILE_BYTES:
-                raise ValueError("file exceeds 128 MiB safety limit; split it into smaller JSONL files")
+                raise ValueError("file exceeds %d MiB safety limit; split it into smaller JSONL files" % (MAX_FILE_BYTES // (1024 * 1024)))
             line_no = 0
             while True:
                 raw = f.readline(MAX_LINE_BYTES + 1)

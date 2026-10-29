@@ -231,7 +231,7 @@ class TranscriptTests(FixtureCase):
         warnings = []
         rows, _ = core.read_session(str(p), warnings)
         self.assertEqual(rows, [])
-        self.assertIn('128 MiB', warnings[0])
+        self.assertIn('MiB safety limit', warnings[0])
 
     def test_oversized_line_discarded_not_split_into_records(self):
         p = self.root / 'line.jsonl'
