@@ -43,11 +43,12 @@ Or install with `python3 -m pip install transcripto==0.3.1`, then run
 ## Try the stranger flow without your transcripts
 
 The bundled public example is synthetic. It works in an isolated home and does
-not depend on agent dotfiles:
+not depend on agent dotfiles. From a clone, replace `transcripto==0.3.1` with `.`
+to test your checkout:
 
 ```sh
 INSTALL="$(mktemp -d)"
-python3 -m pip install --no-deps --no-build-isolation --target "$INSTALL" .
+python3 -m pip install --no-deps --target "$INSTALL" transcripto==0.3.1
 export HOME="$(mktemp -d)"
 transcripto() { PYTHONPATH="$INSTALL" python3 -m transcripto "$@"; }
 
